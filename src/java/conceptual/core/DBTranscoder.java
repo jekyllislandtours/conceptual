@@ -38,13 +38,30 @@ public class DBTranscoder {
     /** Constant <code>VERSION=1</code> */
     public static final int VERSION = 1;
 
-    enum Type {
-        NULL, STRING, KEYWORD, INT, LONG, FLOAT, DOUBLE, CHARACTER, BOOLEAN,
-        DATE, INSTANT, CLASS, STRING_ARRAY, KEYWORD_ARRAY, INT_ARRAY,
-        LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BOOLEAN_ARRAY,
-        CHARACTER_ARRAY, DATE_ARRAY, INSTANT_ARRAY, EDN}
-
-    static Type[] typeArray = Type.values();
+    // NOTE: enums do not version well
+    public static final int NULL = 0;
+    public static final int STRING = 1;
+    public static final int KEYWORD = 2;
+    public static final int INT = 3;
+    public static final int LONG = 4;
+    public static final int FLOAT = 5;
+    public static final int DOUBLE = 6;
+    public static final int CHARACTER = 7;
+    public static final int BOOLEAN = 8;
+    public static final int DATE = 9;
+    public static final int INSTANT = 10;
+    public static final int CLASS = 11;
+    public static final int STRING_ARRAY = 12;
+    public static final int KEYWORD_ARRAY = 13;
+    public static final int INT_ARRAY = 14;
+    public static final int LONG_ARRAY = 15;
+    public static final int FLOAT_ARRAY = 16;
+    public static final int DOUBLE_ARRAY = 17;
+    public static final int BOOLEAN_ARRAY = 18;
+    public static final int CHARACTER_ARRAY = 19;
+    public static final int DATE_ARRAY = 20;
+    public static final int INSTANT_ARRAY = 21;
+    public static final int EDN = 22;
 
     public static String nsname(Keyword k) {
         if (k.getNamespace() != null) {
@@ -357,10 +374,10 @@ public class DBTranscoder {
         if (val != null) {
             Class<?> clazz = val.getClass();
             if (clazz == String.class) {
-                dos.writeInt(Type.STRING.ordinal());
+                dos.writeInt(STRING);
                 dos.writeUTF((String) val);
             } else if (clazz == Keyword.class) { // relation
-                dos.writeInt(Type.KEYWORD.ordinal());
+                dos.writeInt(KEYWORD);
                 Keyword key = ((Keyword) val);
                 String ns = key.getNamespace();
                 if (ns != null) {
@@ -369,13 +386,13 @@ public class DBTranscoder {
                     dos.writeUTF(key.getName());
                 }
             } else if (clazz == Integer.class) { // relation
-                dos.writeInt(Type.INT.ordinal());
+                dos.writeInt(INT);
                 dos.writeInt((Integer) val);
             } else if (clazz == Double.class) {
-                dos.writeInt(Type.DOUBLE.ordinal());
+                dos.writeInt(DOUBLE);
                 dos.writeDouble((Double) val);
             } else if (clazz == int[].class) { // relation
-                dos.writeInt(Type.INT_ARRAY.ordinal());
+                dos.writeInt(INT_ARRAY);
                 int[] data = (int[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -386,28 +403,28 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             } else if (clazz == Long.class) {
-                dos.writeInt(Type.LONG.ordinal());
+                dos.writeInt(LONG);
                 dos.writeLong((Long) val);
             } else if (clazz == Float.class) {
-                dos.writeInt(Type.FLOAT.ordinal());
+                dos.writeInt(FLOAT);
                 dos.writeFloat((Float) val);
             } else if (clazz == Boolean.class) {
-                dos.writeInt(Type.BOOLEAN.ordinal());
+                dos.writeInt(BOOLEAN);
                 dos.writeBoolean((Boolean) val);
             } else if (clazz == Character.class) {
-                dos.writeInt(Type.CHARACTER.ordinal());
+                dos.writeInt(CHARACTER);
                 dos.writeChar((Character) val);
             } else if (clazz == Date.class) { // purposefully normalizing on joda time
-                dos.writeInt(Type.INSTANT.ordinal());
+                dos.writeInt(INSTANT);
                 dos.writeLong(((Date) val).getTime());
             } else if (clazz == Instant.class) {
-                dos.writeInt(Type.INSTANT.ordinal());
+                dos.writeInt(INSTANT);
                 dos.writeLong(((Instant) val).toEpochMilli());
             } else if (clazz == java.sql.Timestamp.class) { // purposefully normalizing on joda time
-                dos.writeInt(Type.INSTANT.ordinal());
+                dos.writeInt(INSTANT);
                 dos.writeLong(((Date) val).getTime());
             } else if (clazz == java.lang.Class.class) {
-                dos.writeInt(Type.CLASS.ordinal());
+                dos.writeInt(CLASS);
                 if (val == java.sql.Timestamp.class ||
                     val == java.util.Date.class) {
                     dos.writeUTF(java.time.Instant.class.getName());
@@ -415,7 +432,7 @@ public class DBTranscoder {
                     dos.writeUTF(((Class) val).getName());
                 }
             } else if (clazz == String[].class) {
-                dos.writeInt(Type.STRING.ordinal());
+                dos.writeInt(STRING);
                 String[] data = (String[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -426,7 +443,7 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             } else if (clazz == double[].class) {
-                dos.writeInt(Type.DOUBLE_ARRAY.ordinal());
+                dos.writeInt(DOUBLE_ARRAY);
                 double[] data = (double[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -437,7 +454,7 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             } else if (clazz == boolean[].class) {
-                dos.writeInt(Type.BOOLEAN_ARRAY.ordinal());
+                dos.writeInt(BOOLEAN_ARRAY);
                 boolean[] data = (boolean[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -448,7 +465,7 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             } else if (clazz == long[].class) {
-                dos.writeInt(Type.LONG_ARRAY.ordinal());
+                dos.writeInt(LONG_ARRAY);
                 long[] data = (long[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -459,7 +476,7 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             } else if (clazz == char[].class) {
-                dos.writeInt(Type.CHARACTER_ARRAY.ordinal());
+                dos.writeInt(CHARACTER_ARRAY);
                 char[] data = (char[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -470,7 +487,7 @@ public class DBTranscoder {
                     dos.writeInt(0);
                 }
             }  else if (clazz == Instant[].class) {
-                dos.writeInt(Type.INSTANT_ARRAY.ordinal());
+                dos.writeInt(INSTANT_ARRAY);
                 Instant[] data = (Instant[]) val;
                 if (data != null) {
                     dos.writeInt(data.length);
@@ -494,7 +511,7 @@ public class DBTranscoder {
                 throw new IOException("Could not encode unknown type: " + clazz.getName() + ", val: " + val);
             }
         } else {
-            dos.writeInt(Type.NULL.ordinal());
+            dos.writeInt(NULL);
         }
     }
 
@@ -523,7 +540,7 @@ public class DBTranscoder {
     }
 
     public static void encodeEDN(final DataOutputStream dos, final Object val) throws IOException {
-        dos.writeInt(Type.EDN.ordinal());
+        dos.writeInt(EDN);
         String data = (String) clojureStr.invoke(val);
         String[] chunks = chunkString(data, MAX_UTF_LENGTH);
         if (chunks != null) {
@@ -537,7 +554,7 @@ public class DBTranscoder {
     }
 
     public static void encodeEDNString(final DataOutputStream dos, final Object val) throws IOException {
-        dos.writeInt(Type.EDN.ordinal());
+        dos.writeInt(EDN);
         String data = (String) clojureStr.invoke(val);
         String[] chunks = chunkString(data, MAX_UTF_LENGTH);
         if (chunks != null) {
@@ -597,8 +614,7 @@ public class DBTranscoder {
     }
 
     public static Object decodeVal(final DataInputStream dis) throws IOException {
-        int ordinal = dis.readInt();
-        Type type = typeArray[ordinal];
+        int type = dis.readInt();
         switch (type) {
             case INT: {
                 return dis.readInt();
