@@ -16,10 +16,11 @@ import clojure.lang.PersistentTreeSet;
 import clojure.lang.PersistentVector;
 import clojure.java.api.Clojure;
 
+import conceptual.util.IntArrayPool;
+
 import java.io.*;
 
-import org.joda.time.DateTime;
-import conceptual.util.IntArrayPool;
+import java.time.Instant;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -28,16 +29,20 @@ import java.util.Map;
 
 public class DBTranscoder {
 
-    public static final IFn clojureReadString = Clojure.var("clojure.core", "read-string");
+    public static final IFn clojureReadString = Clojure.var("clojure.edn", "read-string");
     public static final IFn clojureStr = Clojure.var("clojure.core", "str");
+
+    public static final IFn nippyFreeze = Clojure.var("taoensso.nippy", "freeze");
+    public static final IFn nippyThaw = Clojure.var("taoensso.nippy", "thaw");
 
     /** Constant <code>VERSION=1</code> */
     public static final int VERSION = 1;
 
     enum Type {
-        NULL, STRING, KEYWORD, INT, LONG, FLOAT, DOUBLE, CHARACTER, BOOLEAN, DATE, DATETIME, CLASS,
-        STRING_ARRAY, KEYWORD_ARRAY, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BOOLEAN_ARRAY,
-        CHARACTER_ARRAY, DATE_ARRAY, DATETIME_ARRAY, EDN}
+        NULL, STRING, KEYWORD, INT, LONG, FLOAT, DOUBLE, CHARACTER, BOOLEAN,
+        DATE, INSTANT, CLASS, STRING_ARRAY, KEYWORD_ARRAY, INT_ARRAY,
+        LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BOOLEAN_ARRAY,
+        CHARACTER_ARRAY, DATE_ARRAY, INSTANT_ARRAY, EDN}
 
     static Type[] typeArray = Type.values();
 
@@ -347,6 +352,7 @@ public class DBTranscoder {
         return bos.toByteArray();
     }
 
+    // TODO: missing DATETIME_ARRAY, INSTANT_ARRAY
     public static void encodeVal(final DataOutputStream dos, final Object val) throws IOException {
         if (val != null) {
             Class<?> clazz = val.getClass();
@@ -392,19 +398,19 @@ public class DBTranscoder {
                 dos.writeInt(Type.CHARACTER.ordinal());
                 dos.writeChar((Character) val);
             } else if (clazz == Date.class) { // purposefully normalizing on joda time
-                dos.writeInt(Type.DATETIME.ordinal());
+                dos.writeInt(Type.INSTANT.ordinal());
                 dos.writeLong(((Date) val).getTime());
-            } else if (clazz == DateTime.class) {
-                dos.writeInt(Type.DATETIME.ordinal());
-                dos.writeLong(((DateTime) val).getMillis());
+            } else if (clazz == Instant.class) {
+                dos.writeInt(Type.INSTANT.ordinal());
+                dos.writeLong(((Instant) val).toEpochMilli());
             } else if (clazz == java.sql.Timestamp.class) { // purposefully normalizing on joda time
-                dos.writeInt(Type.DATETIME.ordinal());
+                dos.writeInt(Type.INSTANT.ordinal());
                 dos.writeLong(((Date) val).getTime());
             } else if (clazz == java.lang.Class.class) {
                 dos.writeInt(Type.CLASS.ordinal());
                 if (val == java.sql.Timestamp.class ||
                     val == java.util.Date.class) {
-                    dos.writeUTF(org.joda.time.DateTime.class.getName());
+                    dos.writeUTF(java.time.Instant.class.getName());
                 } else {
                     dos.writeUTF(((Class) val).getName());
                 }
@@ -459,6 +465,17 @@ public class DBTranscoder {
                     dos.writeInt(data.length);
                     for (int j = 0; j < data.length; j++) {
                         dos.writeChar(data[j]);
+                    }
+                } else {
+                    dos.writeInt(0);
+                }
+            }  else if (clazz == Instant[].class) {
+                dos.writeInt(Type.INSTANT_ARRAY.ordinal());
+                Instant[] data = (Instant[]) val;
+                if (data != null) {
+                    dos.writeInt(data.length);
+                    for (int j = 0; j < data.length; j++) {
+                        dos.writeLong(data[j].toEpochMilli());
                     }
                 } else {
                     dos.writeInt(0);
@@ -519,7 +536,39 @@ public class DBTranscoder {
         }
     }
 
+    public static void encodeEDNString(final DataOutputStream dos, final Object val) throws IOException {
+        dos.writeInt(Type.EDN.ordinal());
+        String data = (String) clojureStr.invoke(val);
+        String[] chunks = chunkString(data, MAX_UTF_LENGTH);
+        if (chunks != null) {
+            dos.writeInt(chunks.length);
+            for (int i=0; i < chunks.length; i++) {
+                dos.writeUTF(chunks[i]);
+            }
+        } else {
+            dos.writeInt(0);
+        }
+    }
+
     public static Object decodeEDN(final DataInputStream dis) throws IOException {
+        Object result = null;
+        int length = dis.readInt();
+        StringBuilder builder = new StringBuilder();
+        for (int i=0; i < length; i++) {
+            builder.append(dis.readUTF());
+        }
+        String edn = builder.toString();
+        try {
+            if (edn != null && !edn.equals(""))
+                result = clojureReadString.invoke(builder.toString());
+        } catch (Exception e) {
+            System.out.println("ERROR reading EDN:" + e.getMessage() + "\n\n" +
+                               builder.toString());
+        }
+        return result;
+    }
+
+    public static Object decodeEDNString(final DataInputStream dis) throws IOException {
         Object result = null;
         int length = dis.readInt();
         StringBuilder builder = new StringBuilder();
@@ -565,8 +614,8 @@ public class DBTranscoder {
             case STRING: {
                 return dis.readUTF();
             }
-            case DATETIME: {
-                return new DateTime(dis.readLong());
+            case INSTANT: {
+                return Instant.ofEpochMilli(dis.readLong());
             }
             case DOUBLE: {
                 return dis.readDouble();
@@ -587,7 +636,7 @@ public class DBTranscoder {
                 return dis.readBoolean();
             }
             case DATE: {
-                return new DateTime(dis.readLong());
+                return Instant.ofEpochMilli(dis.readLong());
             }
             case NULL: {
                 return null;
@@ -656,19 +705,19 @@ public class DBTranscoder {
                 }
                 return result;
             }
-            case DATE_ARRAY: {
+                //case DATE_ARRAY: {
+                //int length = dis.readInt();
+                //Date[] result = new Date[length];
+                //for (int i=0; i < length; i++) {
+                //    result[i] = new Date(dis.readLong());
+                //}
+                //return result;
+                //}
+            case INSTANT_ARRAY: {
                 int length = dis.readInt();
-                DateTime[] result = new DateTime[length];
+                Instant[] result = new Instant[length];
                 for (int i=0; i < length; i++) {
-                    result[i] = new DateTime(dis.readLong());
-                }
-                return result;
-            }
-            case DATETIME_ARRAY: {
-                int length = dis.readInt();
-                DateTime[] result = new DateTime[length];
-                for (int i=0; i < length; i++) {
-                    result[i] = new DateTime(dis.readLong());
+                    result[i] = Instant.ofEpochMilli(dis.readLong());
                 }
                 return result;
             }

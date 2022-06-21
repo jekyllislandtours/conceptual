@@ -301,6 +301,8 @@
     [:imdb/year Integer]
     [:imdb/start-year Integer]
     [:imdb/end-year Integer]
+    [:imdb/birth-year Integer]
+    [:imdb/death-year Integer]
     [:imdb/genres clojure.lang.PersistentHashSet]])
 
   (s/declare-relations!
@@ -446,8 +448,6 @@
 ;; names - :name.basics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn make-aka [])
-
 #:imdb{:nconst "nm0000001",
        :primary-name "Fred Astaire",
        :birth-year "1899",
@@ -455,14 +455,92 @@
        :primary-profession "soundtrack,actor,miscellaneous",
        :known-for-titles "tt0031983,tt0072308,tt0053137,tt0050419"}
 
-(defn make-person [])
+(defn name-key [primary-name]
+  ;;(println "primary-name:" primary-name)
+  (keyword "imdb" (str "person." (str/replace primary-name #"\s" "_"))))
+
+;;(name-key "Fred Astaire")
+
+(defn qualified-name-key [primary-name birth-year death-year]
+  (keyword "imdb" (str "person." (str/replace primary-name #"\s" "_")
+                       (when birth-year (str "." birth-year))
+                       (when death-year (str "." death-year)))))
+
+
+(defn create-person-key [primary-name birth-year-int death-year-int]
+  (let [short-key (name-key primary-name)
+        qualified-key (qualified-name-key primary-name birth-year-int death-year-int)
+        existing-name (c/seek short-key)]
+    ;; check - birth / death year
+    (if (and existing-name
+             (= (:imdb/birth-year existing-name) birth-year-int)
+             (= (:imdb/death-year existing-name) death-year-int))
+      short-key
+      (if existing-name
+        qualified-key
+        short-key))))
+
+;;(c/seek :imdb/Fred_Astaire)
+
+(defn make-person [{:keys [nconst primary-name
+                           birth-year death-year primary-profession
+                           known-for-titles] :as person}]
+  ;;(clojure.pprint/pprint person)
+  ;;(println primary-name)
+  (let [birth-year-int (coerce-int birth-year)
+        death-year-int (coerce-int death-year)
+        known-for-titles (some->> known-for-titles
+                                  split-on-comma
+                                  (map @*const->id*)
+                                  (int-array))
+        primary-professions (split-primary-professions primary-profession)
+        primary-profession-tag-map (some->> primary-professions
+                                            (mapv #(vector (primary-profession-tag %) true))
+                                            (into {}))]
+    (cond->
+        (merge {;;:db/key (create-person-key primary-name birth-year-int death-year-int)
+                :imdb/person? true
+                :imdb/nconst nconst
+                :imdb/primary-name primary-name}
+               primary-profession-tag-map)
+      birth-year-int (assoc :imdb/birth-year death-year-int)
+      death-year-int (assoc :imdb/death-year death-year-int)
+      known-for-titles (assoc :imdb/known-for-titles known-for-titles))))
+
+(comment
+  (c/with-aggr [aggr]
+    (upsert-row!
+     :name.basics
+     aggr
+     (make-person
+      {:nconst "nm0000001",
+       :primary-name "Fred Astaire",
+       :birth-year "1899",
+       :death-year "1987",
+       :primary-profession "soundtrack,actor,miscellaneous",
+       :known-for-titles "tt0031983,tt0072308,tt0053137,tt0050419"})))
+  (->> (make-person
+        {:nconst "nm0000001",
+         :primary-name "Fred Astaire",
+         :birth-year "1899",
+         :death-year "1987",
+         :primary-profession "soundtrack,actor,miscellaneous",
+         :known-for-titles "tt0031983,tt0072308,tt0053137,tt0050419"})
+       keys
+       ;;(map c/key->id)
+       )
+  )
+
+;;(c/seek :imdb/title?)
+;;(c/seek :imdb/person?)
 
 ;;   * add known-for-titles relation
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; names - :name.basics
+;; akas - :title.akas
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn make-aka [])
 ;; * load akas - :title.akas
 ;;   add region tag
 ;;   add language tag
@@ -478,34 +556,24 @@
        :is-original-title "0"}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
+;; title - :title.crew
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; * load ratings into title - :title.ratings
-#:imdb{:tconst "tt0000001", :average-rating "5.7", :num-votes "1879"}
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; * load crew into title - :title.crew
 #:imdb{:tconst "tt0000001", :directors "nm0005690", :writers "\\N"}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
+;; episode - :title.episode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; * load episode - :title.episode
 #:imdb{:tconst "tt0020666",
        :parent-tconst "tt15180956",
        :season-number "1",
        :episode-number "2"}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
+;; principals - :title.principals
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; * load principals - :title.principals
 ;;   * create tags for category
 ;;   * create tags for jobs
 #:imdb{:tconst "tt0000001",
@@ -522,6 +590,7 @@
 (defn row->concept [table-key columns row]
   (cond->> (zipmap columns row)
     (= :title.basics table-key) make-title
+    (= :name.basics table-key) make-person
     (= :title.ratings table-key) make-rating))
 
 (defn merge-concepts [table-key prev new]
@@ -540,7 +609,7 @@
         (c/update! aggr (merge-concepts table-key prev row)))
     (do (c/insert! aggr row)
         (when-let [const (or (some-> row :imdb/tconsts first)
-                             (some-> row :imdb/nconsts first))]
+                             (some-> row :imdb/nconst))]
           (swap! *const->id* assoc const (c/max-id))))))
 
 (defn load-table!
@@ -554,12 +623,20 @@
          (doseq [row (cond->> (rest (line-seq rdr))
                        (not (nil? *row-limit*)) (take *row-limit*)
                        true (map #(str/split % #"\t")))]
-           (let [row (row->concept table-key columns row)]
-             (row-handler-fn table-key aggr row))))))))
+           (try
+             (let [row (row->concept table-key columns row)]
+               (row-handler-fn table-key aggr row))
+             (catch Throwable t
+               (println "problem with row:" row)))))))))
 
-(defn load-basics! []
+(defn load-title-basics! []
   (print "loading title basics... ")
   (load-table! :title.basics upsert-row!)
+  (println "done."))
+
+(defn load-name-basics! []
+  (print "loading name basics... ")
+  (load-table! :name.basics upsert-row!)
   (println "done."))
 
 (defn load-ratings! []
@@ -603,11 +680,18 @@
 
   ;; load the ratings
   (time (load-ratings!))
+
   ;; load the basic titles in a thread
   (run-it! :title.basics)
 
+  ;; load the basic names in a thread
+  (run-it! :name.basics)
+
   ;; check the max id
-  (c/max-id)
+  (println (c/max-id))
+
+  ;; check out last entry
+  (clojure.pprint/pprint (c/seek (c/max-id)))
 
   ;; check out a title
   (c/seek :imdb/The_Shawshank_Redemption)
@@ -647,6 +731,23 @@
        (map c/seek)
        (filter #(>= 1975 (:imdb/start-year %)))
        (map (juxt :imdb/primary-title :imdb/start-year :imdb/average-rating))
+       (take 50)
+       time
+       clojure.pprint/pprint)
+
+  (->> (c/ids :imdb/person?)
+       count)
+
+  (->> (c/ids :imdb/primary-profession.actor?)
+       count)
+
+  (->> [:imdb/primary-profession.actor?
+        :imdb/primary-profession.director?
+        :imdb/primary-profession.writer?]
+       (map c/ids)
+       (apply i/intersection)
+       (map c/seek)
+       (map (juxt :imdb/primary-name :imdb/birth-year))
        (take 50)
        time
        clojure.pprint/pprint))

@@ -1,12 +1,12 @@
 Conceptual
 =========
 
-Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, etc.
+Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more.
 
 ### Usage
 
 ```clojure
-[conceptual 1.2.3]
+[conceptual 0.1.0]
 ```
 
 #### Philosphy
@@ -24,7 +24,7 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * does not keep track of changes to values through time
 
 #### Architectural Design
-  * in-memory - cache-oblivious memory layout
+  * in-memory
   * low-level kernel
   * embeddable
   * simple declarative Clojure dsl
@@ -43,28 +43,28 @@ Conceptual automatically and supports Keywords as a unique indentifier. Every co
 Here are some sample keywords:
 
 ```clojure
-:dbpedia/the-beatles
+:dbpedia/The_Beatles
 :baseball/batting-average
 :msft/2015-04-06.closing-price
 ```
 
-Keywords have a name and can have an optional namespace. In the last example `:dbpedia/the-beatles`, `dbpedia` is the namespace and `the-beatles` is the name. The leading `:` is not part of the namespace or the name.
+Keywords have a name and can have an optional namespace. In the last example `:dbpedia/The_Beatles`, `dbpedia` is the namespace and `The_Beatles` is the name. The leading `:` is not part of the namespace or the name.
 
 ```clojure
-(namespace :dbpedia/the-beatles)
+(namespace :dbpedia/The_Beatles)
 => "dbpedia"
 
-(name :dbpedia/the-beatles)
-=> "the-beatles"
+(name :dbpedia/The_Beatles)
+=> "The_Beatles"
 ```
 
 ### API Functions
 
 #### Basic API
 
-* seek - looks up a concept by `db/id` or `db/key`. The item return will be functionally equivalent to a clojure map.
-* value - looks up a value by the concept id and property id either in the form of a `db/id` or `db/key`.
-* ids
+* seek - looks up a concept by `:db/id` or `:db/key`. The item return will be functionally equivalent to a clojure map.
+* value - looks up a value by the concept id and property id either in the form of a `:db/id` or `:db/key`.
+* ids - returns the 'db/ids' for concept given a `:db/id` or `:db/key`
 
 #### Convenience API
 
@@ -97,11 +97,8 @@ Keywords have a name and can have an optional namespace. In the last example `:d
 * Primitive Arrays
 * URI
 * UUID
-* clojure data-types (not yet supported)
-* Date/DateTime/MonthDay/Instant (java.util.Date/org.joda.time.DateTime)
-* Currencies
-* Reference
-...
+* Clojure data-types
+* Date/Instant
 
 ### Types of Concepts
 
@@ -154,6 +151,11 @@ All properties or attributes have a built-in relations `db/ids` that is a
 The function `seek` is the most common means of accessing concepts within Conceptual. Seek is overloaded in several ways that make it very versatile. Seek return either a map of KV pairs or it returns a single value depending on the arguments.
 
 ##### seeking by key
+
+``` clojure
+(seek :dbpedia/The_Beatles)
+```
+
 ##### seeking by id
 
 In addition to seeking by Keyword, it is also possible to seek by id:
@@ -175,7 +177,7 @@ In addition to seeking by Keyword, it is also possible to seek by id:
 When seek is given two parameters, it will return a singular value. What is required with the key or id for the concept and a key or id for the value being requested.
 
 ```clojure
-(seek :dbpedia/the-beatles :dbpedia/active-from)
+(seek :dbpedia/The_Beatles :dbpedia/active-from)
 => 1960
 ```
 
@@ -273,7 +275,7 @@ Projections can also be filtered similarly. The following projection filters ent
 
 ```clojure
 (->> (project [:db/key :wpi/self-control]
-              (ids :dbpedia/american-child-actors?))
+              (ids :dbpedia/American_child_actors))
      (filter (comp not nil? second))
      (sort-by second)
 =>
@@ -288,13 +290,13 @@ This expression filters entries where `:self-control` is not nil and is less tha
 
 ```clojure
 (->> (project [:db/key :wpi/self-control]
-              (ids :dbpedia/american-child-actors?))
+              (ids :dbpedia/American_child_actors))
      (filter (comp not nil? second))
      (filter (comp (partial > 5.0) second)))
 =>
 ```
 
-By choosing `:wpi/self-control` as our set instead of `:dbpedia/american-child-actors?`.
+By choosing `:wpi/self-control` as our set instead of `:dbpedia/American_child_actors`.
 
 ```clojure
 (->> (project [:db/key :/wpi/self-control]

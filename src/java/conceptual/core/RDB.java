@@ -538,14 +538,6 @@ public final class RDB implements DB, WritableDB {
         }
     }
 
-    // @Override
-    // public WritableDB update(final IndexAggregator aggregator, final int id,
-    //                          final int[] keys, final Object[] vals) {
-    //     // TODO: fix
-    //     throw new UnsupportedOperationException();
-
-    // }
-
     @Override
     public WritableDB update(final IndexAggregator aggregator, final int id,
                              final int[] keys, final Object[] vals) {
