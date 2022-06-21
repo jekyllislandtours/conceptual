@@ -541,13 +541,10 @@ public class DBTranscoder {
 
     public static void encodeEDN(final DataOutputStream dos, final Object val) throws IOException {
         dos.writeInt(EDN);
-        String data = (String) clojureStr.invoke(val);
-        String[] chunks = chunkString(data, MAX_UTF_LENGTH);
-        if (chunks != null) {
-            dos.writeInt(chunks.length);
-            for (int i=0; i < chunks.length; i++) {
-                dos.writeUTF(chunks[i]);
-            }
+        byte[] data = (byte[]) nippyFreeze.invoke(val);
+        if (data != null) {
+            dos.writeInt(data.length);
+            dos.write(data);
         } else {
             dos.writeInt(0);
         }
@@ -570,19 +567,9 @@ public class DBTranscoder {
     public static Object decodeEDN(final DataInputStream dis) throws IOException {
         Object result = null;
         int length = dis.readInt();
-        StringBuilder builder = new StringBuilder();
-        for (int i=0; i < length; i++) {
-            builder.append(dis.readUTF());
-        }
-        String edn = builder.toString();
-        try {
-            if (edn != null && !edn.equals(""))
-                result = clojureReadString.invoke(builder.toString());
-        } catch (Exception e) {
-            System.out.println("ERROR reading EDN:" + e.getMessage() + "\n\n" +
-                               builder.toString());
-        }
-        return result;
+        byte[] bytes = new byte[length];
+        dis.readFully(bytes);
+        return nippyThaw.invoke(bytes);
     }
 
     public static Object decodeEDNString(final DataInputStream dis) throws IOException {
