@@ -316,7 +316,6 @@ This expression filters entries where `:self-control` is not nil and is less tha
               (ids :dbpedia/American_child_actors))
      (filter (comp not nil? second))
      (filter (comp (partial > 5.0) second)))
-=>
 ```
 
 By choosing `:wpi/self-control` as our set instead of `:dbpedia/American_child_actors`.
@@ -325,5 +324,4 @@ By choosing `:wpi/self-control` as our set instead of `:dbpedia/American_child_a
 (->> (project [:db/key :/wpi/self-control]
               (ids :wpi/self-control))
      (filter (comp (partial > 5.0) second)))
-=>
 ```
