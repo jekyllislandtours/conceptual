@@ -14,7 +14,7 @@
 (c/create-db!)
 
 ;; get :default db
- (c/db)
+(c/db)
 
 ;; dumps db to console... only use when db is small
 (c/dump)
