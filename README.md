@@ -1,13 +1,7 @@
-Conceptual
-=========
+Conceptual 0.1.0
+================
 
-Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more.
-
-### Usage
-
-```clojure
-[conceptual 0.1.0]
-```
+Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more. It's goal is to make every tradeoff in favor of speed.
 
 #### Philosphy
   * maximize read performance - optimize all tradeoffs for read performance
@@ -18,7 +12,7 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * multi-threaded reads/single-threaded writes
 
 #### Tradeoffs
-  * non-durable
+  * non-durable (although there are durable implementations)
   * does not support distributed transactions
   * does not currently index by value
   * does not keep track of changes to values through time
@@ -31,6 +25,35 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * functionally an EAV/AEV triple store
   * row/column based indexing
   * represented as co-indexed arrays
+
+### Usage
+
+Add to :deps map in your deps.edn:
+
+```clojure
+conceptual {:mvn/version "0.1.0"}
+```
+
+Add to your dependencies in your Leiningen project.clj:
+
+``` clojure
+[conceptual "0.1.0"]
+```
+
+### Building
+
+``` shell
+clj -T:build clean
+clj -T:build compile-java
+clj -T:build jar
+```
+
+### Running the walkthrough and IMDb demo
+
+``` shell
+clj -T:build compile-java
+```
+
 
 ## Graph of Concepts
 
