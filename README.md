@@ -50,9 +50,13 @@ clj -T:build jar
 
 ### Running the walkthrough and IMDb demo
 
+Start the REPL:
+
 ``` shell
-clj -T:build compile-java
+clj -Mcider:walkthrough
 ```
+
+Then eval the demo/imdb_demo.clj namespace, then begin to eval the code at the bottom.
 
 
 ## Graph of Concepts
