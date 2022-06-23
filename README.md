@@ -163,7 +163,7 @@ Tags themselves can be modeled as first class concepts. Tags are by convention f
 * usually have a boolean value, but just the presence of the tag is used to denote membership, the value is typically ignored.
 * can contain any constraints or predicates which must be true before assigning tag.
 
-#### Relation
+#### Relations
 
 Relations are properties that relate a concept to one or more other concepts. These relations are modeled as sorted integer arrays and refer to the `db/id` of the item(s) in that relation.
 

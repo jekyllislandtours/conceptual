@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as str]
-            [clojure.test :refer :all]
+            [clojure.test :refer [deftest testing is]]
             [taoensso.nippy :as nippy])
   (:import [clojure.lang Keyword PersistentHashMap]
            [java.util Date]

@@ -74,7 +74,7 @@
         (integer? v) (cond
                       (instance? Integer v) (int->bytes v)
                       (instance? Long v) (long->bytes v))
-        :default (object->bytes v)))
+        :else (object->bytes v)))
 
 (comment (print-bytes (->bytes {:a "hello"})))
 

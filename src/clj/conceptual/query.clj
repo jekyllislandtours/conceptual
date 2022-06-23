@@ -17,7 +17,7 @@
                                     (cond
                                      (number? l) (value path l)
                                      (int-array? l) (map (partial value path) l)))) result)
-     :default :else-case)
+     :else :else-case)
     (seek path)))
 
 (defn ^:private path-with-no-crumbs [result path]
@@ -33,7 +33,7 @@
                             ))
                         result)
      ;;(map #(value path %) result)
-     :default :else-case)
+     :else :else-case)
     (seek path)))
 
 (defn ^:private path-0
@@ -43,7 +43,7 @@
        (recur (path-with-crumbs result (first paths)) (rest paths) crumbs?)
        (recur (path-with-no-crumbs result (first paths)) (rest paths) crumbs?))
      (cond (int-array? result) (map seek result)
-           :default result))))
+           :else result))))
 
 (defn path
   ([paths & {:keys [crumbs?] :or {crumbs? true}}]

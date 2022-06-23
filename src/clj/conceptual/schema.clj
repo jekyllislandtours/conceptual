@@ -1,6 +1,9 @@
 (ns conceptual.schema
   (:require [conceptual.arrays :refer :all]
-            [conceptual.core :refer :all]
+            [conceptual.core :refer [*aggr*
+                                     with-aggr apply-aggregator!
+                                     insert! update! update-0!
+                                     seek value value-0 key->id ids project]]
             [conceptual.contracts :refer [defn-checked]])
   (:import [conceptual.core IndexAggregator]
            [clojure.lang Keyword]))

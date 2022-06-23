@@ -9,11 +9,12 @@
 ;;(def d (int-array [5 8 10 15]))
 ;;(def test-set (let [size 10] (seq (mapv (fn [n] (int-array (range n (+ n size)))) (range 0 size)))))
 
-(defn- chunked-reduce [f val coll chunk-size]
+(defn- chunked-reduce
   "Acts similarly to reduce except f is passed chunk-size number of
   arguments from coll after val. For example (chunked-reduce + 0 [1 2
   3 4 5 6 7 8] 3) will pass 0, 1, 2, and 3 to + in the first
   iteration."
+  [f val coll chunk-size]
   (loop [current-coll coll
          acc val]
     (let [result (apply f acc (take chunk-size current-coll))
