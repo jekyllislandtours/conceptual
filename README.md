@@ -53,10 +53,12 @@ clj -T:build jar
 Start the REPL:
 
 ``` shell
-clj -Mcider:walkthrough
+clj -Mwalkthrough
 ```
 
-Then eval the demo/imdb_demo.clj namespace, then begin to eval the code at the bottom.
+To go through the walkthrough just start evaluating each form one by one.
+
+Then eval the demo/imdb_demo.clj namespace, then begin to eval the code at the bottom in the comment.
 
 
 ## Graph of Concepts

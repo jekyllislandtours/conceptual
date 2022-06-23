@@ -7,3 +7,5 @@
 /.lein-repl-history
 .DS_Store
 /.cpcache
+/demo/*.tsv
+/demo/*.gz
