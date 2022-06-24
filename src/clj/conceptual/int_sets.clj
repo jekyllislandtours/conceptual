@@ -25,6 +25,7 @@
         result))))
 
 (defn intersection
+  "Returns the integer intersection of the given sorted int array sets."
   ([] (int-array []))
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/intersection a b))
@@ -41,6 +42,7 @@
 ;;(seq (apply intersection test-set))
 
 (defn union
+  "Returns the integer union of the given sorted int array sets."
   ([] (int-array []))
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/union a b))
@@ -57,6 +59,8 @@
 ;;(seq (apply union test-set))
 
 (defn difference
+  "Returns the integer difference of the given sorted int arrays. Everything is
+  subtracted from the first sorted int array set."
   ([] (int-array []))
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/difference a b))
@@ -70,28 +74,24 @@
    (difference a (apply union a b c d e f g h more))))
 
 (defn add-to-int-set [^ints a b]
-  (union a (int-array [b]))
-  ;;(IntegerSets/union ^ints a ^int b)
-  )
+  (union a (int-array [b])))
 
 ;;(seq (difference (int-array (range 10 20)) (apply union test-set)))
 
-(defn index-of [key ^ints coll]
+(defn index-of
   "Returns the index of a key in a sorted int array, -1 if not found."
+  [key ^ints coll]
   (IntegerSets/contains coll key))
 
 ;;(index-of 3 a)
 
 (defn binary-search-greater
+  "Searches for a key in a sorted array, and returns an index to an element
+   which is greater than or equal key. Returns end if nothing greater or equal
+   was found, else an index satisfying the search criteria."
   ([key ^ints coll]
-     "Searches for a key in a sorted array, and returns an index to an element
-      which is greater than or equal key. Returns end if nothing greater or equal
-      was found, else an index satisfying the search criteria."
      (IntegerSets/binarySearchGreater coll key))
   ([key begin end ^ints coll]
-     "Searches for a key in a sorted array, and returns an index to an element
-      which is greater than or equal key. Returns end if nothing greater or equal
-      was found, else an index satisfying the search criteria."
      (IntegerSets/binarySearchGreater coll key begin end)))
 
 ;;(binary-search-greater 3 0 (alength a) a)
@@ -102,13 +102,10 @@
 ;;(binary-search-greater 20 d)
 
 (defn binary-search-smaller
-  ([key ^ints coll]
-     "Searches for a key in a sorted array, and returns an index to an element
+  "Searches for a key in a sorted array, and returns an index to an element
       which is smaller than or equal key."
-     (IntegerSets/binarySearchSmaller coll key))
+  ([key ^ints coll] (IntegerSets/binarySearchSmaller coll key))
   ([key begin end ^ints coll]
-     "Searches for a key in a sorted array, and returns an index to an element
-      which is smaller than or equal key."
      (IntegerSets/binarySearchSmaller coll key begin end)))
 
 ;;(binary-search-smaller 3 0 (alength a) a)
@@ -118,21 +115,23 @@
 ;;(binary-search-smaller 7 a)
 
 (defn binary-search
+  "Searches for a key in a sorted array."
   ([key ^ints coll]
-     "Searches for a key in a sorted array."
      (IntegerSets/binarySearch coll key 0 (alength coll)))
   ([key begin end ^ints coll]
-     "Searches for a key in a subset of a sorted array."
      (IntegerSets/binarySearch coll key begin end)))
 
-(defn equals [^ints a ^ints b]
+(defn equals
   "Returns true if a and b are equal in contents."
+  [^ints a ^ints b]
   (IntegerSets/equals a b))
 
-(defn encode [^ints s]
+(defn encode
   "Encodes and integer array into a byte array."
+  [^ints s]
   (IntegerSets/encode s))
 
-(defn decode [^bytes s]
-   "Decodes an encoded integer array back into into an integer array."
+(defn decode
+  "Decodes an encoded integer array back into into an integer array."
+  [^bytes s]
   (IntegerSets/decode s))

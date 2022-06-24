@@ -1,9 +1,9 @@
 (ns conceptual.core
-  (:use [conceptual.arrays])
-  (:require [conceptual.int-sets :as int-sets]
+  (:require [conceptual.arrays :refer [int-array-class]]
+            [conceptual.int-sets :as int-sets]
             [clojure.data.int-map :as int-map]
             [clojure.test])
-  (:import [conceptual.core DB DBMap IndexAggregator PersistentDB RDB WritableDB]
+  (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
            [clojure.lang IFn Keyword]))
 
 ;; name of default implicit db
@@ -14,15 +14,6 @@
 (def ^{:private true :const true} -key (int DB/KEY_ID))
 (def ^{:private true :const true} -type (int DB/TYPE_ID))
 (def ^{:private true :const true} -property? (int DB/PROPERTY_TAG_ID))
-(def ^{:private true :const true} -fn (int DB/FN_ID))
-(def ^{:private true :const true} -dont-index (int DB/DONT_INDEX_ID))
-(def ^{:private true :const true} -tag? (int DB/TAG_TAG_ID))
-(def ^{:private true :const true} -fn? (int DB/FN_TAG_ID))
-(def ^{:private true :const true} -relation? (int DB/RELATION_TAG_ID))
-(def ^{:private true :const true} -to-many-relation (int DB/TO_MANY_RELATION_TAG_ID))
-(def ^{:private true :const true} -to-one-relation (int DB/TO_ONE_RELATION_TAG_ID))
-(def ^{:private true :const true} -inverse-relation (int DB/INVERSE_RELATION_TAG_ID))
-(def ^{:private true :const true} -ids (int DB/IDS_ID))
 
 (def ^:private default-max-id (int 3))
 
@@ -30,8 +21,6 @@
   (let [ids (range (inc default-max-id))
         ids-array (int-array ids)]
     (into (int-map/int-map) (map #(list % ids-array) ids))))
-
-(def ^:private default-key-array (int-array (range (inc default-max-id))))
 
 ;; these are they core values in the db
 (def ^:private default-values

@@ -1,6 +1,6 @@
 (ns conceptual.query
-  (:use [conceptual.arrays]
-        [conceptual.core])
+  (:require [conceptual.arrays :refer [int-array?]]
+            [conceptual.core :refer [seek value]])
   (:import [conceptual.core DBMap]))
 
 (defn db-map? [arg]

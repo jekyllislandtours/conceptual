@@ -1,5 +1,5 @@
 (ns conceptual.arrays
-  (:use [conceptual.timing])
+  (:use [conceptual.timing :refer [many ntimes]])
   (:require [clojure.data.fressian :as fressian])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.nio ByteBuffer]))

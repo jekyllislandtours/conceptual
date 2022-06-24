@@ -48,7 +48,6 @@ Cleaning:
 clj -T:build clean
 ```
 
-
 Compiling java code:
 
 ``` shell
