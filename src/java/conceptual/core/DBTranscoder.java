@@ -148,7 +148,7 @@ public class DBTranscoder {
         int oneIfNotNull = dis.readInt();
         if (oneIfNotNull == 1) {
             int count = dis.readInt();
-            Map temp = new HashMap(count);
+            Map<Keyword, Integer> temp = new HashMap<Keyword, Integer>(count);
             for (int i=0; i < count; i++) {
                 String nsname = dis.readUTF();
                 Keyword key = Keyword.intern(nsname);

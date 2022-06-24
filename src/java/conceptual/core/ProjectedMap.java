@@ -152,6 +152,7 @@ public class ProjectedMap extends DBMap {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public int compareTo(Object o2) {
             if (!(o2 instanceof IMapEntry))
                 throw new IllegalArgumentException

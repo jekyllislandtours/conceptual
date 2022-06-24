@@ -7,12 +7,12 @@
 * DONE Fix Tupl dependencies
 * DONE use nippy to encode/decode EDN
 * DONE remove Joda DateTime dependency
+* DONE fix javac warnings
 * IN-PROGRESS README.md
 * IN-PROGRESS basic walkthrough
 * IN-PROGRESS deep-dive imdb demo
 * implement unsupported fn's in Tupl
 * replace/add Fressian with Nippy
-* fix javac warnings
 * remove array types in favor of edn
 * support more types and/or delegate more to Nippy
   * Instant
@@ -23,10 +23,11 @@
   * UUID
   * custom types
 * unit tests
-  * test every type transcoding round-trip
+  * DONE test most types transcoding round-trip
   * core namespace test functions
   * schema namespace test functions
-* version
+  * create tests from the examples in the int-sets namespace
+* DONE version
 * publish to clojars
 
 # Future Versions

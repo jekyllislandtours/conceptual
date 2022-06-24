@@ -549,10 +549,4 @@ public final class TuplDB implements WritableDB {
 
     @Override
     public void shutdown() {}
-
-    @Override
-    public void finalize() throws Throwable {
-        super.finalize();
-        shutdown();
-    }
 }

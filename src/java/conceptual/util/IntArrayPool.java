@@ -7,6 +7,7 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
+import java.time.Duration;
 import java.util.Arrays;
 
 public class IntArrayPool {
@@ -17,6 +18,7 @@ public class IntArrayPool {
         intArrayPool = createObjectPool();
     }
 
+    @SuppressWarnings("unchecked")
     private GenericObjectPool<int[]> createObjectPool() {
         PooledObjectFactory<int[]> intArrayFactory = new PooledObjectFactory<int[]>() {
             // Reinitialize an instance to be returned by the pool.
@@ -47,7 +49,8 @@ public class IntArrayPool {
         GenericObjectPoolConfig config = new GenericObjectPoolConfig();
         config.setMaxIdle(10);
         config.setMaxTotal(20);
-        config.setMaxWaitMillis(1000);
+
+        config.setMaxWait(Duration.ofMillis(1000));
         return new GenericObjectPool<>(intArrayFactory, config);
     }
 
@@ -56,6 +59,7 @@ public class IntArrayPool {
         return (int[]) intArrayPool.borrowObject();
     }
 
+    @SuppressWarnings("unchecked")
     public void returnArray(int[] array) {
         intArrayPool.returnObject(array);
     }

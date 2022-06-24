@@ -293,6 +293,7 @@ public class DBTuplMap extends DBMap implements ILookup, Map, Iterable, Associat
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public int compareTo(Object o2) {
             if (!(o2 instanceof DBMapEntry))
                 throw new IllegalArgumentException
