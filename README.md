@@ -1,7 +1,7 @@
 Conceptual 0.1.0
 ================
 
-Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more. It's goal is to make every tradeoff in favor of speed.
+Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more.
 
 #### Philosphy
   * maximize read performance - optimize all tradeoffs for read performance
