@@ -42,10 +42,31 @@ Add to your dependencies in your Leiningen project.clj:
 
 ### Building
 
+Cleaning:
+
 ``` shell
 clj -T:build clean
+```
+
+
+Compiling java code:
+
+``` shell
 clj -T:build compile-java
 clj -T:build jar
+clj -T:build install
+```
+
+Building a jar:
+
+``` shell
+clj -T:build jar
+```
+
+Installing into local Maven repo cache:
+
+``` shell
+clj -T:build install
 ```
 
 ### Running the walkthrough and IMDb demo

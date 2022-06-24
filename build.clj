@@ -1,29 +1,37 @@
 (ns build
-  (:require [clojure.tools.build.api :as b]))
+  (:require [clojure.tools.build.api :as b]
+            [org.corfield.build :as bb]
+            [clojure.pprint :as pprint]))
 
-(def lib 'conceptual/conceptual)
+(def lib 'org.clojars.jekyllislandtours/conceptual)
 (def version (format "0.1.%s" (b/git-count-revs nil)))
-(def class-dir "target/classes")
-(def basis (b/create-basis {:project "deps.edn"}))
-(def jar-file (format "target/%s-%s.jar" (name lib) version))
+
+(defn show-defaults [_]
+  (println "default-basis:")
+  (pprint/pprint (bb/default-basis))
+  (println "default-target:" (bb/default-target))
+  (println "default-class-dir:" (bb/default-class-dir))
+  (println "default-jar-file:" (bb/default-jar-file lib version)))
 
 (defn clean [_]
-  (b/delete {:path "target"}))
+  (bb/clean {}))
 
 (defn compile-java [_]
+  (print "Compiling java...")
   (b/javac {:src-dirs ["src/java"]
-            :class-dir class-dir
-            :basis basis
-            :javac-opts ["-source" "8" "-target" "8" "-Xlint:deprecation" "-Xlint:unchecked"]}))
+            :class-dir (bb/default-class-dir)
+            :basis (bb/default-basis)
+            :javac-opts [;;"-source" "8" "-target" "8"
+                         "-Xlint:deprecation" "-Xlint:unchecked"]}))
 
 (defn jar [_]
   (compile-java nil)
-  (b/write-pom {:class-dir class-dir
-                :lib lib
-                :version version
-                :basis basis
-                :src-dirs ["src"]})
-  (b/copy-dir {:src-dirs ["src" "resources"]
-               :target-dir class-dir})
-  (b/jar {:class-dir class-dir
-          :jar-file jar-file}))
+  (bb/jar {:lib lib :version version}))
+
+(defn install [_]
+  (jar nil)
+  (println "Installing jar into local Maven repo cache...")
+  (bb/install {:lib lib :version version}))
+
+(defn deploy [_]
+  (bb/deploy {:lib lib :version version}))
