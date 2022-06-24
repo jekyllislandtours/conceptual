@@ -28,6 +28,7 @@
   * schema namespace test functions
   * create tests from the examples in the int-sets namespace
 * DONE version
+* DONE upgrade build.clj to support install and deploy with sean cornfields build.clj
 * publish to clojars
 
 # Future Versions
