@@ -5,7 +5,7 @@
         org.clojure/data.fressian {:mvn/version "0.2.1"}
         com.taoensso/nippy {:mvn/version "3.1.1"}
         org.cojen/cojen {:mvn/version "2.2.5"}
-        com.github.cojen/Tupl {:mvn/version "1.5.3.3"} ;;:exclusions [net.java.dev.jna/jna-platform]
+        org.cojen/tupl {:mvn/version "1.6.0"} ;;:exclusions [net.java.dev.jna/jna-platform]
         org.apache.commons/commons-pool2 {:mvn/version "2.11.1"}
         org.apache.commons/commons-compress {:mvn/version "1.10"}
         org.iq80.snappy/snappy {:mvn/version "0.4"}}
@@ -22,6 +22,4 @@
 
  :deps/prep-lib {:ensure "target/classes"
                  :alias :build
-                 :fn compile-java}
-
- :mvn/repos {"jitpack.io" {:url "https://jitpack.io"}}}
+                 :fn compile-java}}
