@@ -34,11 +34,25 @@ Add to :deps map in your deps.edn:
 conceptual {:mvn/version "0.1.0"}
 ```
 
+Once published to Clojars it will be:
+
+```clojure
+org.clojars.jekyllislandtours/conceptual {:mvn/version "0.1.0"}
+```
+
+
 Add to your dependencies in your Leiningen project.clj:
 
 ``` clojure
 [conceptual "0.1.0"]
 ```
+
+Once published to clojars it will be:
+
+``` clojure
+[org.clojars.jekyllislandtours/conceptual "0.1.0"]
+```
+
 
 ### Building
 

@@ -29,7 +29,8 @@
   * create tests from the examples in the int-sets namespace
 * DONE version
 * DONE upgrade build.clj to support install and deploy with sean cornfields build.clj
-* publish to clojars
+* DONE make repo public
+* IN-PROGRESS publish to clojars
 
 # Future Versions
 * [RoaringBitmap implementation](https://github.com/RoaringBitmap/RoaringBitmap)
