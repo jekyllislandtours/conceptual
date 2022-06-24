@@ -53,8 +53,6 @@ Compiling java code:
 
 ``` shell
 clj -T:build compile-java
-clj -T:build jar
-clj -T:build install
 ```
 
 Building a jar:
