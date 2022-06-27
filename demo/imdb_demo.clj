@@ -681,11 +681,16 @@
   ;; load the ratings
   (time (load-ratings!))
 
+  (load-table! :title.basics)
   ;; load the basic titles in a thread
-  (run-it! :title.basics)
+  ;; do this instead if you don't want to lockup the repl
+  ;;(run-it! :title.basics)
 
-  ;; load the basic names in a thread
-  (run-it! :name.basics)
+  ;; NOTE: will print out some duplicate error message
+  (load-table! :name.basics)
+  ;; load the basic names in a thread, wait for previous step to finish
+  ;; to use this
+  ;; (run-it! :name.basics)
 
   ;; check the max id
   (println (c/max-id))
