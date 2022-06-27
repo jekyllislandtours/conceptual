@@ -12,13 +12,9 @@
 
  :paths ["src/clj" "target/classes"]
 
- :aliases {:build {:deps {;;io.github.clojure/tools.build {:git/tag "v0.8.2" :git/sha "ba1a2bf"}
-                          io.github.seancorfield/build-clj {:git/tag "v0.8.2" :git/sha "0ffdb4c"
-                                                            ;; omits deps-deploy dependency:
-                                                            ;; :deps/root "slim"
-                                                            }}
+ :aliases {:build {:deps {io.github.seancorfield/build-clj {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
                    :ns-default build}
-           :walkthrough {:jvm-opts ["-Dmy.prop=val" "-Xmx25g"]}}
+           :walkthrough {:jvm-opts ["-Xmx25g"]}}
 
  :deps/prep-lib {:ensure "target/classes"
                  :alias :build
