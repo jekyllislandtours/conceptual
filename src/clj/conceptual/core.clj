@@ -2,7 +2,8 @@
   (:require [conceptual.arrays :refer [int-array-class]]
             [conceptual.int-sets :as int-sets]
             [clojure.data.int-map :as int-map]
-            [clojure.test])
+            [clojure.test]
+            [clojure.pprint])
   (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
            [clojure.lang IFn Keyword]))
 
@@ -139,6 +140,20 @@
 
 (declare seek)
 
+(defn insert-1!
+  "Inserts an array of values given an array of keys. Must be a WritableDB"
+  ([^ints ks #^Object vs]
+   (insert-1! @*db* nil ks vs))
+  ([^IndexAggregator aggr ^ints ks #^Object vs]
+   (insert-1! @*db* aggr ks vs))
+  ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
+   {:pre [(clojure.test/is (not-any? nil? [ks vs]))]}
+   (reset! (db-atom db)
+           (.insert ^WritableDB db
+                    ^IndexAggregator aggr
+                    ^ints ks
+                    #^Object vs))))
+
 (defn insert!
   "Inserts into db. Must be a WritableDB."
   ([arg] (insert! @*db* nil arg))
@@ -147,20 +162,21 @@
    {:pre [(when-let [ks (keys arg)]
             (clojure.test/is (not-any? nil? (map key->id ks))
                              (map vector ks (map key->id ks))))]}
-   (when-not (seek (:db/key arg))
-     (let [key->id-fn (partial key->id db)
-           items (try
-                   (->> (seq arg)
-                        (map #(vector (try (key->id-fn (first %))
-                                          (catch Exception e)) (second %)))
+   (try
+     (when-not (seek (:db/key arg))
+       (let [items (->> (seq arg)
+                        (map #(vector (key->id db (first %)) (second %)))
                         (sort-by first <))
-                   (catch NullPointerException e
-                     (println (->> (seq arg)
-                                   (map #(vector (try (key->id-fn (first %))
-                                                     (catch Exception e)) (second %)))))))
-           ks (int-array (map first items))
-           vs (object-array (map second items))]
-       (reset! (db-atom db) (.insert db aggr ks vs))))))
+             ks (int-array (map first items))
+             vs (object-array (map second items))]
+         (insert-1! db aggr ks vs)))
+     (catch Exception e
+       (println (.getMessage e))
+       (println (->> (seq arg)
+                     (map #(vector (try (key->id db (first %))
+                                        (catch Exception e
+                                          (identity e)
+                                          nil)) (second %)))))))))
 
 (def ^:private db-entries
   [{:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}
@@ -257,10 +273,11 @@
      )))
 
 (defn reset-db!
-  ([] (do (create-db! *default-identity*)
-          (prime-db! *default-identity*)))
-  ([^Keyword k] (do (create-db! k)
-                    (prime-db! k))))
+  ([]
+   (reset-db! *default-identity*))
+  ([^Keyword k]
+   (create-db! k)
+   (prime-db! k)))
 
 (defn max-id
   "Returns the max id for the database."
@@ -323,21 +340,23 @@
   ([db id]
     (:db/ids (seek db id))))
 
-(defn proj-0 [^ints ks id] (apply vector (map #(value % id) ks)))
+(defn proj-0
+  ([^ints ks id] (proj-0 db ks id))
+  ([^DB db ^ints ks id] (apply vector (map #(value db % id) ks))))
 
 (defn proj
   ([ks ^ints ids]
    (proj ^DB @*db* ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (ordered-ids ks)]
+   (let [^ints key-ids (ordered-ids db ks)]
      (.project db key-ids ids))))
 
 (defn project
   ([ks ids]
    (project ^DB @*db* ks ids))
   ([^DB db ks ids]
-   (let [^ints key-ids (normalize-ids ks)]
-     (map #(proj-0 key-ids %) ids)
+   (let [^ints key-ids (normalize-ids db ks)]
+     (map #(proj-0 db key-ids %) ids)
      ;;(for [^int id ids] (proj-0 key-ids id))
      )))
 
@@ -349,35 +368,56 @@
   ([ks ^ints ids]
    (project-map @*db* ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (keys->ids ks)]
-     (for [^int id ids] (into {} (map #(vector %1 (value-0 %2 id)) ks key-ids))))))
+   (let [^ints key-ids (keys->ids db ks)]
+     (for [^int id ids] (into {} (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids))))))
 
-;;; TODO arity
-(defn ident [arg] (if (instance? DBMap arg) (:db/key arg) (value :db/key arg)))
+(defn ident
+  ([arg] (ident ^DB @*db* arg))
+  ([^DB db arg] (if (instance? DBMap arg)
+                  (:db/key arg)
+                  (value ^DB db :db/key arg))))
 
-;;; TODO arity
-(defn idents [aset]
-  (map (comp :db/key seek) (if (keyword? aset) (ids aset) aset)))
+(defn idents
+  "Given a set i.e. has a :db/ids, returns the :db/key's for them"
+  ([aset] (idents @*db* aset))
+  ([^DB db aset]
+   (map (comp :db/key (partial seek ^DB db))
+        (if (keyword? aset)
+          (ids ^DB db aset) aset))))
 
-;;; TODO arity
-(defn scan [args]
-  (map seek (if (keyword? args) (ids args) args)))
+(defn scan
+  ([args] (scan @*db* args))
+  ([^DB db args]
+   (map (partial seek ^DB db)
+        (if (keyword? args)
+          (ids ^DB db args) args))))
 
-;;; TODO arity
 (defn into-seq [^DBMap c]
   (map (fn [k v] [k v]) (keys c) (vals c)))
 
-;;; TODO arity
-(defn apply-aggregator! [^IndexAggregator aggr]
-  (doseq [k (.keys aggr)]
-    (update-0! k (key->id :db/ids) (int-sets/union (ids k) (.ids aggr k)))))
+(defn apply-aggregator!
+  ([^IndexAggregator aggr]
+   (apply-aggregator! ^DB @*db* aggr))
+  ([^DB db ^IndexAggregator aggr]
+   (doseq [k (.keys aggr)]
+     (update-0! ^DB db k (key->id ^DB db :db/ids)
+                (int-sets/union (ids ^DB db k) (.ids aggr k))))))
 
-;;; TODO arity
-(defmacro with-aggr [binding & bodies]
-  `(let [~(first binding) (IndexAggregator.)]
-     ~@bodies
-     (apply-aggregator! ~(first binding))))
+;;; TODO figure out how to combine with-aggr-0 and with-aggr
+;; results in warning: unused binding db
+;; (defmacro with-aggr-0
+;;   ([^DB db binding & bodies]
+;;    `(let [~(first binding) (IndexAggregator.)]
+;;       ~@bodies
+;;       (apply-aggregator! ^DB db ~(first binding)))))
 
+(defmacro with-aggr
+  ([binding & bodies]
+   `(let [~(first binding) (IndexAggregator.)]
+      ~@bodies
+      (apply-aggregator! ~(first binding)))))
+
+;; TODO: support more compaction target types
 (defn compact!
   ([] (compact! :r))
   ([type] (compact! @*db* type))
@@ -386,8 +426,10 @@
     (db-atom db)
     ;; type is not currently used here, but will be in the future
     (condp instance? db
-      conceptual.core.PersistentDB (.compactToRDB ^conceptual.core.PersistentDB db)
-      conceptual.core.TuplDB (.compactToRDB ^conceptual.core.TuplDB db)))))
+      conceptual.core.PersistentDB (case type
+                                     (.compactToRDB ^conceptual.core.PersistentDB db))
+      conceptual.core.TuplDB (case type
+                               (.compactToRDB ^conceptual.core.TuplDB db))))))
 
 ;; TODO: make this more versatile... only update selective indices
 (defn pickle!
@@ -413,6 +455,7 @@
             db @*db*}}]
    (reset! (db-atom db) (unpickle type filename))))
 
+;; TODO: fix arity
 (defn reset-pickle! [& args]
   (reset! (db-atom (get args :db @*db*)) (create-db!))
   (apply load-pickle! args))
@@ -420,10 +463,11 @@
 (defn load-pickle-0! [filename type]
   (load-pickle! :filename filename :type (keyword type)))
 
-;; TODO: fix arity on these
-(defn dump []
-  (doseq [i (range (inc (max-id)))]
-    (clojure.pprint/pprint (seek i))))
+(defn dump
+  ([] (dump ^DB @*db*))
+  ([^DB db]
+   (doseq [i (range (inc (max-id db)))]
+     (clojure.pprint/pprint (seek db i)))))
 
 ;;(dump)
 
