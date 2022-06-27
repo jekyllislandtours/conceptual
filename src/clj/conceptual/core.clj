@@ -403,13 +403,11 @@
      (update-0! ^DB db k (key->id ^DB db :db/ids)
                 (int-sets/union (ids ^DB db k) (.ids aggr k))))))
 
-;;; TODO figure out how to combine with-aggr-0 and with-aggr
-;; results in warning: unused binding db
-;; (defmacro with-aggr-0
-;;   ([^DB db binding & bodies]
-;;    `(let [~(first binding) (IndexAggregator.)]
-;;       ~@bodies
-;;       (apply-aggregator! ^DB db ~(first binding)))))
+(defmacro with-aggr-0
+  ([^DB db binding & bodies]
+   `(let [~(first binding) (IndexAggregator.)]
+      ~@bodies
+      (apply-aggregator! ^DB ~db ~(first binding)))))
 
 (defmacro with-aggr
   ([binding & bodies]
