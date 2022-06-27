@@ -1,6 +1,7 @@
 (ns conceptual.contracts
   (:require [clojure.set :as cset]
-            [clojure.test :as t]))
+            ;;[clojure.test :as t]
+            ))
 
 (defmacro defn-checked
   "If a function destructures its arguments, this checks the first level
@@ -31,14 +32,15 @@
     (concat (list 'defn fn-name fn-args contracts)
             body)))
 
-(defn defn-checked-test [] ;; Can't seem to use clojure.test to test a fn that uses clojure.test/is
-  (let [f (defn-checked testfn [& {:keys [arg1 arg2]
-                                     :or {arg1 1}}]
-            (+ arg1 arg2))]
-    (and (t/is (thrown? AssertionError (f :arg1 1)))
-         (t/is (thrown? AssertionError (f :arg3 1)))
-         (t/is (= 2 (f :arg2 1))))
-    ))
+;; (def test-fn (defn-checked testfn [& {:keys [arg1 arg2]
+;;                                       :or {arg1 1}}]
+;;                (+ arg1 arg2)))
+
+;; (defn defn-checked-test [] ;; Can't seem to use clojure.test to test a fn that uses clojure.test/is
+;;   (and (t/is (thrown? AssertionError (test-fn :arg1 1)))
+;;        (t/is (thrown? AssertionError (test-fn :arg3 1)))
+;;        (t/is (= 2 (test-fn :arg2 1))))
+;;   )
 
 ;;(defn-checked-test)
 ;; => true (but prints the errors... :\)

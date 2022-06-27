@@ -1,6 +1,6 @@
 (ns conceptual.arrays
-  (:use [conceptual.timing :refer [many ntimes]])
-  (:require [clojure.data.fressian :as fressian])
+  (:require [conceptual.timing]
+            [clojure.data.fressian :as fressian])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.nio ByteBuffer]))
 
@@ -37,8 +37,8 @@
     (.put bb b 0 len)
     (.array bb)))
 
-(comment (ntimes 1000000 (print-bytes (str->bytes "hello")))
-         (ntimes 1000000 (print-bytes (str->bytes "-tag"))))
+(comment (conceptual.timing/ntimes 1000000 (print-bytes (str->bytes "hello")))
+         (conceptual.timing/ntimes 1000000 (print-bytes (str->bytes "-tag"))))
 
 (defn int->bytes [i]
   (let [bb (ByteBuffer/allocate 5)]
@@ -46,9 +46,9 @@
     (.putInt bb i)
     (.array bb)))
 
-(comment (ntimes 1000000 (print-bytes (int->bytes 1)))
-         (ntimes 1000000 (print-bytes (int->bytes 2)))
-         (ntimes 1000000 (print-bytes (int->bytes Integer/MAX_VALUE))))
+(comment (conceptual.timing/ntimes 1000000 (print-bytes (int->bytes 1)))
+         (conceptual.timing/ntimes 1000000 (print-bytes (int->bytes 2)))
+         (conceptual.timing/ntimes 1000000 (print-bytes (int->bytes Integer/MAX_VALUE))))
 
 (defn long->bytes [i]
   (let [bb (ByteBuffer/allocate 9)]
@@ -56,9 +56,9 @@
     (.putLong bb i)
     (.array bb)))
 
-(comment (ntimes 1000000 (print-bytes (long->bytes 1)))
-         (ntimes 1000000 (print-bytes (long->bytes 2)))
-         (ntimes 1000000 (print-bytes (long->bytes Long/MAX_VALUE))))
+(comment (conceptual.timing/ntimes 1000000 (print-bytes (long->bytes 1)))
+         (conceptual.timing/ntimes 1000000 (print-bytes (long->bytes 2)))
+         (conceptual.timing/ntimes 1000000 (print-bytes (long->bytes Long/MAX_VALUE))))
 
 (defn object->bytes [o]
   (let [os (ByteArrayOutputStream.)
@@ -88,9 +88,9 @@
               reader (fressian/create-reader is)]
           (.readObject reader)))))
 
-(comment (many (bytes-> (->bytes "hello")))
-         (many (bytes-> (->bytes (int 1))))
-         (many (bytes-> (->bytes (long 1)))))
+(comment (conceptual.timing/many (bytes-> (->bytes "hello")))
+         (conceptual.timing/many (bytes-> (->bytes (int 1))))
+         (conceptual.timing/many (bytes-> (->bytes (long 1)))))
 
 (comment (bytes-> (->bytes "hello"))
          (bytes-> (->bytes {:a 1 :b "hello"}))
