@@ -1,5 +1,5 @@
 (ns conceptual.faceting
-  (:use [conceptual.core])
+  (:require [conceptual.core :refer [*db*]])
   (:import [conceptual.core DB]))
 
 (defn keys-by-frequency

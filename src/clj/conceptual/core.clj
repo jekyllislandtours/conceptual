@@ -395,7 +395,13 @@
 (defn into-seq [^DBMap c]
   (map (fn [k v] [k v]) (keys c) (vals c)))
 
+(defn aggregator []
+  (if (bound? #'*aggr*) *aggr* (IndexAggregator.)))
+
 (defn apply-aggregator!
+  ([]
+   (when (bound? #'*aggr*)
+     (apply-aggregator! ^DB @*db* ^IndexAggregator *aggr*)))
   ([^IndexAggregator aggr]
    (apply-aggregator! ^DB @*db* aggr))
   ([^DB db ^IndexAggregator aggr]
