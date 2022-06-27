@@ -601,12 +601,8 @@
 
 (defn upsert-row! [table-key aggr row]
   (if-let [prev (or (some-> row :imdb/tconsts first (@*const->id*) c/seek c/->persistent-map)
-                    (some-> row :db/id c/seek c/->persistent-map)
-                    ;;(some-> row :db/key c/seek c/->persistent-map)
-                    )]
-    ;; yeah there are multiple records for the same thing
-    (do ;;(println "\n" (merge-concepts table-key prev row))
-        (c/update! aggr (merge-concepts table-key prev row)))
+                    (some-> row :db/id c/seek c/->persistent-map))]
+    (c/update! aggr (merge-concepts table-key prev row))
     (do (c/insert! aggr row)
         (when-let [const (or (some-> row :imdb/tconsts first)
                              (some-> row :imdb/nconst))]
