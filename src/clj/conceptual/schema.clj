@@ -14,18 +14,16 @@
   "Given property specs of the form [key type] or [key type opts]
    declares a property."
   ([^Keyword key type]
-   (declare-property! ^Keyword key type nil))
-  ([^Keyword key type opts]
    (let [aggr (aggregator)]
-     (declare-property! aggr key type opts)
+     (declare-property! aggr key type)
      (apply-aggregator! ^DB @*db* ^IndexAggregator aggr)))
-  ([^IndexAggregator aggr ^Keyword key type opts]
-   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key type opts))
-  ([^DB db ^IndexAggregator aggr ^Keyword key type opts]
+  ([^IndexAggregator aggr ^Keyword key type]
+   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key type))
+  ([^DB db ^IndexAggregator aggr ^Keyword key type]
    {:pre [(clojure.test/is (not-any? nil? [db aggr key type]))]}
-   (insert! ^DB db ^IndexAggregator aggr (merge {:db/key key
-                                                 :db/type type
-                                                 :db/property? true} opts))))
+   (insert! ^DB db ^IndexAggregator aggr {:db/key key
+                                          :db/type type
+                                          :db/property? true})))
 
 (defn declare-properties!
   "Given a list of property specs of the form [key type] or [key type opts],
@@ -42,17 +40,14 @@
 
 (defn declare-tag!
   ([^Keyword key]
-   (declare-tag! key nil))
-  ([^Keyword key args]
    (let [aggr (aggregator)]
-     (declare-property! ^IndexAggregator aggr ^Keyword key Boolean args)
+     (declare-property! ^IndexAggregator aggr ^Keyword key Boolean)
      (apply-aggregator! ^DB @*db* ^IndexAggregator aggr)))
-  ([^IndexAggregator aggr ^Keyword key args]
-   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key Boolean args))
-  ([^DB db ^IndexAggregator aggr ^Keyword key args]
+  ([^IndexAggregator aggr ^Keyword key]
+   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key Boolean))
+  ([^DB db ^IndexAggregator aggr ^Keyword key]
    {:pre [(not-any? nil? [db aggr key key])]}
-   (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Boolean
-                      (merge {:db/tag? true} args))))
+   (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Boolean {:db/tag? true})))
 
 (defn declare-tags!
   ([args]
@@ -68,34 +63,30 @@
 
 (defn declare-to-one-relation!
   ([^Keyword key]
-   (declare-to-one-relation! key nil))
-  ([^Keyword key args]
    (let [aggr (aggregator)]
-     (declare-property! ^IndexAggregator aggr ^Keyword key Integer args)
+     (declare-property! ^IndexAggregator aggr ^Keyword key Integer)
      (apply-aggregator! ^DB @*db* ^IndexAggregator aggr)))
-  ([^IndexAggregator aggr ^Keyword key args]
-   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key Integer args))
-  ([^DB db ^IndexAggregator aggr ^Keyword key args]
+  ([^IndexAggregator aggr ^Keyword key]
+   (declare-property! ^DB @*db* ^IndexAggregator aggr ^Keyword key Integer))
+  ([^DB db ^IndexAggregator aggr ^Keyword key]
    {:pre [(not-any? nil? [db aggr key])]}
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Integer
-                      (merge {:db/relation? true
-                              :db/to-one-relation? true} args))))
+                      {:db/relation? true
+                       :db/to-one-relation? true})))
 
 (defn declare-to-many-relation!
   ([^Keyword key]
-   (declare-to-many-relation! ^Keyword key nil))
-  ([^Keyword key args]
    (let [aggr (aggregator)]
-     (declare-property! ^IndexAggregator aggr ^Keyword key int-array-class args)
+     (declare-property! ^IndexAggregator aggr ^Keyword key int-array-class)
      (apply-aggregator! ^DB @*db* ^IndexAggregator aggr)))
-  ([^IndexAggregator aggr ^Keyword key args]
-   (declare-property! ^IndexAggregator aggr ^Keyword key int-array-class args))
+  ([^IndexAggregator aggr ^Keyword key]
+   (declare-property! ^IndexAggregator aggr ^Keyword key int-array-class))
   ([^DB db ^IndexAggregator aggr ^Keyword key args]
    {:pre [(clojure.test/is (not-any? nil? [db aggr key]))]}
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key
                       int-array-class
-                      (merge {:db/relation? true
-                              :db/to-many-relation? true} args))))
+                      {:db/relation? true
+                       :db/to-many-relation? true})))
 
 (defn declare-relations!
   ([args opts]
