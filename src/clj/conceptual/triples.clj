@@ -1,15 +1,17 @@
 (ns conceptual.triples
-  (:use [conceptual.core]
-        [conceptual.arrays])
-  (:import [java.io Writer]
-           [conceptual.core DB DBMap$DBMapEntry]))
+  (:require [conceptual.core :refer [nsname seek max-id]]
+            [conceptual.arrays :refer [int-array-class]]
+            [clojure.java.io])
+  (:import [conceptual.core DBMap$DBMapEntry]))
+
+;; TODO: support DB and IndexAggregator arities
 
 (defn- map-entry->triples [e a v]
   (if (instance? int-array-class v)
     (map #(vector e a (seek % :db/key)) v)
     (vector e a v)))
 
-(defn- ->triple-reducer [s t]
+(defn ->triple-reducer [s t]
   (if (seq t)
     (reduce cons s t)
     (cons t s)))
