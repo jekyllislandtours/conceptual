@@ -1,4 +1,4 @@
-# TODO
+# Conceptual TODO
 
 # Prepare initial release
 
@@ -8,9 +8,13 @@
 * DONE use nippy to encode/decode EDN
 * DONE remove Joda DateTime dependency
 * DONE fix javac warnings
+* DONE support DB and IndexAggregator arities in schema
+* DONE clj-kondo fixes
 * IN-PROGRESS README.md
 * IN-PROGRESS basic walkthrough
 * IN-PROGRESS deep-dive imdb demo
+* fix arity and refactor triples namespace
+* refactory tupl-db namespace
 * implement unsupported fn's in Tupl
 * replace/add Fressian with Nippy
 * remove array types in favor of edn
@@ -30,7 +34,8 @@
 * DONE version
 * DONE upgrade build.clj to support install and deploy with sean cornfields build.clj
 * DONE make repo public
-* IN-PROGRESS publish to clojars
+* DONE publish to clojars
+* build on commit to main
 
 # Future Versions
 * [RoaringBitmap implementation](https://github.com/RoaringBitmap/RoaringBitmap)
