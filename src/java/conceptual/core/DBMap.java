@@ -259,14 +259,14 @@ public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, C
 
     @Override
     public IPersistentCollection cons(Object o) {
-        throw new UnsupportedOperationException("DBMap is read-only, so cons is not supported.");
-        //return asPersistentMap().cons(o);
+        //throw new UnsupportedOperationException("DBMap is read-only, so cons is not supported.");
+        return asPersistentMap().cons(o);
     }
 
     @Override
     public IPersistentCollection empty() {
-        throw new UnsupportedOperationException("DBMap is read-only, so empty is not supported.");
-        //return PersistentHashMap.create();
+        //throw new UnsupportedOperationException("DBMap is read-only, so empty is not supported.");
+        return PersistentHashMap.create();
     }
 
     @Override
@@ -289,8 +289,8 @@ public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, C
 
     @Override
     public Associative assoc(Object key, Object val) {
-        throw new UnsupportedOperationException("DBMap is read-only, so assoc is not supported.");
-        //return asPersistentMap().assoc(key, val);
+        //throw new UnsupportedOperationException("DBMap is read-only, so assoc is not supported.");
+        return asPersistentMap().assoc(key, val);
     }
 
     class DBMapEntry implements IMapEntry, Sequential, Comparable {

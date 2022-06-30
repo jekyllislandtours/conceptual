@@ -183,7 +183,6 @@ public final class PersistentDB implements WritableDB {
         final Object[] vs1 = new Object[ks1.length];
         vs1[0] = id;
         System.arraycopy(vs, 0, vs1, 1, ks.length);
-
         if (aggregator != null) {
             for (int key: ks1) {
                 aggregator.add(key, id);
