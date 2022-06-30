@@ -187,6 +187,14 @@
         (mapv #(vector (genre-tag %) {:imdb/genre? true
                                       :imdb/name %})))))
 
+(comment
+  (reset-db!)
+  (declare-genres!)
+  (c/seek :imdb/genre.action?)
+  (c/seek :imdb/genre.western?)
+  (->> (c/idents :imdb/genre?)
+       (clojure.pprint/pprint)))
+
 (def regions
   ["AD" "AE" "AF" "AG" "AI" "AL" "AM" "AN" "AO" "AQ" "AR" "AS" "AT" "AU" "AW" "AZ" "BA" "BB" "BD" "BE" "BF" "BG" "BH" "BI" "BJ" "BM" "BN" "BO" "BR" "BS" "BT" "BUMM" "BW" "BY" "BZ" "CA" "CD" "CF" "CG" "CH" "CI" "CK" "CL" "CM" "CN" "CO" "CR" "CSHH" "CSXX" "CU" "CV" "CW" "CY" "CZ" "DDDE" "DE" "DJ" "DK" "DM" "DO" "DZ" "EC" "EE" "EG" "EH" "ER" "ES" "ET" "FI" "FJ" "FM" "FO" "FR" "GA" "GB" "GD" "GE" "GF" "GH" "GI" "GL" "GM" "GN" "GP" "GQ" "GR" "GT" "GU" "GW" "GY" "HK" "HN" "HR" "HT" "HU" "ID" "IE" "IL" "IM" "IN" "IQ" "IR" "IS" "IT" "JE" "JM" "JO" "JP" "KE" "KG" "KH" "KI" "KM" "KN" "KP" "KR" "KW" "KY" "KZ" "LA" "LB" "LC" "LI" "LK" "LR" "LS" "LT" "LU" "LV" "LY" "MA" "MC" "MD" "ME" "MG" "MH" "MK" "ML" "MM" "MN" "MO" "MP" "MQ" "MR" "MS" "MT" "MU" "MV" "MW" "MX" "MY" "MZ" "NA" "NC" "NE" "NG" "NI" "NL" "NO" "NP" "NR" "NU" "NZ" "OM" "PA" "PE" "PF" "PG" "PH" "PK" "PL" "PR" "PS" "PT" "PW" "PY" "QA" "RE" "RO" "RS" "RU" "RW" "SA" "SB" "SC" "SD" "SE" "SG" "SH" "SI" "SK" "SL" "SM" "SN" "SO" "SR" "ST" "SUHH" "SV" "SY" "SZ" "TC" "TD" "TG" "TH" "TJ" "TL" "TM" "TN" "TO" "TR" "TT" "TV" "TW" "TZ" "UA" "UG" "US" "UY" "UZ" "VA" "VC" "VDVN" "VE" "VG" "VI" "VN" "VU" "WS" "XAS" "XAU" "XEU" "XKO" "XKV" "XNA" "XPI" "XSA" "XSI" "XWG" "XWW" "XYU" "YE" "YUCS" "ZA" "ZM" "ZRCD" "ZW"])
 
@@ -282,75 +290,6 @@
                       {:imdb/primary-profession? true
                        :imdb/name %}))
        s/declare-tags!))
-
-(defn declare-schema! []
-  (s/declare-properties!
-   [[:imdb/nconst String]
-    [:imdb/tconsts clojure.lang.PersistentHashSet] ;; there can be multiple records for one title...
-    [:imdb/parent-tconst String]
-    [:imdb/name String]
-    [:imdb/primary-name String]
-    [:imdb/primary-title String]
-    [:imdb/original-title String]
-    [:imdb/average-rating Double]
-    [:imdb/num-votes Integer]
-    [:imdb/runtime-minutes Integer]
-    [:imdb/season-number Integer]
-    [:imdb/episode-number Integer]
-    [:imdb/ordering Integer]
-    [:imdb/year Integer]
-    [:imdb/start-year Integer]
-    [:imdb/end-year Integer]
-    [:imdb/birth-year Integer]
-    [:imdb/death-year Integer]
-    [:imdb/genres clojure.lang.PersistentHashSet]])
-
-  (s/declare-relations!
-   [[:imdb/start-year]
-    [:imdb/end-year]]
-   :type :to-one)
-
-  (s/declare-relations!
-   [[:imdb/titles]
-    [:imdb/versions]
-    [:imdb/directors]
-    [:imdb/writers]
-    [:imdb/principles]
-    [:imdb/professions]
-    [:imdb/known-for-titles]]
-   :type :to-many)
-
-  (s/declare-tags!
-   (concat
-    [[:imdb/year?]
-     [:imdb/title?]
-     [:imdb/title-type?]
-     [:imdb/version?]
-     [:imdb/version-type?]
-     [:imdb/version-attribute?]
-     [:imdb/original-title?]
-     [:imdb/region?]
-     [:imdb/language?]
-     [:imdb/person?]
-     [:imdb/crew?]
-     [:imdb/writer?]
-     [:imdb/director?]
-     [:imdb/actor?]
-     [:imdb/season?]
-     [:imdb/episode?]
-     [:imdb/adult?]
-     [:imdb/genre?]
-     [:imdb/job?]
-     [:imdb/job-category?]
-     [:imdb/primary-profession?]]))
-
-  (declare-genres!)
-  (declare-regions!)
-  (declare-languages!)
-  (declare-years!)
-  (declare-version-types!)
-  (declare-version-attributes!)
-  (declare-primary-professions!))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; title ratings - :title.ratings
@@ -656,6 +595,71 @@
     (.start t)
     (reset! runner-thread t)))
 
+;;(c/reset-db!)
+
+(defn declare-schema! []
+  ;;(s/declare-property! :imdb/nconst String)
+  (s/declare-properties!
+   [[:imdb/nconst String]
+    [:imdb/tconsts clojure.lang.PersistentHashSet] ;; there can be multiple records for one title...
+    [:imdb/parent-tconst String]
+    [:imdb/name String]
+    [:imdb/primary-name String]
+    [:imdb/primary-title String]
+    [:imdb/original-title String]
+    [:imdb/average-rating Double]
+    [:imdb/num-votes Integer]
+    [:imdb/runtime-minutes Integer]
+    [:imdb/season-number Integer]
+    [:imdb/episode-number Integer]
+    [:imdb/ordering Integer]
+    [:imdb/year Integer]
+    [:imdb/start-year Integer]
+    [:imdb/end-year Integer]
+    [:imdb/birth-year Integer]
+    [:imdb/death-year Integer]
+    [:imdb/genres clojure.lang.PersistentHashSet]])
+
+  (s/declare-to-many-relations!
+   [[:imdb/titles]
+    [:imdb/versions]
+    [:imdb/directors]
+    [:imdb/writers]
+    [:imdb/principles]
+    [:imdb/professions]
+    [:imdb/known-for-titles]])
+
+  (s/declare-tags!
+   [[:imdb/genre?]
+    [:imdb/year?]
+    [:imdb/title?]
+    [:imdb/title-type?]
+    [:imdb/version?]
+    [:imdb/version-type?]
+    [:imdb/version-attribute?]
+    [:imdb/original-title?]
+    [:imdb/region?]
+    [:imdb/language?]
+    [:imdb/person?]
+    [:imdb/crew?]
+    [:imdb/writer?]
+    [:imdb/director?]
+    [:imdb/actor?]
+    [:imdb/season?]
+    [:imdb/episode?]
+    [:imdb/adult?]
+    [:imdb/job?]
+    [:imdb/job-category?]
+    [:imdb/primary-profession?]])
+
+  (declare-genres!)
+  (declare-regions!)
+  (declare-languages!)
+  (declare-years!)
+  (declare-version-types!)
+  (declare-version-attributes!)
+  (declare-primary-professions!))
+
 (defn reset-db! []
   (reset! *ratings* [])
   (reset! *const->id* {})
@@ -670,6 +674,8 @@
 
   ;; reset the db so you can start over
   (reset-db!)
+  ;;(c/seek :imdb/genre.action?)
+  ;;(c/seek :imdb/genre.western?)
 
   ;; dump entire db to stdout - don't use if db is too big :D
   (c/dump)
@@ -693,6 +699,8 @@
 
   ;; check out last entry
   (clojure.pprint/pprint (c/seek (c/max-id)))
+
+  ;;(c/seek :imdb/crew?)
 
   ;; check out a title
   (c/seek :imdb/The_Shawshank_Redemption)
