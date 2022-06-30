@@ -687,14 +687,8 @@
   ;; check out last entry
   (clojure.pprint/pprint (c/seek (c/max-id)))
 
-  ;;(c/seek :imdb/crew?)
-
   ;; check out a title
   (c/seek :imdb/The_Shawshank_Redemption)
-
-  ;;(c/seek :imdb/genre.action?)
-
-  ;;(c/seek :db/ids)
 
   ;; some titles have the year in the key to disabiguate
   (c/seek :imdb/The_Dark_Knight.2008)
