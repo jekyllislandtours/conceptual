@@ -8,7 +8,7 @@
            [clojure.lang IFn Keyword]))
 
 ;; name of default implicit db
-(def ^{:dynamic true :private true} *default-identity* :default)
+(def ^:dynamic *default-identity* :default)
 
 ;; internal keys
 (def ^{:private true :const true} -id (int DB/ID_ID))
@@ -87,14 +87,14 @@
 
 (defn key->id
   "Given a keyword identity returns the id."
-  ([^Keyword k] (key->id @*db* k))
-  ([^DB db ^Keyword k] (.keywordToId db k)))
+  ([^Keyword k] (key->id ^DB @*db* ^Keyword k))
+  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
 (defn keys->ids
   "Returns a sorted int array representing a collection of keywords."
   ([ks] (keys->ids @*db* ks))
   ([^DB db ks]
-   (let [f (partial key->id db)]
+   (let [f (partial key->id ^DB db)]
      (->> (map f ks)
           (into #{})
           (sort)
@@ -105,16 +105,16 @@
   ([key] (key-ids @*db* key))
   ([^DB db key]
    (if (instance? Number key)
-     (.getKeys db ^int key)
+     (.getKeys ^DB db ^int key)
      (when (keyword? key)
-       (.getKeys db ^int (key->id db key))))))
+       (.getKeys ^DB db ^int (key->id db key))))))
 
 ;; TODO: reconcile this with normalize-ids
 (defn ordered-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
   ([ks] (ordered-ids @*db* ks))
-  ([db ks] (let [f (partial key->id db)] (int-array (map f ks)))))
+  ([db ks] (let [f (partial key->id ^DB db)] (int-array (map f ks)))))
 
 (defn normalize-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
@@ -124,19 +124,19 @@
             (instance? int-array-class ks) ks
             (or (vector? ks)
                 (list? ks)
-                (set? ks)) (let [f (partial key->id db)]
+                (set? ks)) (let [f (partial key->id ^DB db)]
                              (int-array (map f ks))))))
 
 (defn id->key
   "Given and id returns the key."
   ([id] (id->key @*db* ^int id))
-  ([^DB db id] (.getValue db ^int id ^int -key)))
+  ([^DB db id] (.getValue ^DB db ^int id ^int -key)))
 
 (defn ids->keys
   "Given a collection of ids returns a collection of keys."
-  ([ids] (ids->keys @*db* ids))
-  ([^DB db ids]
-   (let [f (partial id->key db)] (map f ids))))
+  ([^ints ids] (ids->keys @*db* ids))
+  ([^DB db ^ints ids]
+   (let [f (partial id->key ^DB db)] (map f ids))))
 
 (declare seek)
 
@@ -148,11 +148,14 @@
    (insert-1! @*db* aggr ks vs))
   ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
    {:pre [(clojure.test/is (not-any? nil? [ks vs]))]}
+   ;;(println "insert-1!: " (seq ks) (seq vs))
    (reset! (db-atom db)
            (.insert ^WritableDB db
                     ^IndexAggregator aggr
                     ^ints ks
-                    #^Object vs))))
+                    #^Object vs))
+   ;;(println "insert-1!! " (id->key @*db* (get ks 0)) (->persistent-map (seek  @*db* (get ks 0))))
+   ))
 
 (defn insert!
   "Inserts into db. Must be a WritableDB."
@@ -160,20 +163,20 @@
   ([^IndexAggregator aggr arg] (insert! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    {:pre [(when-let [ks (keys arg)]
-            (clojure.test/is (not-any? nil? (map key->id ks))
-                             (map vector ks (map key->id ks))))]}
+            (clojure.test/is (not-any? nil? (map (partial key->id ^DB db) ks))
+                             (map vector ks (map (partial key->id ^DB db) ks))))]}
    (try
-     (when-not (seek (:db/key arg))
+     (when-not (seek ^DB db (:db/key arg))
        (let [items (->> (seq arg)
-                        (map #(vector (key->id db (first %)) (second %)))
+                        (map #(vector (key->id ^DB db (first %)) (second %)))
                         (sort-by first <))
              ks (int-array (map first items))
              vs (object-array (map second items))]
-         (insert-1! db aggr ks vs)))
+         (insert-1! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs)))
      (catch Exception e
        (println (.getMessage e))
        (println (->> (seq arg)
-                     (map #(vector (try (key->id db (first %))
+                     (map #(vector (try (key->id ^DB db (first %))
                                         (catch Exception e
                                           (identity e)
                                           nil)) (second %)))))))))
@@ -198,7 +201,7 @@
    (update-0! @*db* aggr ^int id ^int k v))
   ([^WritableDB db ^IndexAggregator aggr id k ^Object v]
    {:pre [(clojure.test/is (not-any? nil? [id k]))]}
-   (reset! (db-atom db) (.update db aggr ^int id ^int k v))))
+   (reset! (db-atom db) (.update ^DB db ^IndexAggregator aggr ^int id ^int k v))))
 
 (defn update-1!
   "Updates an array of values given an array of keys."
@@ -406,7 +409,10 @@
    (apply-aggregator! ^DB @*db* aggr))
   ([^DB db ^IndexAggregator aggr]
    (doseq [k (.keys aggr)]
-     (update-0! ^DB db k (key->id ^DB db :db/ids)
+     (reset! (db-atom db)
+             (.update db aggr ^int k ^int (key->id ^DB db :db/ids)
+                      (int-sets/union (ids ^DB db k) (.ids aggr k))))
+     #_(update-0! ^DB db k (key->id ^DB db :db/ids)
                 (int-sets/union (ids ^DB db k) (.ids aggr k))))))
 
 (defmacro with-aggr-0
