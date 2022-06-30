@@ -187,14 +187,6 @@
         (mapv #(vector (genre-tag %) {:imdb/genre? true
                                       :imdb/name %})))))
 
-(comment
-  (reset-db!)
-  (declare-genres!)
-  (c/seek :imdb/genre.action?)
-  (c/seek :imdb/genre.western?)
-  (->> (c/idents :imdb/genre?)
-       (clojure.pprint/pprint)))
-
 (def regions
   ["AD" "AE" "AF" "AG" "AI" "AL" "AM" "AN" "AO" "AQ" "AR" "AS" "AT" "AU" "AW" "AZ" "BA" "BB" "BD" "BE" "BF" "BG" "BH" "BI" "BJ" "BM" "BN" "BO" "BR" "BS" "BT" "BUMM" "BW" "BY" "BZ" "CA" "CD" "CF" "CG" "CH" "CI" "CK" "CL" "CM" "CN" "CO" "CR" "CSHH" "CSXX" "CU" "CV" "CW" "CY" "CZ" "DDDE" "DE" "DJ" "DK" "DM" "DO" "DZ" "EC" "EE" "EG" "EH" "ER" "ES" "ET" "FI" "FJ" "FM" "FO" "FR" "GA" "GB" "GD" "GE" "GF" "GH" "GI" "GL" "GM" "GN" "GP" "GQ" "GR" "GT" "GU" "GW" "GY" "HK" "HN" "HR" "HT" "HU" "ID" "IE" "IL" "IM" "IN" "IQ" "IR" "IS" "IT" "JE" "JM" "JO" "JP" "KE" "KG" "KH" "KI" "KM" "KN" "KP" "KR" "KW" "KY" "KZ" "LA" "LB" "LC" "LI" "LK" "LR" "LS" "LT" "LU" "LV" "LY" "MA" "MC" "MD" "ME" "MG" "MH" "MK" "ML" "MM" "MN" "MO" "MP" "MQ" "MR" "MS" "MT" "MU" "MV" "MW" "MX" "MY" "MZ" "NA" "NC" "NE" "NG" "NI" "NL" "NO" "NP" "NR" "NU" "NZ" "OM" "PA" "PE" "PF" "PG" "PH" "PK" "PL" "PR" "PS" "PT" "PW" "PY" "QA" "RE" "RO" "RS" "RU" "RW" "SA" "SB" "SC" "SD" "SE" "SG" "SH" "SI" "SK" "SL" "SM" "SN" "SO" "SR" "ST" "SUHH" "SV" "SY" "SZ" "TC" "TD" "TG" "TH" "TJ" "TL" "TM" "TN" "TO" "TR" "TT" "TV" "TW" "TZ" "UA" "UG" "US" "UY" "UZ" "VA" "VC" "VDVN" "VE" "VG" "VI" "VN" "VU" "WS" "XAS" "XAU" "XEU" "XKO" "XKV" "XNA" "XPI" "XSA" "XSI" "XWG" "XWW" "XYU" "YE" "YUCS" "ZA" "ZM" "ZRCD" "ZW"])
 
@@ -595,10 +587,7 @@
     (.start t)
     (reset! runner-thread t)))
 
-;;(c/reset-db!)
-
 (defn declare-schema! []
-  ;;(s/declare-property! :imdb/nconst String)
   (s/declare-properties!
    [[:imdb/nconst String]
     [:imdb/tconsts clojure.lang.PersistentHashSet] ;; there can be multiple records for one title...
@@ -674,8 +663,6 @@
 
   ;; reset the db so you can start over
   (reset-db!)
-  ;;(c/seek :imdb/genre.action?)
-  ;;(c/seek :imdb/genre.western?)
 
   ;; dump entire db to stdout - don't use if db is too big :D
   (c/dump)
@@ -704,6 +691,10 @@
 
   ;; check out a title
   (c/seek :imdb/The_Shawshank_Redemption)
+
+  ;;(c/seek :imdb/genre.action?)
+
+  ;;(c/seek :db/ids)
 
   ;; some titles have the year in the key to disabiguate
   (c/seek :imdb/The_Dark_Knight.2008)
