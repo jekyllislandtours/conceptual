@@ -402,16 +402,14 @@
   (if (bound? #'*aggr*) *aggr* (IndexAggregator.)))
 
 (defn apply-aggregator!
-  ([]
-   (when (bound? #'*aggr*)
-     (apply-aggregator! ^DB @*db* ^IndexAggregator *aggr*)))
   ([^IndexAggregator aggr]
-   (apply-aggregator! ^DB @*db* aggr))
-  ([^DB db ^IndexAggregator aggr]
+   (apply-aggregator! ^Keyword *default-identity* aggr))
+  ([^Keyword db-key ^IndexAggregator aggr]
    (doseq [k (.keys aggr)]
-     (reset! (db-atom db)
-             (.update db aggr ^int k ^int (key->id ^DB db :db/ids)
-                      (int-sets/union (ids ^DB db k) (.ids aggr k))))
+     (let [-db (db db-key)]
+       (reset! (db-atom -db)
+               (.update ^DB -db aggr ^int k ^int (key->id ^DB -db :db/ids)
+                        (int-sets/union (ids ^DB -db k) (.ids aggr k)))))
      #_(update-0! ^DB db k (key->id ^DB db :db/ids)
                 (int-sets/union (ids ^DB db k) (.ids aggr k))))))
 
