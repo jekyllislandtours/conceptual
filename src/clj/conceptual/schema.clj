@@ -21,18 +21,11 @@
    (declare-property! ^DB @*db* ^IndexAggregator aggr key type nil))
   ([^DB db ^IndexAggregator aggr ^Keyword key type opts]
    {:pre [(clojure.test/is (not-any? nil? [db aggr key type]))]}
-   (try
-     (let [c (merge {:db/key key
-                     :db/type type
-                     :db/property? true}
-                    opts)]
-       ;;(println "declare-property!:" key c)
-       (insert! ^DB db ^IndexAggregator aggr c)
-       ;;(println "declare-property!!:" (key->id ^DB @*db* key))
-       )
-     (catch Exception e
-       (println key type opts)
-       (throw e)))))
+   (let [c (merge {:db/key key
+                   :db/type type
+                   :db/property? true}
+                  opts)]
+     (insert! ^DB db ^IndexAggregator aggr c))))
 
 (defn declare-properties!
   "Given a list of property specs of the form [key type] or [key type opts],
