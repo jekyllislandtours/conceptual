@@ -1,6 +1,6 @@
 (ns conceptual.tupl
   (:refer-clojure :exclude [load])
-  (:require [conceptual.int-sets :as int-sets]
+  (:require ;;[conceptual.int-sets :as int-sets]
             [conceptual.arrays :as arrays]
             [conceptual.core :as core])
   (:import [conceptual.core DB TuplDB]
@@ -153,18 +153,20 @@
   (let [^Database d (db db-key)]
     (with-bindings* {#'*db* d} f)))
 
-(defmacro with-db [^Database db & forms]
+(defmacro with-db
   "Evaluates body in the context of a specified database. The binding
   provides the the database for the evaluation of the body."
+  [^Database db & forms]
   `(with-db* ~db (fn [] ~@forms)))
 
 (defn with-index* [idx f]
   (let [^Index idx (index idx)]
     (with-bindings* {#'*index* idx} f)))
 
-(defmacro with-index [idx & forms]
+(defmacro with-index
   "Evaluates body in the context of a specified index. The binding
   provides the the index for the evaluation of the body."
+  [idx & forms]
   `(with-index* ~idx (fn [] ~@forms)))
 
 (defn with-cursor*
@@ -267,7 +269,7 @@
   "Returns a copy of the value for the given key, or null if no matching entry exists."
   ([k] (load *index* k))
   ([idx k]
-   (if-let [r (load-0 (index idx)
+   (when-let [r (load-0 (index idx)
                       (arrays/ensure-bytes k))]
      (arrays/bytes-> r))))
 
@@ -298,7 +300,9 @@
        (loop [k (.key cursor)
               result []]
          (if k
-           (let [v (.value cursor)]
+           (do
+             ;; this v was not used - bug?
+             ;;let [v (.value cursor)]
              (if -stop
                (.nextLt cursor -stop)
                (.next cursor))

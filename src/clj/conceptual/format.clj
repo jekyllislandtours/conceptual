@@ -1,7 +1,6 @@
 (ns conceptual.format
   (:require [conceptual.core :as c])
-  (:import [clojure.lang Keyword]
-           [conceptual.core DBMap]))
+  (:import [conceptual.core DBMap]))
 
 (defn format-to-many-relation [r]
   (if (c/value :db/key (get r 0))

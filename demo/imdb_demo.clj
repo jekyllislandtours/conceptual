@@ -283,75 +283,6 @@
                        :imdb/name %}))
        s/declare-tags!))
 
-(defn declare-schema! []
-  (s/declare-properties!
-   [[:imdb/nconst String]
-    [:imdb/tconsts clojure.lang.PersistentHashSet] ;; there can be multiple records for one title...
-    [:imdb/parent-tconst String]
-    [:imdb/name String]
-    [:imdb/primary-name String]
-    [:imdb/primary-title String]
-    [:imdb/original-title String]
-    [:imdb/average-rating Double]
-    [:imdb/num-votes Integer]
-    [:imdb/runtime-minutes Integer]
-    [:imdb/season-number Integer]
-    [:imdb/episode-number Integer]
-    [:imdb/ordering Integer]
-    [:imdb/year Integer]
-    [:imdb/start-year Integer]
-    [:imdb/end-year Integer]
-    [:imdb/birth-year Integer]
-    [:imdb/death-year Integer]
-    [:imdb/genres clojure.lang.PersistentHashSet]])
-
-  (s/declare-relations!
-   [[:imdb/start-year]
-    [:imdb/end-year]]
-   :type :to-one)
-
-  (s/declare-relations!
-   [[:imdb/titles]
-    [:imdb/versions]
-    [:imdb/directors]
-    [:imdb/writers]
-    [:imdb/principles]
-    [:imdb/professions]
-    [:imdb/known-for-titles]]
-   :type :to-many)
-
-  (s/declare-tags!
-   (concat
-    [[:imdb/year?]
-     [:imdb/title?]
-     [:imdb/title-type?]
-     [:imdb/version?]
-     [:imdb/version-type?]
-     [:imdb/version-attribute?]
-     [:imdb/original-title?]
-     [:imdb/region?]
-     [:imdb/language?]
-     [:imdb/person?]
-     [:imdb/crew?]
-     [:imdb/writer?]
-     [:imdb/director?]
-     [:imdb/actor?]
-     [:imdb/season?]
-     [:imdb/episode?]
-     [:imdb/adult?]
-     [:imdb/genre?]
-     [:imdb/job?]
-     [:imdb/job-category?]
-     [:imdb/primary-profession?]]))
-
-  (declare-genres!)
-  (declare-regions!)
-  (declare-languages!)
-  (declare-years!)
-  (declare-version-types!)
-  (declare-version-attributes!)
-  (declare-primary-professions!))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; title ratings - :title.ratings
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -601,12 +532,8 @@
 
 (defn upsert-row! [table-key aggr row]
   (if-let [prev (or (some-> row :imdb/tconsts first (@*const->id*) c/seek c/->persistent-map)
-                    (some-> row :db/id c/seek c/->persistent-map)
-                    ;;(some-> row :db/key c/seek c/->persistent-map)
-                    )]
-    ;; yeah there are multiple records for the same thing
-    (do ;;(println "\n" (merge-concepts table-key prev row))
-        (c/update! aggr (merge-concepts table-key prev row)))
+                    (some-> row :db/id c/seek c/->persistent-map))]
+    (c/update! aggr (merge-concepts table-key prev row))
     (do (c/insert! aggr row)
         (when-let [const (or (some-> row :imdb/tconsts first)
                              (some-> row :imdb/nconst))]
@@ -659,6 +586,68 @@
                            (load-table! table-key))))]
     (.start t)
     (reset! runner-thread t)))
+
+(defn declare-schema! []
+  (s/declare-properties!
+   [[:imdb/nconst String]
+    [:imdb/tconsts clojure.lang.PersistentHashSet] ;; there can be multiple records for one title...
+    [:imdb/parent-tconst String]
+    [:imdb/name String]
+    [:imdb/primary-name String]
+    [:imdb/primary-title String]
+    [:imdb/original-title String]
+    [:imdb/average-rating Double]
+    [:imdb/num-votes Integer]
+    [:imdb/runtime-minutes Integer]
+    [:imdb/season-number Integer]
+    [:imdb/episode-number Integer]
+    [:imdb/ordering Integer]
+    [:imdb/year Integer]
+    [:imdb/start-year Integer]
+    [:imdb/end-year Integer]
+    [:imdb/birth-year Integer]
+    [:imdb/death-year Integer]
+    [:imdb/genres clojure.lang.PersistentHashSet]])
+
+  (s/declare-to-many-relations!
+   [[:imdb/titles]
+    [:imdb/versions]
+    [:imdb/directors]
+    [:imdb/writers]
+    [:imdb/principles]
+    [:imdb/professions]
+    [:imdb/known-for-titles]])
+
+  (s/declare-tags!
+   [[:imdb/genre?]
+    [:imdb/year?]
+    [:imdb/title?]
+    [:imdb/title-type?]
+    [:imdb/version?]
+    [:imdb/version-type?]
+    [:imdb/version-attribute?]
+    [:imdb/original-title?]
+    [:imdb/region?]
+    [:imdb/language?]
+    [:imdb/person?]
+    [:imdb/crew?]
+    [:imdb/writer?]
+    [:imdb/director?]
+    [:imdb/actor?]
+    [:imdb/season?]
+    [:imdb/episode?]
+    [:imdb/adult?]
+    [:imdb/job?]
+    [:imdb/job-category?]
+    [:imdb/primary-profession?]])
+
+  (declare-genres!)
+  (declare-regions!)
+  (declare-languages!)
+  (declare-years!)
+  (declare-version-types!)
+  (declare-version-attributes!)
+  (declare-primary-professions!))
 
 (defn reset-db! []
   (reset! *ratings* [])

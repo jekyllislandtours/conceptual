@@ -1,11 +1,9 @@
 (ns conceptual.word-fixes
-  (:use [conceptual.arrays]
-        [conceptual.core])
+  (:require [conceptual.arrays]
+            [conceptual.core :refer [id->key ids nsname project seek]])
   (:require [conceptual.int-sets :as int-sets]
-            [conceptual.tupl :as tupl]
-            [clojure.string :as string])
-  (:import [conceptual.core DB]
-           [conceptual.util IntegerSets]))
+            [conceptual.tupl :as tupl])
+  (:import [conceptual.util IntegerSets]))
 
 (defn- string->words [s]
   (->> (.split ^String s "[\\s\\./_-]")
@@ -25,17 +23,16 @@
         result))))
 
 (defn- non-overlapping-intervals [cnt]
-  (let [last-idx (dec cnt)]
-    (loop [result nil
-           start 0
-           end 1]
-      (if (= start cnt)
-        result
-        (recur (cons [start end] result)
-               (if (= end cnt) (inc start) start)
-               (if (= end cnt)
-                 (+ start 2)
-                 (inc end)))))))
+  (loop [result nil
+         start 0
+         end 1]
+    (if (= start cnt)
+      result
+      (recur (cons [start end] result)
+             (if (= end cnt) (inc start) start)
+             (if (= end cnt)
+               (+ start 2)
+               (inc end))))))
 
 (defn word->infixes [word]
   (->> (non-overlapping-intervals (.length ^String word))
@@ -90,7 +87,7 @@
          (map (fn [[k v]] (tupl/store! idx k v)))
          (dorun))))
 
-(comment (tupl/drop-index :name->id))
+(comment (tupl/drop! :name->id))
 
 (comment (tupl/index-size :name->id)
          (tupl/index-size :prefix)
@@ -102,7 +99,7 @@
 (comment (tupl/drop! :prefix)
          (tupl/drop! :infix))
 
-(comment (tupl/drop-index :name->id))
+(comment (tupl/drop! :name->id))
 
 (comment (.isClosed (tupl/index :name->id)))
 
