@@ -26,12 +26,18 @@
 
 (defn jar [_]
   (compile-java nil)
-  (bb/jar {:lib lib :version version}))
+  (bb/jar {:lib lib
+           :version version
+           :src-dirs ["src/clj"]}))
 
 (defn install [_]
   (jar nil)
   (println "Installing jar into local Maven repo cache...")
-  (bb/install {:lib lib :version version}))
+  (bb/install {:lib lib
+               :version version
+               :src-dirs ["src/clj"]}))
 
 (defn deploy [_]
-  (bb/deploy {:lib lib :version version}))
+  (bb/deploy {:lib lib
+              :version version
+              :src-dirs ["src/clj"]}))
