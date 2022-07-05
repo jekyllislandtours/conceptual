@@ -28,7 +28,7 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
 
 ### Usage
 
-Add to :deps map in your deps.edn:
+Add to :deps in your deps.edn:
 
 ```clojure
 conceptual {:mvn/version "0.1.0"}
