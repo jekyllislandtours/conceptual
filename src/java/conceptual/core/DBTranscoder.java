@@ -20,6 +20,9 @@ import conceptual.util.IntArrayPool;
 
 import java.io.*;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 import java.time.Instant;
 
 import java.util.Date;
@@ -62,6 +65,8 @@ public class DBTranscoder {
     public static final int DATE_ARRAY = 20;
     public static final int INSTANT_ARRAY = 21;
     public static final int EDN = 22;
+    public static final int BIGINTEGER = 23;
+    public static final int BIGDECIMAL = 24;
 
     public static String nsname(Keyword k) {
         if (k.getNamespace() != null) {
@@ -414,15 +419,21 @@ public class DBTranscoder {
             } else if (clazz == Character.class) {
                 dos.writeInt(CHARACTER);
                 dos.writeChar((Character) val);
-            } else if (clazz == Date.class) { // purposefully normalizing on joda time
+            } else if (clazz == Date.class) { // purposefully normalizing on Instant
                 dos.writeInt(INSTANT);
                 dos.writeLong(((Date) val).getTime());
             } else if (clazz == Instant.class) {
                 dos.writeInt(INSTANT);
                 dos.writeLong(((Instant) val).toEpochMilli());
-            } else if (clazz == java.sql.Timestamp.class) { // purposefully normalizing on joda time
+            } else if (clazz == java.sql.Timestamp.class) { // purposefully normalizing on Instant
                 dos.writeInt(INSTANT);
                 dos.writeLong(((Date) val).getTime());
+            } else if (clazz == BigInteger.class) {
+                dos.writeInt(BIGINTEGER);
+                dos.writeUTF(val.toString());
+            } else if (clazz == BigDecimal.class) {
+                dos.writeInt(BIGDECIMAL);
+                dos.writeUTF(val.toString());
             } else if (clazz == java.lang.Class.class) {
                 dos.writeInt(CLASS);
                 if (val == java.sql.Timestamp.class ||
@@ -640,6 +651,12 @@ public class DBTranscoder {
             }
             case DATE: {
                 return Instant.ofEpochMilli(dis.readLong());
+            }
+            case BIGINTEGER: {
+                return new BigInteger(dis.readUTF());
+            }
+            case BIGDECIMAL: {
+                return new BigDecimal(dis.readUTF());
             }
             case NULL: {
                 return null;
