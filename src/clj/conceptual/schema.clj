@@ -250,37 +250,37 @@
                     (value ^DB db fkw id)))))))
 
 ;; TODO support DB and IndexAggregator overloading, fix clj-kondo issues
-;; (defn-checked add-to-one-relation!
-;;   [{:keys [from to join-on fk-join-on relation]
-;;     :or {fk-join-on nil}}]
-;;   (declare-to-one-relation! relation)
-;;   (with-aggr [aggr]
-;;     (let [->ids (multi-key-map to join-on)
-;;           fk (if fk-join-on fk-join-on join-on)]
-;;       (->> (ids from)
-;;            (map seek)
-;;            (filter #(not-empty (->ids (fk %))))
-;;            (mapcat (fn [m] (map #(update-0! aggr (:db/id m) (key->id relation) %) (->ids (fk m)))))
-;;            dorun))))
+(defn-checked add-to-one-relation!
+  [{:keys [from to join-on fk-join-on relation]
+    :or {fk-join-on nil}}]
+  (declare-to-one-relation! relation)
+  (with-aggr [aggr]
+    (let [->ids (multi-key-map to join-on)
+          fk (if fk-join-on fk-join-on join-on)]
+      (->> (ids from)
+           (map seek)
+           (filter #(not-empty (->ids (fk %))))
+           (mapcat (fn [m] (map #(update-0! aggr (:db/id m) (key->id relation) %) (->ids (fk m)))))
+           dorun))))
 
 ;; TODO support DB and IndexAggregator overloading, fix clj-kondo issues
-;; (defn-checked add-to-many-relation!
-;;   [{:keys [from to pk-join-on join-on relation filter-to-fn]
-;;     :or {filter-to-fn (constantly true)
-;;          filter-from-fm (constantly true)
-;;          pk-join-on nil}}]
-;;   (declare-to-many-relation! relation)
-;;   (with-aggr [aggr]
-;;     (let [pk (if pk-join-on pk-join-on join-on)
-;;           ->ids (multi-key-map from pk)]
-;;       (->> (ids to)
-;;            (map seek)
-;;            (filter filter-to-fn)
-;;            (map (juxt join-on :db/id))
-;;            (group-by first)
-;;            (mapcat (fn [m]
-;;                      (map #(vector % (int-array (sort (into #{} (map second (second m))))))
-;;                           (->ids (first m)))))
-;;            (filter (comp not nil? first))
-;;            (map #(update-0! aggr (first %) (key->id relation) (second %)))
-;;            dorun))))
+(defn-checked add-to-many-relation!
+  [{:keys [from to pk-join-on join-on relation filter-to-fn]
+    :or {filter-to-fn (constantly true)
+         filter-from-fm (constantly true)
+         pk-join-on nil}}]
+  (declare-to-many-relation! relation)
+  (with-aggr [aggr]
+    (let [pk (if pk-join-on pk-join-on join-on)
+          ->ids (multi-key-map from pk)]
+      (->> (ids to)
+           (map seek)
+           (filter filter-to-fn)
+           (map (juxt join-on :db/id))
+           (group-by first)
+           (mapcat (fn [m]
+                     (map #(vector % (int-array (sort (into #{} (map second (second m))))))
+                          (->ids (first m)))))
+           (filter (comp not nil? first))
+           (map #(update-0! aggr (first %) (key->id relation) (second %)))
+           dorun))))
