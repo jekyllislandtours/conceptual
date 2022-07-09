@@ -4,9 +4,9 @@ import clojure.lang.IFn;
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
 import clojure.lang.MapEntry;
+import clojure.lang.LazySeq;
 import clojure.lang.PersistentArrayMap;
 import clojure.lang.PersistentHashMap;
-
 import clojure.lang.PersistentHashSet;
 import clojure.lang.PersistentList;
 import clojure.lang.PersistentQueue;
@@ -508,7 +508,8 @@ public class DBTranscoder {
                 } else {
                     dos.writeInt(0);
                 }
-            } else if (clazz == PersistentArrayMap.class ||
+            } else if (clazz == LazySeq.class ||
+                       clazz == PersistentArrayMap.class ||
                        clazz == PersistentHashMap.class ||
                        clazz == PersistentHashSet.class ||
                        clazz == PersistentList.class ||
