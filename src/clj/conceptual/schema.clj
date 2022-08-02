@@ -6,8 +6,7 @@
                      aggregator apply-aggregator! with-aggr
                      insert! update! update-0!
                      seek value value-0 valuei key->id ids project]]
-            [conceptual.contracts :refer [defn-checked]]
-            [clojure.test])
+            [conceptual.contracts :refer [defn-checked]])
   (:import [conceptual.core DB IndexAggregator]
            [clojure.lang Keyword]))
 
@@ -20,7 +19,7 @@
   ([^DB db ^IndexAggregator aggr ^Keyword key type]
    (declare-property! ^DB @*db* ^IndexAggregator aggr key type nil))
   ([^DB db ^IndexAggregator aggr ^Keyword key type opts]
-   {:pre [(clojure.test/is (not-any? nil? [db aggr key type]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db aggr key type]))]}
    (let [c (merge {:db/key key
                    :db/type type
                    :db/property? true}
@@ -34,7 +33,7 @@
    (with-aggr [aggr]
      (declare-properties! c/*default-identity* ^IndexAggregator aggr args)))
   ([^Keyword db-key ^IndexAggregator aggr args]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
    (doseq [arg args]
      (apply (partial declare-property! ^DB (c/db db-key) ^IndexAggregator aggr) arg))))
 
@@ -45,7 +44,7 @@
   ([^DB db ^IndexAggregator aggr ^Keyword key]
    (declare-tag! ^DB @*db* ^IndexAggregator aggr ^Keyword key nil))
   ([^DB db ^IndexAggregator aggr ^Keyword key opts]
-   {:pre [(not-any? nil? [db aggr key])]}
+   ;;{:pre [(not-any? nil? [db aggr key])]}
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Boolean
                       (merge {:db/tag? true} opts))))
 
@@ -54,8 +53,7 @@
    (with-aggr [aggr]
      (declare-tags! c/*default-identity* ^IndexAggregator aggr args)))
   ([^Keyword db-key ^IndexAggregator aggr args]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
-   ;;(println (count args))
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
    (doseq [arg args]
      (apply (partial declare-tag! ^DB (c/db db-key) ^IndexAggregator aggr) arg))))
 
@@ -68,7 +66,7 @@
   ([^DB db ^IndexAggregator aggr ^Keyword key]
    (declare-to-one-relation! ^DB @*db* ^IndexAggregator aggr ^Keyword key nil))
   ([^DB db ^IndexAggregator aggr ^Keyword key opts]
-   {:pre [(not-any? nil? [db aggr key])]}
+   ;;{:pre [(not-any? nil? [db aggr key])]}
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Integer
                       (merge {:db/relation? true
                               :db/to-one-relation? true}
@@ -83,7 +81,7 @@
   ([^DB db ^IndexAggregator aggr ^Keyword key]
    (declare-to-many-relation! ^DB @*db* ^IndexAggregator aggr ^Keyword key nil))
   ([^DB db ^IndexAggregator aggr ^Keyword key opts]
-   {:pre [(clojure.test/is (not-any? nil? [db aggr key]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db aggr key]))]}
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key
                       int-array-class
                       (merge {:db/relation? true
@@ -95,7 +93,7 @@
    (with-aggr [aggr]
      (declare-to-one-relations! c/*default-identity* ^IndexAggregator aggr args)))
   ([^Keyword db-key ^IndexAggregator aggr args]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
    (let [tuple-fn (fn [a] (if (> (count a) 1)
                             (vector (first a) {:db/inverse-relation
                                                (value (c/db db-key) :db/id (second a))}) a))]
@@ -108,7 +106,7 @@
    (with-aggr [aggr]
      (declare-to-many-relations! c/*default-identity* ^IndexAggregator aggr args)))
   ([^Keyword db-key ^IndexAggregator aggr args]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr args]))]}
    (let [tuple-fn (fn [a] (if (> (count a) 1)
                             (vector (first a) {:db/inverse-relation
                                                (value (c/db db-key) :db/id (second a))}) a))]
@@ -120,7 +118,7 @@
    Assumes the mapping is one to one."
   ([the-set the-key] (key-map ^DB @*db* the-set the-key))
   ([^DB db the-set the-key]
-   {:pre [(clojure.test/is (not-any? nil? [the-set the-key (key->id the-key)]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [the-set the-key (key->id the-key)]))]}
    (some->> (ids ^DB db the-set)
             (project ^DB db [the-key :db/id])
             (into {}))))
@@ -129,7 +127,7 @@
   "Creates a map of the-key's value to a vector of all of the ids with that value."
   ([the-set the-key] (multi-key-map ^DB @*db* the-set the-key))
   ([^DB db the-set the-key]
-   {:pre [(clojure.test/is (not-any? nil? [db the-set the-key (key->id db the-key)]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db the-set the-key (key->id db the-key)]))]}
    (->> the-set
         (partial ids ^DB db)
         (project ^DB db [the-key :db/id])
@@ -144,7 +142,7 @@
    (with-aggr [aggr]
      (add-inverse-relations! c/*default-identity* ^IndexAggregator aggr args)))
   ([^Keyword db-key ^IndexAggregator aggr args]
-   {:pre [(not-any? nil? [db-key aggr args])]}
+   ;;{:pre [(not-any? nil? [db-key aggr args])]}
    (doseq [arg args]
      (let [db (c/db db-key)]
        (update! ^DB db ^IndexAggregator aggr
@@ -160,7 +158,7 @@
    (with-aggr [aggr]
      (add-tag! c/*default-identity* ^IndexAggregator aggr set-key tag-key)))
   ([^Keyword db-key ^IndexAggregator aggr set-key tag-key]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr set-key tag-key (key->id tag-key)]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr set-key tag-key (key->id tag-key)]))]}
    (let [tag-id (key->id ^DB (c/db db-key) tag-key)]
      (doseq [id (ids ^DB (c/db db-key) set-key)]
        (update-0! ^DB (c/db db-key) ^IndexAggregator aggr id tag-id true)))))
@@ -171,7 +169,7 @@
    (with-aggr [aggr]
      (add-tags! c/*default-identity* ^IndexAggregator aggr set-key tag-keys)))
   ([^Keyword db-key ^IndexAggregator aggr set-key tag-keys]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr set-key tag-keys]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr set-key tag-keys]))]}
    (doseq [tag-key tag-keys]
      (add-tag! ^DB (c/db db-key) ^IndexAggregator aggr set-key tag-key))))
 
@@ -181,9 +179,9 @@
    (with-aggr [aggr]
      (add-tag-by-fk! c/*default-identity* ^IndexAggregator aggr fk tag-key)))
   ([^Keyword db-key ^IndexAggregator aggr fk tag-key]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr fk tag-key
-                                           (key->id ^DB (c/db db-key) fk)
-                                           (key->id ^DB (c/db db-key) tag-key)]))]}
+   ;; {:pre [(clojure.test/is (not-any? nil? [db-key aggr fk tag-key
+   ;;                                         (key->id ^DB (c/db db-key) fk)
+   ;;                                         (key->id ^DB (c/db db-key) tag-key)]))]}
    (let [fk-id (key->id ^DB (c/db db-key) fk)
          tag-id (key->id ^DB (c/db db-key) tag-key)]
      (doseq [id (->> (ids ^DB (c/db db-key) fk)
@@ -196,9 +194,9 @@
    (with-aggr [aggr]
      (copy-key! ^DB @*db* ^IndexAggregator aggr copy-from copy-to)))
   ([^DB db ^IndexAggregator aggr copy-from copy-to]
-   {:pre [(clojure.test/is (not-any? nil? [db aggr copy-from copy-to
-                                           (key->id ^DB db copy-from)
-                                           (key->id ^DB db copy-to)]))]}
+   ;;{:pre [(clojure.test/is (not-any? nil? [db aggr copy-from copy-to
+                                           ;; (key->id ^DB db copy-from)
+                                           ;; (key->id ^DB db copy-to)]))]}
    (doseq [id (ids ^DB db copy-from)]
      (update-0! ^DB db ^IndexAggregator aggr id
                 (key->id ^DB db copy-to)
@@ -210,8 +208,8 @@
    (with-aggr [aggr]
      (add-new-relation! c/*default-identity* ^IndexAggregator aggr relation-keyword relation-type id-val-pairs)))
   ([^Keyword db-key ^IndexAggregator aggr relation-keyword relation-type id-val-pairs]
-   {:pre [(clojure.test/is (not-any? nil? [db-key aggr relation-keyword relation-type id-val-pairs
-                                           (key->id ^DB (c/db db-key) relation-keyword)]))]}
+   ;; {:pre [(clojure.test/is (not-any? nil? [db-key aggr relation-keyword relation-type id-val-pairs
+   ;;                                         (key->id ^DB (c/db db-key) relation-keyword)]))]}
    ((case relation-type
       :to-one declare-to-one-relation!
       :to-many declare-to-many-relation!) ^DB (c/db db-key) ^IndexAggregator aggr [[relation-keyword]])
@@ -239,9 +237,9 @@
    (with-aggr [aggr]
      (rename-column! c/*default-identity* ^IndexAggregator aggr set-kw from to)))
   ([^Keyword db-key ^IndexAggregator aggr set-kw from to]
-   {:pre [(clojure.test/is (not-any? nil? (concat [db-key aggr]
-                                                  (mapcat (fn [x] [x (key->id ^DB (c/db db-key) x)])
-                                                          [set-kw from to]))))]}
+   ;; {:pre [(clojure.test/is (not-any? nil? (concat [db-key aggr]
+   ;;                                                (mapcat (fn [x] [x (key->id ^DB (c/db db-key) x)])
+   ;;                                                        [set-kw from to]))))]}
    (let [fkw (key->id ^DB (c/db db-key) from)
          tkw (key->id ^DB (c/db db-key) to)]
      (doseq [id (ids ^DB (c/db db-key) set-kw)]

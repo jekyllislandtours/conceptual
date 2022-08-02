@@ -2,7 +2,6 @@
   (:require [conceptual.arrays :refer [int-array-class]]
             [conceptual.int-sets :as int-sets]
             [clojure.data.int-map :as int-map]
-            [clojure.test]
             [clojure.pprint])
   (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
            [clojure.lang IFn Keyword]))
@@ -147,44 +146,35 @@
   ([^IndexAggregator aggr ^ints ks #^Object vs]
    (insert-1! @*db* aggr ks vs))
   ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
-   {:pre [(clojure.test/is (not-any? nil? [ks vs]))]}
    (reset! (db-atom db)
            (.insert ^WritableDB db
                     ^IndexAggregator aggr
                     ^ints ks
                     #^Object vs))))
 
-(defn- debug-keys [db arg]
-  (let [pairs (->> (seq arg)
-                   (filter (fn [[k v]]
-                             (nil? (try
-                                     (key->id ^DB db k)
-                                     (catch Exception e (identity e) nil))))))]
-    (doseq [[k v] pairs]
-      (println "    conceptual key" k "not defined."))))
-
 (defn insert!
   "Inserts into db. Must be a WritableDB."
   ([arg] (insert! @*db* nil arg))
   ([^IndexAggregator aggr arg] (insert! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
-   ;; {:pre [(when-let [ks (keys arg)]
-   ;;          (let [result (clojure.test/is (not-any? nil? (map (partial key->id ^DB db) ks))
-   ;;                                        (map vector ks (map (partial key->id ^DB db) ks)))]
-   ;;            (when-not result (debug-keys arg))
-   ;;            result))]}
    (try
      (when-not (seek ^DB db (:db/key arg))
        (let [items (->> (seq arg)
-                        (map #(vector (key->id ^DB db (first %)) (second %)))
+                        (map (fn [[k v]] [(key->id ^DB db k) v]))
                         (sort-by first <))
              ks (int-array (map first items))
              vs (object-array (map second items))]
          (insert-1! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs)))
-     (catch Exception e
-       (println "Error inserting concept:")
-       (debug-keys db arg)
-       (throw e)))))
+     (catch Throwable t
+       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+         (throw
+          (ex-info (str "Error inserting concept:"
+                        (.getMessage t)
+                        (when (seq undefined-keys)
+                          " undefined-key - update! requires all keys to be defined."))
+                   {:arg arg
+                    :undefined-keys undefined-keys}
+                   t)))))))
 
 (def ^:private db-entries
   [{:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}
@@ -205,7 +195,6 @@
   ([^IndexAggregator aggr id k ^Object v]
    (update-0! @*db* aggr ^int id ^int k v))
   ([^WritableDB db ^IndexAggregator aggr id k ^Object v]
-   {:pre [(clojure.test/is (not-any? nil? [id k]))]}
    (reset! (db-atom db) (.update ^DB db ^IndexAggregator aggr ^int id ^int k v))))
 
 (defn update-1!
@@ -215,7 +204,6 @@
   ([^IndexAggregator aggr id ^ints ks #^Object vs]
    (update-1! @*db* aggr id ks vs))
   ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
-   {:pre [(clojure.test/is (not-any? nil? [id ks vs]))]}
    (let [new-db (.update ^WritableDB db
                          ^IndexAggregator aggr
                          ^int id
@@ -224,12 +212,26 @@
      (reset! (db-atom db) new-db))))
 
 (defn update-2!
-  ([^IndexAggregator aggr id ^ints ks #^Object vs]
-   (update-2! @*db* aggr id ks vs))
-  ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
-   (reset! (db-atom db) (.updateInline ^WritableDB db aggr id ks vs))))
+  [^WritableDB db ^IndexAggregator aggr id arg]
+  (try
+    (let [key->id-fn (partial key->id db)
+          items (->> (dissoc arg :db/id)
+                     (map (fn [[k v]] [(key->id-fn k) v]))
+                     (sort-by first <))
+          ^ints ks (int-array (map first items))
+          #^Object vs (object-array (map second items))]
+      (update-1! db aggr ^int id ks vs))
+    (catch Throwable t
+      (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+        (throw
+         (ex-info (str "Error updating concept: "
+                       (.getMessage t)
+                       (when (seq undefined-keys)
+                         "undefined-key - update! requires all keys to be defined."))
+                  {:arg arg
+                   :undefined-keys undefined-keys}
+                  t))))))
 
-;; clean up preconditions
 (defn update!
   "Given a map which contains either a :db/id or a :db/key and value as well as the
   keys and values that need to added or updated, updates the concept."
@@ -237,23 +239,24 @@
   ([^IndexAggregator aggr arg] (update! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (if (:db/id arg)
-     (update! db aggr (:db/id arg) (dissoc arg :db/id)) ;; dissoc :db/id
+     (update-2! db aggr (:db/id arg) (dissoc arg :db/id)) ;; dissoc :db/id
      (if (:db/key arg)
-       (update! db aggr (key->id (:db/key arg)) arg)
-       (RuntimeException. "update! requires an :db/id or :db/key in the argument."))))
-  ([^WritableDB db ^IndexAggregator aggr id arg]
-   {:pre [(and (clojure.test/is (not (nil? id)))
-               (when-let [ks (keys arg)]
-                 (when-let [ks-ids (map key->id ks)]
-                   (clojure.test/is (not-any? nil? ks-ids)
-                                    (map vector ks ks-ids)))))]}
-   (let [key->id-fn (partial key->id db)
-         items (sort-by first <
-                        (map #(list (key->id-fn (first %1)) (second %1))
-                             (seq (dissoc arg :db/id))))
-         ^ints ks (int-array (map first items))
-         #^Object vs (object-array (map second items))]
-     (update-1! db aggr ^int id ks vs))))
+       (update-2! db aggr (key->id (:db/key arg)) arg)
+       (throw
+        (ex-info (str "Error updating concept: "
+                      (when-not (or (:db/id arg)
+                                    (:db/key arg))
+                        (format "\n\tmissing id - update! requires a :db/id (%d) or :db/key (%s) in the argument."
+                                (:db/id arg)
+                                (str (:db/key arg)))))
+                 {:arg arg}))))))
+
+;; TODO: make this safe or remove
+(defn update-inline!
+  ([^IndexAggregator aggr id ^ints ks #^Object vs]
+   (update-inline! @*db* aggr id ks vs))
+  ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
+   (reset! (db-atom db) (.updateInline ^WritableDB db aggr id ks vs))))
 
 ;; THIS FN is garbage.... gotta fix!!!!
 ;; TODO break this up to allow updates on individual properties
