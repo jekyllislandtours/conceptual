@@ -81,14 +81,16 @@ public final class PersistentDB implements WritableDB {
     @Override
     public int keyToId(Object key) {
         int kid = -1;
-        if (key instanceof Keyword) {
-            kid = (Integer) keyIdIndex.valAt(key);
-        } else if (key instanceof String) {
+        if (key != null) {
+            if (key instanceof Keyword) {
+                kid = (Integer) keyIdIndex.valAt(key);
+            } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
-        } else if (key instanceof Integer) {
-            kid = (Integer) key;
-        } else if (key instanceof Long) {
-            kid = ((Long) key).intValue();
+            } else if (key instanceof Integer) {
+                kid = (Integer) key;
+            } else if (key instanceof Long) {
+                kid = ((Long) key).intValue();
+            }
         }
         return kid;
     }

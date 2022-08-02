@@ -148,23 +148,31 @@
    (insert-1! @*db* aggr ks vs))
   ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
    {:pre [(clojure.test/is (not-any? nil? [ks vs]))]}
-   ;;(println "insert-1!: " (seq ks) (seq vs))
    (reset! (db-atom db)
            (.insert ^WritableDB db
                     ^IndexAggregator aggr
                     ^ints ks
-                    #^Object vs))
-   ;;(println "insert-1!! " (id->key @*db* (get ks 0)) (->persistent-map (seek  @*db* (get ks 0))))
-   ))
+                    #^Object vs))))
+
+(defn- debug-keys [db arg]
+  (let [pairs (->> (seq arg)
+                   (filter (fn [[k v]]
+                             (nil? (try
+                                     (key->id ^DB db k)
+                                     (catch Exception e (identity e) nil))))))]
+    (doseq [[k v] pairs]
+      (println "    conceptual key" k "not defined."))))
 
 (defn insert!
   "Inserts into db. Must be a WritableDB."
   ([arg] (insert! @*db* nil arg))
   ([^IndexAggregator aggr arg] (insert! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
-   {:pre [(when-let [ks (keys arg)]
-            (clojure.test/is (not-any? nil? (map (partial key->id ^DB db) ks))
-                             (map vector ks (map (partial key->id ^DB db) ks))))]}
+   ;; {:pre [(when-let [ks (keys arg)]
+   ;;          (let [result (clojure.test/is (not-any? nil? (map (partial key->id ^DB db) ks))
+   ;;                                        (map vector ks (map (partial key->id ^DB db) ks)))]
+   ;;            (when-not result (debug-keys arg))
+   ;;            result))]}
    (try
      (when-not (seek ^DB db (:db/key arg))
        (let [items (->> (seq arg)
@@ -174,12 +182,9 @@
              vs (object-array (map second items))]
          (insert-1! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs)))
      (catch Exception e
-       (println (.getMessage e))
-       (println (->> (seq arg)
-                     (map #(vector (try (key->id ^DB db (first %))
-                                        (catch Exception e
-                                          (identity e)
-                                          nil)) (second %)))))))))
+       (println "Error inserting concept:")
+       (debug-keys db arg)
+       (throw e)))))
 
 (def ^:private db-entries
   [{:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}
