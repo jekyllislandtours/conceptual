@@ -1,7 +1,5 @@
 (ns conceptual.contracts
-  (:require [clojure.set :as cset]
-            ;;[clojure.test :as t]
-            ))
+  (:require [clojure.set :as cset]))
 
 (defmacro defn-checked
   "If a function destructures its arguments, this checks the first level
