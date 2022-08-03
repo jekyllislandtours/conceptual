@@ -19,7 +19,7 @@
 
   build:jar
   {:doc "Builds a jar file"
-   :depends [build:check clean compile-java]
+   :depends ['build:check 'clean 'compile:java]
    :task (shell "clojure -T:build jar")}
 
 
