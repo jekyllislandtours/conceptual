@@ -32,7 +32,9 @@
                   :basis (bb/default-basis)}))
 
 (defn jar [_]
+  (clean nil)
   (compile-java nil)
+  (compile-clj nil)
   (bb/jar {:lib lib
            :version version
            :src-dirs ["src/clj"]}))
