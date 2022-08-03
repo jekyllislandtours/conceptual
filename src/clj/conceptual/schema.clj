@@ -6,7 +6,8 @@
                      apply-aggregator! with-aggr
                      insert! update! update-0!
                      seek value value-0 valuei key->id ids project]]
-            [conceptual.contracts :refer [defn-checked]])
+            ;;[conceptual.contracts :refer [defn-checked]]
+            )
   (:import [conceptual.core DB IndexAggregator]
            [clojure.lang Keyword]))
 
