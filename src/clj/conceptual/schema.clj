@@ -3,7 +3,7 @@
             [conceptual.core :as c
              :refer [*db*
                      *aggr*
-                     aggregator apply-aggregator! with-aggr
+                     apply-aggregator! with-aggr
                      insert! update! update-0!
                      seek value value-0 valuei key->id ids project]]
             [conceptual.contracts :refer [defn-checked]])
@@ -248,7 +248,7 @@
                     (value ^DB db fkw id)))))))
 
 ;; TODO support DB and IndexAggregator overloading, fix clj-kondo issues
-(defn-checked add-to-one-relation!
+#_(defn-checked add-to-one-relation!
   [{:keys [from to join-on fk-join-on relation]
     :or {fk-join-on nil}}]
   (declare-to-one-relation! relation)
@@ -262,7 +262,7 @@
            dorun))))
 
 ;; TODO support DB and IndexAggregator overloading, fix clj-kondo issues
-(defn-checked add-to-many-relation!
+#_(defn-checked add-to-many-relation!
   [{:keys [from to pk-join-on join-on relation filter-to-fn]
     :or {filter-to-fn (constantly true)
          filter-from-fm (constantly true)
