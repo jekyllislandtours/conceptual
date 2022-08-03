@@ -19,13 +19,11 @@
 
   build:jar
   {:doc "Builds a jar file"
-   :depends ['build:check 'clean 'compile:java]
    :task (shell "clojure -T:build jar")}
 
 
   install
   {:doc "Install into local Maven repo cache"
-   :depends [build:jar]
    :task (shell "clojure -T:build install")}
 
 
