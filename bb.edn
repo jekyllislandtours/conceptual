@@ -1,0 +1,35 @@
+{:tasks
+ {clean
+  {:doc "Cleans up any build artifacts"
+   :task (shell "clojure -T:build clean")}
+
+
+  compile:java
+  {:doc "Compiles the java files"
+   :task (shell "clojure -T:build compile-java")}
+
+
+  compile:clj
+  {:doc "Compiles the Clojure files"
+   :task (shell "clojure -T:build compile-clj")}
+
+  build:check
+  {:task (doseq [t ['clean 'compile:java 'compile:clj]]
+           (run t))}
+
+  build:jar
+  {:doc "Builds a jar file"
+   :depends [build:check clean compile-java]
+   :task (shell "clojure -T:build jar")}
+
+
+  install
+  {:doc "Install into local Maven repo cache"
+   :depends [build:jar]
+   :task (shell "clojure -T:build install")}
+
+
+  deploy
+  {:doc "Deploy to clojars."
+   :depends [build:jar]
+   :task (shell "clojure -T:build deploy")}}}
