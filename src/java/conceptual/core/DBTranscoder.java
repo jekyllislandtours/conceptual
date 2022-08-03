@@ -90,7 +90,7 @@ public class DBTranscoder {
         }
     }
 
-    public static RDB decodeRDB(DataInputStream dis) throws IOException {
+    public static RDB decodeRDB(final DataInputStream dis, final boolean verbose) throws IOException {
         RDB result = null;
         int oneIfNotNull = dis.readInt();
         if (oneIfNotNull == 1) {
@@ -106,10 +106,12 @@ public class DBTranscoder {
             identity = Keyword.intern(dis.readUTF());
             maxId = dis.readInt();
             keyIdIndex = decodeKeyIdIndex(dis);
-            keyIndex = decodeKeyIndex(dis);
-            valIndex = decodeValIndex(dis);
+            keyIndex = decodeKeyIndex(dis, verbose);
+            valIndex = decodeValIndex(dis, verbose);
             RDB.C[] cs = new RDB.C[keyIndex.length];
-            System.out.println("\nconstructing core index: ");
+            if (verbose) {
+                System.out.println("\nconstructing core index: ");
+            }
             double last = 0.0;
             double current;
             double lengthD = (double) maxId;
@@ -118,10 +120,14 @@ public class DBTranscoder {
                 current = Math.round(((double) i/ lengthD) * 100.0d);
                 if (current != last) {
                     last = current;
-                    System.out.printf("\r    %3.0f%% complete.", current);
+                    if (verbose == true) {
+                        System.out.printf("\r    %3.0f%% complete.", current);
+                    }
                 }
             }
-            System.out.println();
+            if (verbose == true) {
+                System.out.println();
+            }
             result = new RDB(identity, keyIdIndex, cs, maxId, new IntArrayPool());
         }
         return result;
@@ -217,13 +223,15 @@ public class DBTranscoder {
         }
     }
 
-    public static int[][] decodeKeyIndex(final DataInputStream dis) throws IOException {
+    public static int[][] decodeKeyIndex(final DataInputStream dis, final boolean verbose) throws IOException {
         int[][] result = null;
         int oneIfNotNull = dis.readInt();
         if (oneIfNotNull == 1) {
             int length = dis.readInt();
             result = new int[length][];
-            System.out.println("\ndecoding key index: ");
+            if (verbose) {
+                System.out.println("\ndecoding key index: ");
+            }
             double last = 0.0;
             double current;
             double lengthD = (double) length;
@@ -232,10 +240,14 @@ public class DBTranscoder {
                 current = Math.round(((double) i/ lengthD) * 100.0d);
                 if (current != last) {
                     last = current;
-                    System.out.printf("\r    %3.0f%% loaded.", current);
+                    if (verbose) {
+                        System.out.printf("\r    %3.0f%% loaded.", current);
+                    }
                 }
             }
-            System.out.println();
+            if (verbose) {
+                System.out.println();
+            }
         }
         return result;
     }
@@ -320,13 +332,15 @@ public class DBTranscoder {
         }
     }
 
-    public static Object[][] decodeValIndex(final DataInputStream dis) throws IOException {
+    public static Object[][] decodeValIndex(final DataInputStream dis, final boolean verbose) throws IOException {
         Object[][] result = null;
         int oneIfNotNull = dis.readInt();
         if (oneIfNotNull == 1) {
             int length = dis.readInt();
             result = new Object[length][];
-            System.out.println("\ndecoding val index: ");
+            if (verbose) {
+                System.out.println("\ndecoding val index: ");
+            }
             double last = 0.0;
             double current;
             double lengthD = (double) length;
@@ -335,10 +349,14 @@ public class DBTranscoder {
                 current = Math.round(((double) i/ lengthD) * 100.0d);
                 if (current != last) {
                     last = current;
-                    System.out.printf("\r    %3.0f%% loaded.", current);
+                    if (verbose) {
+                        System.out.printf("\r    %3.0f%% loaded.", current);
+                    }
                 }
             }
-            System.out.println();
+            if (verbose) {
+                System.out.println();
+            }
         }
         return result;
     }

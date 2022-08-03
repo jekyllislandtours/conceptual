@@ -405,13 +405,20 @@ public final class TuplDB implements WritableDB {
     }
 
     public static DB load(final String filename)
+        throws IOException
+    {
+        return load(filename, false);
+    }
+
+
+    public static DB load(final String filename, final boolean verbose)
             throws IOException
     {
         try (FileInputStream fis = new FileInputStream(filename);
              InputStream is = ZipTools.getCompressedInputStream(fis, filename);
              BufferedInputStream bis = new BufferedInputStream(is, 0x100_000);
              DataInputStream dis = new DataInputStream(bis)) {
-            RDB db = DBTranscoder.decodeRDB(dis);
+            RDB db = DBTranscoder.decodeRDB(dis, false);
             return TuplDB.clone(db);
         }
     }
