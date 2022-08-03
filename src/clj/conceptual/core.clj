@@ -471,7 +471,7 @@
             type :r
             verbose false
             db @*db*}}]
-   (reset! (db-atom db) (unpickle type filename))))
+   (reset! (db-atom db) (unpickle type filename verbose))))
 
 ;; TODO: fix arity
 (defn reset-pickle! [& args]
