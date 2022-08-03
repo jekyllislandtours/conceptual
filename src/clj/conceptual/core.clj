@@ -456,18 +456,20 @@
 
 (def pickle pickle!)
 
-(defn unpickle [type filename]
+(defn unpickle [type filename verbose]
   (case type
-    :r (conceptual.core.RDB/load filename)
-    :tupl (conceptual.core.TuplDB/load filename)
-    (conceptual.core.RDB/load filename)))
+    :r (conceptual.core.RDB/load filename verbose)
+    :tupl (conceptual.core.TuplDB/load filename verbose)
+    (conceptual.core.RDB/load filename verbose)))
 
 (defn load-pickle!
   ([& {filename :filename
        type :type
+       verbose :verbose
        db :db
        :or {filename "pickle.sz"
             type :r
+            verbose false
             db @*db*}}]
    (reset! (db-atom db) (unpickle type filename))))
 

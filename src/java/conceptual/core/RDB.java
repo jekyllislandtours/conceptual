@@ -575,14 +575,20 @@ public final class RDB implements DB, WritableDB {
         throw new UnsupportedOperationException();
     }
 
-    public static RDB load(final String filename)
+    public static DB load(final String filename)
+        throws IOException
+    {
+        return load(filename, false);
+    }
+
+    public static DB load(final String filename, final boolean verbose)
             throws IOException
     {
         try (FileInputStream fis = new FileInputStream(filename);
              BufferedInputStream bis = new BufferedInputStream(fis);
              InputStream zis = ZipTools.getCompressedInputStream(bis, filename);
              DataInputStream dis = new DataInputStream(zis)) {
-            return DBTranscoder.decodeRDB(dis);
+            return DBTranscoder.decodeRDB(dis, verbose);
         }
     }
 
