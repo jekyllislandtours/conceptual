@@ -14,8 +14,7 @@
    :task (shell "clojure -T:build compile-clj")}
 
   build:check
-  {:task (doseq [t ['clean 'compile:java 'compile:clj]]
-           (run t))}
+  {:depends [clean compile:java compile:clj]}
 
   build:jar
   {:doc "Builds a jar file"

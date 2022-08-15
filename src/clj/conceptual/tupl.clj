@@ -5,7 +5,31 @@
             [conceptual.core :as core])
   (:import [conceptual.core DB TuplDB]
            [org.cojen.tupl Cursor Database DatabaseConfig DurabilityMode Index Transaction]
-           [clojure.lang Keyword]))
+           [clojure.lang Keyword]
+           [java.io File]
+           [java.util.concurrent TimeUnit]))
+
+
+(def ^:private kw->durability-mode
+  {:no-flush DurabilityMode/NO_FLUSH
+   :no-redo DurabilityMode/NO_REDO
+   :no-sync DurabilityMode/NO_SYNC
+   :sync DurabilityMode/SYNC})
+
+(def ^:private kw->time-unit
+  {:days TimeUnit/DAYS
+   :hours TimeUnit/HOURS
+   :microseconds TimeUnit/MICROSECONDS
+   :milliseconds TimeUnit/MILLISECONDS
+   :minutes TimeUnit/MINUTES
+   :nanoseconds TimeUnit/NANOSECONDS
+   :seconds TimeUnit/SECONDS})
+
+(defn- time-unit
+  [{:keys [time-unit]}]
+  (or (kw->time-unit time-unit)
+      (throw (ex-info "invalid :time-unit" {:time-unit time-unit
+                                            :valid-time-units (set (keys kw->time-unit))}))))
 
 ;; TODO pull out
 (def ^{:dynamic true :tag String} *default-db-dir* "./tupl-db/")
@@ -30,19 +54,78 @@
   Not sure why this isn't in clojure core or at least a method of Keyword."
   [^clojure.lang.Keyword k] (str (.sym k)))
 
-;; TODO do more here
-(defn db-config [path]
-  (doto (DatabaseConfig.)
-    (.baseFilePath path)
-    (.maxCacheSize 100000000)
-    (.durabilityMode DurabilityMode/NO_REDO)))
+(defn database-config [{:keys [base-file
+                               base-file-path
+                               cache-priming?
+                               checkpoint-delay-threshold
+                               checkpoint-rate
+                               checkpoint-size-threshold
+                               create-file-path?
+                               custom-transaction-handler
+                               data-file
+                               data-files
+                               data-page-array
+                               direct-page-access?
+                               durability-mode
+                               encrypt
+                               event-listener
+                               file-factory
+                               lock-timeout
+                               lock-upgrade-rule
+                               map-data-files?
+                               max-cache-size
+                               max-replica-threads
+                               min-cache-size
+                               page-size
+                               replication-manager
+                               secondary-cache-size
+                               sync-writes?]}]
+  (cond-> (DatabaseConfig.)
+    base-file (.baseFile base-file)
+    base-file-path (.baseFilePath base-file-path)
+    (some? cache-priming?) (.cachePriming cache-priming?)
+    checkpoint-delay-threshold (.checkpointDelayThreshold
+                                (:delay checkpoint-delay-threshold)
+                                (time-unit checkpoint-delay-threshold))
+    checkpoint-rate (.checkpointRate (:rate checkpoint-rate) (time-unit checkpoint-rate))
+    checkpoint-size-threshold (.checkpointSizeThreshold checkpoint-size-threshold)
+    (some? create-file-path?) (.createFilePath create-file-path?)
+    custom-transaction-handler (.customTransactionHandler custom-transaction-handler)
+    data-file (.dataFile data-file)
+    data-files (.dataFiles (into-array File data-files))
+    data-page-array (.dataPageArray data-page-array)
+    (some? direct-page-access?) (.directPageAccess direct-page-access?)
+    durability-mode (.durabilityMode (kw->durability-mode durability-mode))
+    encrypt (.encrypt encrypt)
+    event-listener (.eventListener event-listener)
+    file-factory (.fileFactory file-factory)
+    lock-timeout (.lockTimeout lock-timeout (:timeout lock-timeout) (time-unit lock-timeout))
+    lock-upgrade-rule (.lockUpgradeRule lock-upgrade-rule)
+    (some? map-data-files?) (.mapDataFiles map-data-files?)
+    max-cache-size (.maxCacheSize max-cache-size)
+    max-replica-threads (.maxReplicaThreads max-replica-threads)
+    min-cache-size (.minCacheSize min-cache-size)
+    page-size (.pageSize page-size)
+    replication-manager (.replicate replication-manager)
+    secondary-cache-size (.secondaryCacheSize secondary-cache-size)
+    (some? sync-writes?) (.syncWrites sync-writes?)))
+
+(defn ^:deprecated db-config [path]
+  (database-config {:base-file-path path
+                    :max-cache-size 100000000
+                    :durability-mode :no-redo}))
 
 (defn db-base-file-path [^Keyword k]
   (str *default-db-dir* (nsname k)))
 
 (defn open-db
   ([] (open-db *default-identity*))
-  ([^Keyword k] (Database/open (db-config (db-base-file-path k)))))
+  ([^Keyword k] (open-db k {:max-cache-size 100000000
+                            :durability-mode :no-redo}))
+  ([^Keyword k config]
+   (Database/open (-> {:base-file-path (db-base-file-path k)}
+                      (merge config)
+                      database-config))))
 
 (defn db
   "Given a keyword database name opens that database if it exists,
