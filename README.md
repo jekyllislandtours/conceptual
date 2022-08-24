@@ -331,11 +331,11 @@ The following counts concepts who have `:baseball/batting-average` > than 3.0. N
 => 252
 ```
 
-Projections can also be filtered similarly. The following projection filters entries where `:wpi/self-control` is not nil.
+Projections can also be filtered similarly. The following projection filters entries where `:wpi/self-control` is not nil. Note composing juxt with seek will also work of course.
 
 ```clojure
-(->> (project [:db/key :wpi/self-control]
-              (ids :dbpedia/American_child_actors))
+(->> (ids :dbpedia/American_child_actors)
+     (project [:db/key :wpi/self-control])
      (filter (comp not nil? second))
      (sort-by second)
 =>
@@ -346,19 +346,10 @@ Projections can also be filtered similarly. The following projection filters ent
  ...)
 ```
 
-This expression filters entries where `:self-control` is not nil and is less than or equal to 5.0.
-
-```clojure
-(->> (project [:db/key :wpi/self-control]
-              (ids :dbpedia/American_child_actors))
-     (filter (comp not nil? second))
-     (filter (comp (partial > 5.0) second)))
-```
-
 By choosing `:wpi/self-control` as our set instead of `:dbpedia/American_child_actors`.
 
 ```clojure
-(->> (project [:db/key :/wpi/self-control]
-              (ids :wpi/self-control))
+(->> (ids :wpi/self-control)
+     (project [:db/key :/wpi/self-control])
      (filter (comp (partial > 5.0) second)))
 ```
