@@ -32,11 +32,11 @@ public final class RDB implements DB, WritableDB {
         this.intArrayPool = intArrayPool;
     }
 
-    final static class C {
+    public final static class C {
         final int[] ks;
         final Object[] vs;
 
-        C(final int[] ks, final Object[] vs) {
+        public C(final int[] ks, final Object[] vs) {
             this.ks = ks;
             this.vs = vs;
         }

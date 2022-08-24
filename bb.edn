@@ -14,7 +14,8 @@
    :task (shell "clojure -T:build compile-clj")}
 
   build:check
-  {:depends [clean compile:java compile:clj]}
+  {:doc "Checks that source compiles."
+   :depends [clean compile:java compile:clj]}
 
   build:jar
   {:doc "Builds a jar file"

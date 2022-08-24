@@ -1,8 +1,6 @@
 (ns conceptual.word-fixes
-  (:require [conceptual.arrays]
-            [conceptual.core :refer [id->key ids nsname project seek]])
-  (:require [conceptual.int-sets :as int-sets]
-            [conceptual.tupl :as tupl])
+  (:require [conceptual.core :as c])
+  (:require [conceptual.int-sets :as int-sets])
   (:import [conceptual.util IntegerSets]))
 
 (defn- string->words [s]
@@ -52,114 +50,82 @@
     (transient {}) coll)))
 
 (defn- keyword-fix-index
-  ([idx fix-fn the-set]
-   (->> the-set
-     (map #(vector % (keyword->words (id->key %))))
-     (mapcat #(map (fn [w] (vector w (% 0))) (% 1)))
-     (group-by-txfm first second)
-     (map #(vector (% 0) (IntegerSets/sortAndFilterDuplicates (int-array (% 1)))))
-     (mapcat #(map (fn [fix] (vector fix (% 1))) (fix-fn (% 0))))
-     (group-by-txfm first second)
-     (map #(vector (% 0) (apply int-sets/union (% 1))))
-     (map (fn [[k v]] (tupl/store! idx k v)))
-     dorun)))
+  [fix-fn the-set on-kv-fn]
+  (->> the-set
+       (map #(vector % (keyword->words (c/id->key %))))
+       (mapcat #(map (fn [w] (vector w (% 0))) (% 1)))
+       (group-by-txfm first second)
+       (map #(vector (% 0) (IntegerSets/sortAndFilterDuplicates (int-array (% 1)))))
+       (mapcat #(map (fn [fix] (vector fix (% 1))) (fix-fn (% 0))))
+       (group-by-txfm first second)
+       (map #(vector (% 0) (apply int-sets/union (% 1))))
+       (map (fn [[k v]] (on-kv-fn k v)))
+       dorun))
 
-(defn build-prefix-index []
-  (keyword-fix-index :prefix
-                     word->prefixes
-                     (int-sets/difference (ids :db/key)
-                                          (ids :db/dont-index))))
+(defn build-prefix-index
+  ([]
+   (let [m (volatile! {})]
+     (build-prefix-index (fn [k v] (vswap! m assoc k v)))
+     @m))
+  ([on-kv-fn]
+   (keyword-fix-index word->prefixes
+                      (int-sets/difference (c/ids :db/key)
+                                           (c/ids :db/dont-index))
+                      on-kv-fn)))
 
 (comment (time (build-prefix-index)))
 
-(defn build-infix-index []
-  (keyword-fix-index :infix
-                     word->infixes
-                     (int-sets/difference (ids :db/key)
-                                          (ids :db/dont-index))))
+(defn build-infix-index
+  ([]
+   (let [m (volatile! {})]
+     (build-infix-index (fn [k v] (vswap! m assoc k v)))
+     @m))
+  ([on-kv-fn]
+   (keyword-fix-index word->infixes
+                      (int-sets/difference (c/ids :db/key)
+                                           (c/ids :db/dont-index))
+                      on-kv-fn)))
 
-(defn build-key->id-index []
-  (let [idx (tupl/index :name->id)]
-    (->> (ids :db/key)
-         (map seek)
-         (map #(vector (nsname (:db/key %)) (:db/id %)))
-         (sort-by first)
-         (map (fn [[k v]] (tupl/store! idx k v)))
-         (dorun))))
+(defn build-key->id-index
+  "`on-kv-fn` is a 2 arg fn which receives the key and value"
+  ([]
+   (let [m (volatile! {})]
+     (build-key->id-index (fn [k v] (vswap! m assoc k v)))
+     @m))
+  ([on-kv-fn]
+   (->> (c/ids :db/key)
+        (map c/seek)
+        (map #(vector (c/nsname (:db/key %)) (:db/id %)))
+        (sort-by first)
+        (map (fn [[k v]] (on-kv-fn k v)))
+        (dorun))))
 
-(comment (tupl/drop! :name->id))
-
-(comment (tupl/index-size :name->id)
-         (tupl/index-size :prefix)
-         (tupl/index-size :infix))
-
-(comment (tupl/clear! :prefix)
-         (tupl/clear! :infix))
-
-(comment (tupl/drop! :prefix)
-         (tupl/drop! :infix))
-
-(comment (tupl/drop! :name->id))
-
-(comment (.isClosed (tupl/index :name->id)))
-
-
-(defn ids-by-prefix [s]
-  (tupl/load :prefix s))
-
-(defn ids-by-infix [s]
-  (tupl/load :infix s))
-
-(defn by-prefix [s]
-  (->> (ids-by-prefix s)
-       (map seek)))
-
-(defn by-infix [s]
-  (->> (ids-by-infix s)
-       (map seek)))
-
-(defn keyword-by-prefix [s]
-  (->> (ids-by-prefix s)
-       (map (comp :db/key seek))))
-
-(defn keyword-by-infix [s]
-  (->> (ids-by-infix s)
-       (map (comp :db/key seek))))
-
-(defn ids-by-prefix-phrase [s]
+(defn ids-by-prefix-phrase
+  "Returns the intersection of ids matching the prefix `s`.
+  `ids-by-prefix-fn` is a 1 arity fn that receives a string
+  and returns an integer set."
+  [ids-by-prefix-fn s]
   (->> (keyword->words s)
-       (map ids-by-prefix)
-       (filter (comp not nil?))
+       (map ids-by-prefix-fn)
+       (filter some?)
        (apply int-sets/intersection)))
 
-(defn ids-by-infix-phrase [s]
+(defn ids-by-infix-phrase
+  "Returns the intersection of ids matching the infix `s`.
+  `ids-by-infix-fn` is a 1 arity fn that receives a string
+  and returns an integer set."
+  [ids-by-infix-fn s]
   (->> (keyword->words s)
-       (map ids-by-infix)
-       (filter (comp not nil?))
+       (map ids-by-infix-fn)
+       (filter some?)
        (apply int-sets/intersection)))
 
-(defn by-prefix-phrase [s]
-  (->> (ids-by-prefix-phrase s)
-       (map seek)))
-
-(defn by-infix-phrase [s]
-  (->> (ids-by-infix-phrase s)
-       (map seek)))
-
-(defn keywords-by-prefix-phrase [s]
-  (->> (ids-by-prefix-phrase s)
-       (map (comp :db/key seek))))
-
-(defn keywords-by-infix-phrase [s]
-  (->> (ids-by-infix-phrase s)
-       (map (comp :db/key seek))))
-
-(defn project-prefix-phrase [phrase]
-  (let [cols (->> (ids-by-prefix-phrase phrase)
-                  (map seek)
-                  (filter #(not (nil? (:db/ids %)))))
-        keys (mapv :db/key cols)
-        _ (println keys)]
+(defn project-prefix-phrase
+  [ids-by-prefix-fn phrase]
+  (let [cols (->> (ids-by-prefix-phrase ids-by-prefix-fn phrase)
+                  (map c/seek)
+                  (filter :db/ids))
+        keys (mapv :db/key cols)]
     (->> (map :db/ids cols)
          (apply int-sets/union)
-         (project keys))))
+         (c/project keys))))
