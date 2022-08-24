@@ -433,53 +433,60 @@
       ~@bodies
       (apply-aggregator! ~(first binding)))))
 
-;; TODO: support more compaction target types
+
+(defn- db-type
+  [db]
+  (let [db-type (type db)]
+    (if (instance? Class db-type)
+      (.getName ^Class db-type)
+      db-type)))
+
+(defmulti compact-db! (fn [db _type] [(db-type db) _type]))
+
+(defmethod compact-db! :default
+  [db _type]
+  (.compactToRDB ^conceptual.core.PersistentDB db))
+
 (defn compact!
   ([] (compact! :r))
   ([type] (compact! @*db* type))
   ([db type]
-   (reset!
-    (db-atom db)
-    ;; type is not currently used here, but will be in the future
-    (condp instance? db
-      conceptual.core.PersistentDB (case type
-                                     (.compactToRDB ^conceptual.core.PersistentDB db))
-      conceptual.core.TuplDB (case type
-                               (.compactToRDB ^conceptual.core.TuplDB db))))))
+   (reset! (db-atom db) (compact-db! db type))))
+
+
+(defmulti pickle-db! (fn [db _filename] (db-type db)))
+
+(defmethod pickle-db! :default
+  [db filename]
+  (conceptual.core.RDB/store db filename))
 
 ;; TODO: make this more versatile... only update selective indices
 (defn pickle!
   ([^String filename] (pickle! @*db* filename))
   ([^DB db ^String filename]
-   (condp instance? db
-     conceptual.core.RDB (conceptual.core.RDB/store db filename))))
+   (pickle-db! db filename)))
 
 (def pickle pickle!)
 
-(defn unpickle [type filename verbose]
-  (case type
-    :r (conceptual.core.RDB/load filename verbose)
-    :tupl (conceptual.core.TuplDB/load filename verbose)
-    (conceptual.core.RDB/load filename verbose)))
+
+(defmulti unpickle-db! (fn [-type _opts] -type))
+
+(defmethod unpickle-db! :default
+  [_type {:keys [filename verbose]}]
+  (conceptual.core.RDB/load filename verbose))
 
 (defn load-pickle!
-  ([& {filename :filename
-       type :type
-       verbose :verbose
-       db :db
+  ([& {:keys [filename type verbose db]
        :or {filename "pickle.sz"
             type :r
             verbose false
             db @*db*}}]
-   (reset! (db-atom db) (unpickle type filename verbose))))
+   (reset! (db-atom db) (unpickle-db! type {:filename filename :verbose verbose}))))
 
 ;; TODO: fix arity
 (defn reset-pickle! [& args]
   (reset! (db-atom (get args :db @*db*)) (create-db!))
   (apply load-pickle! args))
-
-(defn load-pickle-0! [filename type]
-  (load-pickle! :filename filename :type (keyword type)))
 
 (defn dump
   ([] (dump ^DB @*db*))

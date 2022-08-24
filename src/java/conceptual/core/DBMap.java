@@ -20,7 +20,7 @@ public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, C
     protected final int id;
     protected final DB db;
 
-    DBMap(DB db, int id) {
+    public DBMap(DB db, int id) {
         this.db = db;
         this.id = id;
     }
