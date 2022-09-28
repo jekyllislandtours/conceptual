@@ -4,6 +4,8 @@ import org.cojen.util.BeanComparator;
 
 import java.util.Comparator;
 
+import clojure.lang.PersistentVector
+
 /**
  * A basic tuple for sorting keys by frequency.
  */

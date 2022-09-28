@@ -157,7 +157,7 @@
    set (i.e. has :db/ids) represented by 'set-key'"
   ([set-key tag-key]
    (with-aggr [aggr]
-     (add-tag! c/*default-identity* ^IndexAggregator aggr set-key tag-key)))
+     (add-tag! c/*default-identity* ^IndexAggregator aggr set-key  tag-key)))
   ([^Keyword db-key ^IndexAggregator aggr set-key tag-key]
    ;;{:pre [(clojure.test/is (not-any? nil? [db-key aggr set-key tag-key (key->id tag-key)]))]}
    (let [tag-id (key->id ^DB (c/db db-key) tag-key)]
