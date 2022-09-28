@@ -91,7 +91,12 @@ public final class RDB implements DB, WritableDB {
         int kid = -1;
         if (key != null) {
             if (key instanceof Keyword) {
-                kid = ((Integer) keyIdIndex.valAt(key));
+                Object id = keyIdIndex.valAt(key);
+                if (id != null) {
+                    kid = ((Integer) id);
+                } else {
+                    System.err.println("id not found for key: " + key);
+                }
             } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
             } else if (key instanceof Integer) {
@@ -126,7 +131,11 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public Object getValueByIdx(final int id, final int idx) {
-        return cs[id].vs[idx];
+        Object result = null;
+        if (idx > 0) {
+            result = cs[id].vs[idx];
+        }
+        return result;
     }
 
     @Override
@@ -139,7 +148,12 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public Keyword getKeywordByIdx(final int id, final int idx) {
-        return (Keyword) getValue(cs[id].ks[idx], KEY_ID);
+        //return (Keyword) getValue(cs[id].ks[idx], KEY_ID);
+        Keyword result = null;
+        if (idx >= 0) {
+            result = (Keyword) getValue(cs[id].ks[idx], KEY_ID);
+        }
+        return result;
     }
 
     @Override
