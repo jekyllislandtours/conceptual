@@ -95,7 +95,7 @@ public final class RDB implements DB, WritableDB {
                 if (id != null) {
                     kid = ((Integer) id);
                 } else {
-                    //System.err.println("id not found for key: " + key);
+                    System.err.println("id not found for key: " + key);
                 }
             } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
