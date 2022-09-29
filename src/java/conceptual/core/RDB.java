@@ -8,6 +8,8 @@ import conceptual.util.ZipTools;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.HashSet;
 
 public final class RDB implements DB, WritableDB {
 
@@ -19,6 +21,8 @@ public final class RDB implements DB, WritableDB {
     public final int maxId;
 
     public final IntArrayPool intArrayPool;
+
+    public final static Set<Keyword> unknownKeywords = new HashSet<Keyword>();
 
     public RDB(final Keyword identity,
                final IPersistentMap keyIdIndex,
@@ -91,11 +95,13 @@ public final class RDB implements DB, WritableDB {
         int kid = -1;
         if (key != null) {
             if (key instanceof Keyword) {
+                final Keyword kw = (Keyword) key;
                 Object id = keyIdIndex.valAt(key);
                 if (id != null) {
                     kid = ((Integer) id);
-                } else {
-                    System.err.println("id not found for key: " + key);
+                } else if(!unknownKeywords.contains(kw)) {
+                    unknownKeywords.add(kw);
+                    System.err.println("WARN: conceptual.core.RDB id not found for keyword: " + kw);
                 }
             } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
