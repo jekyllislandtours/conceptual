@@ -1,4 +1,5 @@
 (ns conceptual.int-sets
+  (:refer-clojure :exclude [contains?])
   (:import [conceptual.util IntegerSets]))
 
 ;;(def a (int-array [1 2 3 4 5 6 7]))
@@ -84,6 +85,19 @@
   (IntegerSets/contains coll key))
 
 ;;(index-of 3 a)
+
+
+(defn member?
+  "Returns `true` if `key` is in `coll`"
+  [key ^ints coll]
+  (not= -1 (index-of key coll)))
+
+
+(defn contains?
+  "Returns `true` if `key` is in `coll`"
+  [^ints coll key]
+  (member? key coll))
+
 
 (defn binary-search-greater
   "Searches for a key in a sorted array, and returns an index to an element
