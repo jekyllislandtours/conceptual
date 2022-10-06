@@ -1,21 +1,33 @@
 package conceptual.core;
 
-import clojure.lang.*;
+import clojure.lang.AFn;
+import clojure.lang.Associative;
+import clojure.lang.Counted;
+import clojure.lang.ILookup;
+import clojure.lang.IMapEntry;
+import clojure.lang.IPersistentCollection;
+import clojure.lang.IPersistentMap;
+import clojure.lang.ISeq;
+import clojure.lang.IteratorSeq;
+import clojure.lang.Keyword;
+import clojure.lang.PersistentHashMap;
+import clojure.lang.RT;
+import clojure.lang.Sequential;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Map;
-import java.util.AbstractSet;
-import java.util.Set;
-import java.util.LinkedHashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * This is a lazy implementation of a map facade on the idea of a concept.
  */
-public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, Counted {
+public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable, Associative, Counted {
 
     protected final int id;
     protected final DB db;
@@ -259,13 +271,11 @@ public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, C
 
     @Override
     public IPersistentCollection cons(Object o) {
-        //throw new UnsupportedOperationException("DBMap is read-only, so cons is not supported.");
         return asPersistentMap().cons(o);
     }
 
     @Override
     public IPersistentCollection empty() {
-        //throw new UnsupportedOperationException("DBMap is read-only, so empty is not supported.");
         return PersistentHashMap.create();
     }
 
@@ -288,9 +298,18 @@ public class DBMap extends AFn implements ILookup, Map, Iterable, Associative, C
     }
 
     @Override
-    public Associative assoc(Object key, Object val) {
-        //throw new UnsupportedOperationException("DBMap is read-only, so assoc is not supported.");
+    public IPersistentMap assoc(Object key, Object val) {
         return asPersistentMap().assoc(key, val);
+    }
+
+    @Override
+    public IPersistentMap assocEx(Object key, Object val) {
+        return assoc(key, val);
+    }
+
+    @Override
+    public IPersistentMap without(Object key) {
+        return asPersistentMap().without(key);
     }
 
     class DBMapEntry implements IMapEntry, Sequential, Comparable {
