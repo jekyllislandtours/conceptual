@@ -137,11 +137,7 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public Object getValueByIdx(final int id, final int idx) {
-        Object result = null;
-        if (idx > 0) {
-            result = cs[id].vs[idx];
-        }
-        return result;
+        return idx > -1 ? cs[id].vs[idx] : null;
     }
 
     @Override
@@ -154,9 +150,8 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public Keyword getKeywordByIdx(final int id, final int idx) {
-        //return (Keyword) getValue(cs[id].ks[idx], KEY_ID);
         Keyword result = null;
-        if (idx >= 0) {
+        if (idx > -1) {
             result = (Keyword) getValue(cs[id].ks[idx], KEY_ID);
         }
         return result;
