@@ -153,13 +153,14 @@
                     #^Object vs))))
 
 (defn insert!
-  "Inserts into db. Must be a WritableDB."
+  "Inserts into db. Must be a WritableDB. The key `:db/id`, if specified in `arg`, is ignored
+  and a new `:db/id` will be added."
   ([arg] (insert! @*db* nil arg))
   ([^IndexAggregator aggr arg] (insert! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (try
      (when-not (seek ^DB db (:db/key arg))
-       (let [items (->> (seq arg)
+       (let [items (->> (seq (dissoc arg :db/id))
                         (map (fn [[k v]] [(key->id ^DB db k) v]))
                         (sort-by first <))
              ks (int-array (map first items))
