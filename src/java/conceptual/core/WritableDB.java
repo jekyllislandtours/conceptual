@@ -74,4 +74,17 @@ public interface WritableDB extends DB {
      */
     WritableDB updateInline(final IndexAggregator aggregator, int id, final int[] ks, final Object[] vs);
 
+    /**
+     * Replaces keys and values in a concept. If the key does not exist it is
+     * added, if a key existed but no longer exists it will be removed.
+     *
+     * @param aggregator an object responsible for tracking keys for a concept to be
+     *                   efficiently indexed and/or removed from indexes.
+     * @param id the id (:db/id) of the concept.
+     * @param keys the keys corresponding to the values. (co-indexed)
+     * @param vals the values corresponding to the keys. (co-indexed)
+     * @return a new version of the database with the new concept.
+     */
+    public WritableDB replace(final IndexAggregator aggregator, final int id,
+                              final int[] keys, final Object[] vals);
 }

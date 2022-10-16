@@ -297,6 +297,35 @@ public final class PersistentDB implements WritableDB {
     }
 
     @Override
+    public WritableDB replace(final IndexAggregator aggregator, final int id,
+                              final int[] keys, final Object[] vals) {
+        final int[] prevKeys = getKeys(id);
+        //final Object[] prevVals = getValues(id);
+
+        // remove id from dropped key's db/ids
+        final int[] removedKeys = IntegerSets.difference(prevKeys, keys);
+        for (int i=0; i < removedKeys.length; i++) {
+            aggregator.remove(removedKeys[i], id);
+        }
+        // add new keys to index aggr for id
+        final int[] newKeys = IntegerSets.difference(keys, prevKeys);
+        for (int i=0; i < newKeys.length; i++) {
+            aggregator.add(newKeys[i], id);
+        }
+
+        Keyword dbKey = null;
+        int idx = IntegerSets.binarySearch(keys, KEY_ID, 0, keys.length);
+        if (idx >= 0) {
+            dbKey = (Keyword) vals[idx];
+        }
+        return new PersistentDB(identity,
+                                (dbKey != null) ? keyIdIndex.assoc(dbKey, id) : keyIdIndex,
+                                keyIndex.assoc(id, keys),
+                                valIndex.assoc(id, vals),
+                                maxId);
+    }
+
+    @Override
     public WritableDB updateInline(final IndexAggregator aggregator,
                                    final int id,
                                    final int[] keys,
