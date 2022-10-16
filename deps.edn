@@ -14,7 +14,29 @@
 
  :aliases {:build {:deps {io.github.seancorfield/build-clj {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
                    :ns-default build}
-           :walkthrough {:jvm-opts ["-Xmx25g"]}}
+
+           ;; the walkthrough requires some memory
+           :walkthrough {:jvm-opts ["-Xmx25g"]}
+
+           :dev {}
+
+           :debug
+           {:extra-deps {djblue/portal                         {:mvn/version "0.31.0"}
+                         com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.0.231"}
+                         com.github.jpmonettas/flow-storm-inst {:mvn/version "3.0.231"}}}
+
+           :cider
+           {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.6"}}
+            :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
+
+           :test
+           {:main-opts   ["-m" "kaocha.runner" "--config-file" "tests.edn"]
+            :extra-paths ["test/clj" "test/resources"]
+            :extra-deps
+            {lambdaisland/kaocha                     {:mvn/version "1.70.1086"}
+             org.clojure/test.check                  {:mvn/version "1.1.1"}
+             expectations/expectations                {:mvn/version "2.2.0-rc3"}}}
+}
 
  :deps/prep-lib {:ensure "target/classes"
                  :alias :build

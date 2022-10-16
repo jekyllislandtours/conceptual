@@ -63,7 +63,14 @@ public class IndexAggregator {
     }
 
     public int[] removeIds(int key) {
-        return IntegerSets.listToIntArray(indexRemoveMap.get(key));
+        int[] result = null;
+        List<Integer> removeList = indexRemoveMap.get(key);
+        if (removeList != null) {
+            result = IntegerSets.listToIntArray(removeList);
+        } else {
+            result = new int[] {};
+        }
+        return result;
     }
 
 }
