@@ -1,5 +1,5 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains?])
+  (:refer-clojure :exclude [contains? conj disj])
   (:import [conceptual.util IntegerSets]))
 
 ;;(def a (int-array [1 2 3 4 5 6 7]))
@@ -78,6 +78,14 @@
   (union a (int-array [b])))
 
 ;;(seq (difference (int-array (range 10 20)) (apply union test-set)))
+
+(defn conj
+  [^ints a b]
+  (union a (int-array [b])))
+
+(defn disj
+  [^ints a b]
+  (difference a (int-array [b])))
 
 (defn index-of
   "Returns the index of a key in a sorted int array, -1 if not found."
