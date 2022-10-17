@@ -235,7 +235,8 @@
 
 (defn update!
   "Given a map which contains either a :db/id or a :db/key and value as well as the
-  keys and values that need to added or updated, updates the concept."
+  keys and values that need to added or updated, updates the concept.
+  NOTE: use replace! to be able to remove keys."
   ([arg] (update! @*db* nil arg))
   ([^IndexAggregator aggr arg] (update! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
@@ -248,6 +249,61 @@
                       (when-not (or (:db/id arg)
                                     (:db/key arg))
                         (format "\n\tmissing id - update! requires a :db/id (%d) or :db/key (%s) in the argument."
+                                (:db/id arg)
+                                (str (:db/key arg)))))
+                 {:arg arg}))))))
+
+(defn replace-0!
+  "Updates an array of values given an array of keys."
+  ([id ^ints ks #^Object vs]
+   (replace-0! @*db* nil id ks vs))
+  ([^IndexAggregator aggr id ^ints ks #^Object vs]
+   (replace-0! @*db* aggr id ks vs))
+  ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
+   (let [new-db (.replace ^WritableDB db
+                          ^IndexAggregator aggr
+                          ^int id
+                          ^ints ks
+                          #^Object vs)]
+     (reset! (db-atom db) new-db))))
+
+(defn replace-1!
+  [^WritableDB db ^IndexAggregator aggr id arg]
+  (try
+    (let [key->id-fn (partial key->id db)
+          items (->> (dissoc arg :db/id)
+                     (map (fn [[k v]] [(key->id-fn k) v]))
+                     (sort-by first <))
+          ^ints ks (int-array (map first items))
+          #^Object vs (object-array (map second items))]
+      (replace-0! db aggr ^int id ks vs))
+    (catch Throwable t
+      (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+        (throw
+         (ex-info (str "Error replacing concept: "
+                       (.getMessage t)
+                       (when (seq undefined-keys)
+                         "undefined-key - replace! requires all keys to be defined."))
+                  {:arg arg
+                   :undefined-keys undefined-keys}
+                  t))))))
+
+(defn replace!
+  "Given a map which contains either a :db/id or a :db/key will replace the
+   concept with the new keys and values.
+  NOTE: use replace! to be able to remove properties."
+  ([arg] (replace! @*db* nil arg))
+  ([^IndexAggregator aggr arg] (replace! @*db* aggr arg))
+  ([^WritableDB db ^IndexAggregator aggr arg]
+   (if (:db/id arg)
+     (replace-1! db aggr (:db/id arg) (dissoc arg :db/id)) ;; dissoc :db/id
+     (if (:db/key arg)
+       (replace-1! db aggr (key->id (:db/key arg)) arg)
+       (throw
+        (ex-info (str "Error replacing concept: "
+                      (when-not (or (:db/id arg)
+                                    (:db/key arg))
+                        (format "\n\tmissing id - replace! requires a :db/id (%d) or :db/key (%s) in the argument."
                                 (:db/id arg)
                                 (str (:db/key arg)))))
                  {:arg arg}))))))
@@ -418,7 +474,8 @@
      (let [-db (db db-key)]
        (reset! (db-atom -db)
                (.update ^DB -db aggr ^int k ^int (key->id ^DB -db :db/ids)
-                        (int-sets/union (ids ^DB -db k) (.ids aggr k)))))
+                        (int-sets/difference (int-sets/union (ids ^DB -db k) (.ids aggr k))
+                                             (.removeIds aggr k)))))
      #_(update-0! ^DB db k (key->id ^DB db :db/ids)
                 (int-sets/union (ids ^DB db k) (.ids aggr k))))))
 

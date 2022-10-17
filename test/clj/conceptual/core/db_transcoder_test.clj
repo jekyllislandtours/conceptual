@@ -26,8 +26,8 @@
     [:test/instant Instant]
     [:test/class Class]
     [:test/edn PersistentHashMap]])
-  (s/declare-relations! [[:test/parent]] :type :to-one)
-  (s/declare-relations! [[:test/children]] :type :to-many)
+  (s/declare-to-one-relations! [[:test/parent]])
+  (s/declare-to-many-relations! [[:test/children]])
   (s/declare-tags! [[:test/tag?]]))
 
 (def +test-data+
