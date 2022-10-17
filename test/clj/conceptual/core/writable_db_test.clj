@@ -13,4 +13,6 @@
            [java.time Instant]
            [conceptual.core DBTranscoder RDB]))
 
-(expect 2 (+ 1 1))
+
+(deftest sample-test
+  (expect 2 (+ 1 1)))
