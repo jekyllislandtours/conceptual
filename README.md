@@ -81,7 +81,7 @@ clj -T:build install
 
 ### Running the walkthrough and IMDb demo
 
-Start the REPL:
+Start the REPL with 25GB of memory:
 
 ``` shell
 clj -Mwalkthrough
