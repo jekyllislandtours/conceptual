@@ -14,6 +14,8 @@ import clojure.lang.PersistentHashMap;
 import clojure.lang.RT;
 import clojure.lang.Sequential;
 
+import conceptual.util.IntegerSets;
+
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.AbstractSet;
@@ -29,12 +31,16 @@ import java.util.Set;
  */
 public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable, Associative, Counted {
 
-    protected final int id;
     protected final DB db;
+    protected final int id;
+    protected final int[] ks;
+    protected final Object[] vs;
 
     public DBMap(DB db, int id) {
         this.db = db;
         this.id = id;
+        this.ks = db.getKeys(id);
+        this.vs = db.getValues(id);
     }
 
     /* DBMap specific properties */
@@ -51,12 +57,33 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
         return get(DB.TYPE_ID);
     }
 
+    public int getKeyIdx(final int key) {
+        return IntegerSets.binarySearch(ks, key, 0, ks.length);
+    }
+
+    public Object getValueByIdx(final int idx) {
+        return idx > -1 ? vs[idx] : null;
+    }
+
+    public Object getValue(final int key) {
+        final int idx = IntegerSets.binarySearch(ks, key, 0, ks.length);
+        return idx > -1 ? vs[idx] : null;
+    }
+
+    public Keyword getKeywordByIdx(final int idx) {
+        Keyword result = null;
+        if (idx > -1) {
+            result = (Keyword) db.getValue(ks[idx], DB.KEY_ID);
+        }
+        return result;
+    }
+
     public int[] getKeys() {
-        return db.getKeys(id);
+        return ks;
     }
 
     public Object[] getValues() {
-        return db.getValues(id);
+        return vs;
     }
 
     /* Map */
@@ -70,7 +97,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
     /** Returns true if this map contains a mapping for the specified key. */
     @Override
     public boolean containsKey(Object key) {
-        return db.containsKey(id, db.keyToId(key));
+        return getKeyIdx(db.keyToId(key)) > -1;
     }
 
     /** Returns true if this map maps one or more keys to the specified value. */
@@ -101,7 +128,8 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
     public Object get(Object key) {
         int kid = db.keyToId(key);
         if (kid > -1) {
-            return db.getValue(id, kid);
+            final int idx = IntegerSets.binarySearch(ks, kid, 0, ks.length);
+            return idx > -1 ? vs[idx] : null;
         } else return null;
     }
 
@@ -112,7 +140,8 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
      * @return Object the value for the given key.
      */
     public Object get(int key) {
-        return db.getValue(id, key);
+        final int idx = IntegerSets.binarySearch(ks, key, 0, ks.length);
+        return idx > -1 ? vs[idx] : null;
     }
 
     /**
@@ -190,7 +219,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
     /** Returns the number of key-value mappings in this map. */
     @Override
     public int size() {
-        return db.getKeys(id).length;
+        return ks.length;
     }
 
     /** Returns a Set view of the mappings contained in this map. */
@@ -218,7 +247,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
     /** Returns a Collection view of the values contained in this map. */
     @Override
     public Collection values() {
-        return Arrays.asList(db.getValues(id));
+        return Arrays.asList(vs);
     }
 
     /* Countable, IPersistentCollection */
@@ -296,7 +325,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
         final int kid = db.keyToId(key);
         DBMapEntry entry = null;
         if (kid > -1) {
-            final int idx = db.getKeyIdx(id, kid);
+            final int idx = getKeyIdx(kid);
             if (idx > -1) {
                 entry = new DBMapEntry(idx);
             }
@@ -331,12 +360,12 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
 
         @Override
         public Object getKey() {
-            return db.getKeywordByIdx(id, idx);
+            return getKeywordByIdx(idx);
         }
 
         @Override
         public Object getValue() {
-            return db.getValueByIdx(id, idx);
+            return getValueByIdx(idx);
         }
 
         @Override
@@ -357,12 +386,12 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
 
         @Override
         public Object key() {
-            return db.getKeywordByIdx(id, idx);
+            return getKeywordByIdx(idx);
         }
 
         @Override
         public Object val() {
-            return db.getValueByIdx(id, idx);
+            return getValueByIdx(idx);
         }
 
         @Override
