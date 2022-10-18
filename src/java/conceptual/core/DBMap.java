@@ -294,7 +294,14 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
     @Override
     public IMapEntry entryAt(Object key) {
         final int kid = db.keyToId(key);
-        return (kid > -1) ? new DBMapEntry(db.getKeyIdx(id, kid)) : null;
+        DBMapEntry entry = null;
+        if (kid > -1) {
+            final int idx = db.getKeyIdx(id, kid);
+            if (idx > -1) {
+                entry = new DBMapEntry(idx);
+            }
+        }
+        return entry;
     }
 
     @Override

@@ -216,7 +216,7 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id db)
-          items (->> (dissoc arg :db/id)
+          items (->> arg
                      (map (fn [[k v]] [(key->id-fn k) v]))
                      (sort-by first <))
           ^ints ks (int-array (map first items))
@@ -241,7 +241,7 @@
   ([^IndexAggregator aggr arg] (update! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (if (:db/id arg)
-     (update-2! db aggr (:db/id arg) (dissoc arg :db/id)) ;; dissoc :db/id
+     (update-2! db aggr (:db/id arg) arg) ;; dissoc :db/id
      (if (:db/key arg)
        (update-2! db aggr (key->id (:db/key arg)) arg)
        (throw
@@ -271,7 +271,7 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id db)
-          items (->> (dissoc arg :db/id)
+          items (->> arg
                      (map (fn [[k v]] [(key->id-fn k) v]))
                      (sort-by first <))
           ^ints ks (int-array (map first items))
@@ -296,7 +296,7 @@
   ([^IndexAggregator aggr arg] (replace! @*db* aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (if (:db/id arg)
-     (replace-1! db aggr (:db/id arg) (dissoc arg :db/id)) ;; dissoc :db/id
+     (replace-1! db aggr (:db/id arg) arg)
      (if (:db/key arg)
        (replace-1! db aggr (key->id (:db/key arg)) arg)
        (throw
