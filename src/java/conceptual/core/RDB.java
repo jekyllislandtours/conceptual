@@ -15,7 +15,7 @@ public final class RDB implements DB, WritableDB {
 
     public final Keyword identity;
 
-    public final IPersistentMap keyIdIndex;
+    public final IPersistentMap uniqueIndices;
     // TODO add int[][] view into keys for freq stuff.
     public final C[] cs;
     public final int maxId;
@@ -25,12 +25,12 @@ public final class RDB implements DB, WritableDB {
     public final static Set<Keyword> unknownKeywords = new HashSet<Keyword>();
 
     public RDB(final Keyword identity,
-               final IPersistentMap keyIdIndex,
+               final IPersistentMap uniqueIndices,
                final C[] cs,
                final int maxId,
                final IntArrayPool intArrayPool) {
         this.identity = identity;
-        this.keyIdIndex = keyIdIndex;
+        this.uniqueIndices = uniqueIndices;
         this.cs = cs;
         this.maxId = maxId;
         this.intArrayPool = intArrayPool;
@@ -87,7 +87,13 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public Integer keywordToId(Keyword key) {
-        return (Integer) keyIdIndex.valAt(key);
+        Integer result = null;
+        // TODO: ensure keyIndex exists so this check isn't necessary
+        IPersistentMap keyIndex = (IPersistentMap) uniqueIndices.valAt(DB.KEY_ID);
+        if (keyIndex != null) {
+            result = (Integer) keyIndex.valAt(key);
+        }
+        return result;
     }
 
     @Override
@@ -96,7 +102,7 @@ public final class RDB implements DB, WritableDB {
         if (key != null) {
             if (key instanceof Keyword) {
                 final Keyword kw = (Keyword) key;
-                Object id = keyIdIndex.valAt(key);
+                Object id = keywordToId(kw);
                 if (id != null) {
                     kid = ((Integer) id);
                 } else if(!unknownKeywords.contains(kw)) {
@@ -362,7 +368,7 @@ public final class RDB implements DB, WritableDB {
             try {
                 intArrayPool.returnArray(freqBins);
             } catch (Exception e) {
-                //throw new RuntimeException(e);
+                throw new RuntimeException(e);
             }
         }
     }
@@ -491,10 +497,11 @@ public final class RDB implements DB, WritableDB {
         }
 
         newCS[id] = new C(ks1, vs1);
+        IPersistentMap updatedUniqueIndices = updateIndices(id, ks, vs);
 
         // vs[0] has to be the keyword by necessity... could check.
         return new RDB(identity,
-                       (ks[0] == KEY_ID) ? keyIdIndex.assoc(vs[0], id) : keyIdIndex,
+                       updatedUniqueIndices,
                        newCS,
                        id,
                        intArrayPool);
@@ -514,8 +521,9 @@ public final class RDB implements DB, WritableDB {
             System.arraycopy(vs, 0, vs1, 0, vs.length);
             vs1[idx] = val;
             cs[id] = new C(cs[id].ks, vs1);
+            IPersistentMap updatedUniqueIndices = updateIndices(id, new int[] { key }, new Object[] { val });
             return new RDB(identity,
-                           (key == KEY_ID) ? keyIdIndex.without(vs[idx]).assoc(val, id) : keyIdIndex,
+                           updatedUniqueIndices,
                            cs,
                            maxId,
                            intArrayPool);
@@ -542,8 +550,9 @@ public final class RDB implements DB, WritableDB {
                 aggregator.add(key, id);
             }
             cs[id] = new C(ks1, vs1);
+            IPersistentMap updatedUniqueIndices = updateIndices(id, new int[] { key }, new Object[] { val });
             return new RDB(identity,
-                           (key == KEY_ID) ? keyIdIndex.assoc(val, id) : keyIdIndex,
+                           updatedUniqueIndices,
                            cs,
                            maxId,
                            intArrayPool);
@@ -578,8 +587,9 @@ public final class RDB implements DB, WritableDB {
             dbKey = (Keyword) vals[idx];
         }
         cs[id] = new C(ks, vs);
+        IPersistentMap updatedUniqueIndices = updateIndices(id, ks, vs);
         return new RDB(identity,
-                       (dbKey != null) ? keyIdIndex.assoc(dbKey, id) : keyIdIndex,
+                       updatedUniqueIndices,
                        cs,
                        maxId,
                        intArrayPool);
@@ -589,7 +599,6 @@ public final class RDB implements DB, WritableDB {
     public WritableDB replace(final IndexAggregator aggregator, final int id,
                               final int[] keys, final Object[] vals) {
         final int[] prevKeys = getKeys(id);
-        //final Object[] prevVals = getValues(id);
 
         // remove id from dropped key's db/ids
         final int[] removedKeys = IntegerSets.difference(prevKeys, keys);
@@ -608,8 +617,9 @@ public final class RDB implements DB, WritableDB {
             dbKey = (Keyword) vals[idx];
         }
         cs[id] = new C(keys, vals);
+        IPersistentMap replacedKeyIndices = replaceIndices(id, keys, vals, removedKeys);
         return new RDB(identity,
-                       (dbKey != null) ? keyIdIndex.assoc(dbKey, id) : keyIdIndex,
+                       replacedKeyIndices,
                        cs,
                        maxId,
                        intArrayPool);
@@ -619,6 +629,25 @@ public final class RDB implements DB, WritableDB {
     public WritableDB updateInline(final IndexAggregator aggregator, int id, final int[] ks, final Object[] vs) {
         throw new UnsupportedOperationException();
     }
+
+    private boolean[] keysUnique(final int[] keys) {
+        boolean[] result = new boolean[keys.length];
+        for (int i=0; i < keys.length; i++) {
+            Object value = getValue(keys[i], DB.UNIQUE_TAG_ID);
+            result[i] = (value != null && value instanceof Boolean && true == ((Boolean) value));
+        }
+        return result;
+    }
+
+    private IPersistentMap updateIndices(final int id, final int[] keys, final Object[] vals) {
+        return IndexAggregator.updateIndices(uniqueIndices, id, keys, keysUnique(keys), vals);
+    }
+
+    private IPersistentMap replaceIndices(final int id, final int[] keys, final Object[] vals, final int[] keysToRemove) {
+        IPersistentMap result = IndexAggregator.removeFromIndices(uniqueIndices, keysToRemove, keysUnique(keysToRemove), vals);
+        return IndexAggregator.updateIndices(result, id, keys, keysUnique(keys), vals);
+    }
+
 
     public static DB load(final String filename)
         throws IOException

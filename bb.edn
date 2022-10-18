@@ -34,7 +34,8 @@
 
   test
   {:doc "Runs clojure tests"
-   :task (shell "clojure -M:dev:test default")}
+   :task (do (shell "clojure -T:build install")
+             (shell "clojure -M:dev:test default"))}
 
   test:ff
   {:doc "Runs clojure tests stopping on first failure."

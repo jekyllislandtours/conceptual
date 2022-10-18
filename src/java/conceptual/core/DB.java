@@ -9,15 +9,16 @@ public interface DB extends Counted {
     int KEY_ID = 1;
     int TYPE_ID = 2;
     int PROPERTY_TAG_ID = 3;
-    int FN_ID = 4;
-    int DONT_INDEX_ID = 5;
-    int TAG_TAG_ID = 6;
-    int FN_TAG_ID = 7;
-    int RELATION_TAG_ID = 8;
-    int TO_MANY_RELATION_TAG_ID = 9;
-    int TO_ONE_RELATION_TAG_ID = 10;
-    int INVERSE_RELATION_TAG_ID = 11;
-    int IDS_ID = 12;
+    int TAG_TAG_ID = 4;
+    int UNIQUE_TAG_ID = 5;
+    int DONT_INDEX_TAG_ID = 6;
+    int RELATION_TAG_ID = 7;
+    int TO_MANY_RELATION_TAG_ID = 8;
+    int TO_ONE_RELATION_TAG_ID = 9;
+    int INVERSE_RELATION_TAG_ID = 10;
+    int IDS_ID = 11;
+    int FN_TAG_ID = 12;
+    int FN_ID = 13;
 
     /**
      * Returns the identity of this database.

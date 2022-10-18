@@ -7,11 +7,16 @@ import clojure.lang.ILookup;
 import clojure.lang.IMapEntry;
 import clojure.lang.IPersistentCollection;
 import clojure.lang.IPersistentMap;
+import clojure.lang.IPersistentStack;
+import clojure.lang.IPersistentVector;
 import clojure.lang.ISeq;
 import clojure.lang.IteratorSeq;
 import clojure.lang.Keyword;
+import clojure.lang.LazilyPersistentVector;
 import clojure.lang.PersistentHashMap;
+import clojure.lang.PersistentVector;
 import clojure.lang.RT;
+import clojure.lang.Seqable;
 import clojure.lang.Sequential;
 
 import conceptual.util.IntegerSets;
@@ -348,7 +353,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
         return asPersistentMap().without(key);
     }
 
-    class DBMapEntry implements IMapEntry, Sequential, Comparable {
+    class DBMapEntry implements IMapEntry, Seqable, Sequential, Comparable {
 
         private int idx;
 
@@ -392,6 +397,47 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
         @Override
         public Object val() {
             return getValueByIdx(idx);
+        }
+
+        public Object nth(int i){
+            if (i == 0)
+                return key();
+            else if (i == 1)
+                return val();
+            else
+                throw new IndexOutOfBoundsException();
+        }
+
+        public PersistentVector asVector() {
+            return PersistentVector.create(key(), val());
+        }
+
+        public IPersistentVector assocN(int i, Object val) {
+            return asVector().assocN(i, val);
+        }
+
+        public int count() {
+            return 2;
+        }
+
+        public ISeq seq() {
+            return asVector().seq();
+        }
+
+        public ISeq cons(Object o) {
+            return (ISeq) asVector().cons(o);
+        }
+
+        public IPersistentCollection empty() {
+            return null;
+        }
+
+        public IPersistentStack pop() {
+            return LazilyPersistentVector.createOwning(key());
+        }
+
+        public boolean equiv(Object obj){
+            return asVector().equiv(obj);
         }
 
         @Override

@@ -81,12 +81,12 @@
       (io/make-parents pickle-path)
 
       ;; pickle setup
-      (c/reset-db!)
-      (is (= 12 (c/max-id)))
+      (c/create-db!)
+      (is (= 13 (c/max-id)))
 
       ;; compact the PersistentDB into an RDB type
       (c/compact!)
-      (is (= 12 (c/max-id)))
+      (is (= 13 (c/max-id)))
 
       ;; type should be RDB
       (is (instance? conceptual.core.RDB (c/db)))
@@ -106,8 +106,8 @@
 
       ;; pickle setup
       (c/create-db!)
-      (c/prime-db!)
-      (is (= 12 (c/max-id)))
+
+      (is (= 13 (c/max-id)))
 
       ;; declare a test schema
       (declare-test-schema!)
