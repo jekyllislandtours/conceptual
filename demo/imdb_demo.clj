@@ -652,7 +652,7 @@
 (defn reset-db! []
   (reset! *ratings* [])
   (reset! *const->id* {})
-  (c/reset-db!)
+  (c/create-db!)
   (reset! title-count 0)
   (reset! title-set #{})
   (declare-schema!))
