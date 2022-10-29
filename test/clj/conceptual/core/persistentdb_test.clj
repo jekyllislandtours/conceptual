@@ -49,6 +49,3 @@
   (expect  #{(c/value :db/id :hello/there)
              (c/value :db/id :hello/dude)}
            (into #{} (c/value :test/children :hello/world))))
-
-(deftest db-map-test
-  )

@@ -2,12 +2,9 @@
   (:require [conceptual.arrays :refer [int-array-class]]
             [conceptual.core :as c
              :refer [*db*
-                     *aggr*
                      apply-aggregator! with-aggr
                      insert! update! update-0!
-                     seek value value-0 valuei key->id ids project]]
-            ;;[conceptual.contracts :refer [defn-checked]]
-            )
+                     seek value value-0 valuei key->id ids project]])
   (:import [conceptual.core DB IndexAggregator]
            [clojure.lang Keyword]))
 
@@ -15,12 +12,12 @@
   "Given property specs of the form [key type] or [key type opts]
    declares a property."
   ([^Keyword key type]
-   (declare-property! key type {}))
-  ([^Keyword key type opts]
    (with-aggr [aggr]
-     (declare-property! ^IndexAggregator aggr key type opts)))
-  ([^IndexAggregator aggr ^Keyword key type opts]
-   (swap! *db* (fn [db] (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key type opts))))
+     (declare-property! ^IndexAggregator aggr ^Keyword key type)))
+  ([^IndexAggregator aggr ^Keyword key type]
+   (swap! *db* declare-property! ^IndexAggregator aggr ^Keyword key type))
+  ([^DB db ^IndexAggregator aggr ^Keyword key type]
+   (declare-property! ^DB db ^IndexAggregator aggr key type {}))
   ([^DB db ^IndexAggregator aggr ^Keyword key type opts]
    (insert! ^DB db ^IndexAggregator aggr (merge {:db/key key
                                                  :db/type type
@@ -32,31 +29,28 @@
    declares the set of properties."
   ([args]
    (with-aggr [aggr]
-     (declare-properties! @*db* ^IndexAggregator aggr args)))
+     (declare-properties! ^IndexAggregator aggr args)))
   ([^IndexAggregator aggr args]
-   (swap! *db* (fn [db] (declare-properties! ^DB db ^IndexAggregator aggr args))))
+   (swap! *db* declare-properties! ^IndexAggregator aggr args))
   ([^DB db ^IndexAggregator aggr args]
-   (reduce (fn [db arg]
-             (apply (partial declare-property! ^DB db ^IndexAggregator aggr) arg))
+   (reduce (fn [-db arg]
+             (apply (partial declare-property! ^DB -db ^IndexAggregator aggr) arg))
            db args)))
 
 (defn declare-tag!
   ([^Keyword key]
    (with-aggr [aggr] (declare-tag! ^IndexAggregator aggr ^Keyword key)))
   ([^IndexAggregator aggr ^Keyword key]
-   (declare-tag! ^IndexAggregator aggr ^Keyword key {}))
-  ([^IndexAggregator aggr ^Keyword key opts]
-   (swap! *db* (fn [db] (declare-tag! db aggr key opts))))
-  ([^DB db ^IndexAggregator aggr ^Keyword key opts]
-   (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Boolean
-                      (merge {:db/tag? true} opts))))
+   (declare-tag! ^IndexAggregator aggr ^Keyword key))
+  ([^DB db ^IndexAggregator aggr ^Keyword key]
+   (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Boolean {:db/tag? true})))
 
 (defn declare-tags!
   ([args]
    (with-aggr [aggr]
      (declare-tags! ^IndexAggregator aggr args)))
   ([^IndexAggregator aggr args]
-   (swap! *db* (fn [db] (declare-tags! ^DB db ^IndexAggregator aggr args))))
+   (swap! *db* declare-tags! ^IndexAggregator aggr args))
   ([^DB db ^IndexAggregator aggr args]
    (reduce (fn [^DB db arg]
              (apply (partial declare-tag! ^DB db ^IndexAggregator aggr) arg))
@@ -64,12 +58,12 @@
 
 (defn declare-to-one-relation!
   ([^Keyword key]
-   (declare-to-one-relation! ^Keyword key {}))
-  ([^Keyword key opts]
    (with-aggr [aggr]
-     (declare-to-one-relation! ^IndexAggregator aggr ^Keyword key opts)))
-  ([^IndexAggregator aggr ^Keyword key opts]
-   (swap! *db* (fn [db] (declare-to-one-relation! ^DB db ^IndexAggregator aggr ^Keyword key opts))))
+     (declare-to-one-relation! ^IndexAggregator aggr ^Keyword key)))
+  ([^IndexAggregator aggr ^Keyword key]
+   (swap! *db* declare-to-one-relation! ^IndexAggregator aggr ^Keyword key))
+  ([^DB db ^IndexAggregator aggr ^Keyword key]
+   (declare-to-one-relation! ^DB db ^IndexAggregator aggr ^Keyword key {}))
   ([^DB db ^IndexAggregator aggr ^Keyword key opts]
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key Integer
                       (merge {:db/relation? true
@@ -78,12 +72,12 @@
 
 (defn declare-to-many-relation!
   ([^Keyword key]
-   (declare-to-many-relation! ^Keyword key {}))
-  ([^Keyword key opts]
    (with-aggr [aggr]
-     (declare-to-many-relation! ^IndexAggregator aggr ^Keyword key opts)))
-  ([^IndexAggregator aggr ^Keyword key opts]
-   (swap! *db* (fn [db] (declare-to-many-relation! ^DB db ^IndexAggregator aggr ^Keyword key opts))))
+     (declare-to-many-relation! ^IndexAggregator aggr ^Keyword key)))
+  ([^IndexAggregator aggr ^Keyword key]
+   (swap! *db* declare-to-many-relation! ^IndexAggregator aggr ^Keyword key))
+  ([^DB db ^IndexAggregator aggr ^Keyword key]
+   (declare-to-many-relation! ^DB db ^IndexAggregator aggr ^Keyword key {}))
   ([^DB db ^IndexAggregator aggr ^Keyword key opts]
    (declare-property! ^DB db ^IndexAggregator aggr ^Keyword key
                       int-array-class
@@ -96,7 +90,7 @@
    (with-aggr [aggr]
      (declare-to-one-relations! ^IndexAggregator aggr args)))
   ([^IndexAggregator aggr args]
-   (swap! *db* (fn [db] (declare-to-one-relations! db ^IndexAggregator aggr args))))
+   (swap! *db* declare-to-one-relations! ^IndexAggregator aggr args))
   ([^DB db ^IndexAggregator aggr args]
    (let [tuple-fn (fn [a] (if (> (count a) 1)
                             (vector (first a) {:db/inverse-relation
@@ -110,7 +104,7 @@
    (with-aggr [aggr]
      (declare-to-many-relations! ^IndexAggregator aggr args)))
   ([^IndexAggregator aggr args]
-   (swap! *db* (fn [^DB db] (declare-to-many-relations! ^DB db ^IndexAggregator aggr args))))
+   (swap! *db* declare-to-many-relations! ^IndexAggregator aggr args))
   ([^DB db ^IndexAggregator aggr args]
    (let [tuple-fn (fn [a] (if (> (count a) 1)
                             (vector (first a) {:db/inverse-relation
@@ -122,18 +116,16 @@
 (defn key-map
   "Creates a map of the-key's value to id for the given set key or id.
    Assumes the mapping is one to one."
-  ([the-set the-key] (key-map ^DB @*db* the-set the-key))
+  ([the-set the-key] (key-map ^DB (c/db) the-set the-key))
   ([^DB db the-set the-key]
-   ;;{:pre [(clojure.test/is (not-any? nil? [the-set the-key (key->id the-key)]))]}
    (some->> (ids ^DB db the-set)
             (project ^DB db [the-key :db/id])
             (into {}))))
 
 (defn multi-key-map
   "Creates a map of the-key's value to a vector of all of the ids with that value."
-  ([the-set the-key] (multi-key-map ^DB @*db* the-set the-key))
+  ([the-set the-key] (multi-key-map ^DB (c/db) the-set the-key))
   ([^DB db the-set the-key]
-   ;;{:pre [(clojure.test/is (not-any? nil? [db the-set the-key (key->id db the-key)]))]}
    (->> the-set
         (partial ids ^DB db)
         (project ^DB db [the-key :db/id])
@@ -148,14 +140,12 @@
    (with-aggr [aggr]
      (add-inverse-relations! ^IndexAggregator aggr args)))
   ([^IndexAggregator aggr args]
-   (swap! *db* (fn [db] (add-inverse-relations! ^DB db ^IndexAggregator aggr args))))
+   (swap! *db* add-inverse-relations! ^IndexAggregator aggr args))
   ([^DB db ^IndexAggregator aggr args]
-   (reduce (fn [^DB db arg]
+   (reduce (fn [^DB db [k v]]
              (update! ^DB db ^IndexAggregator aggr
-                      {:db/key (first arg)
-                       :db/inverse-relation (some-> arg
-                                                    second
-                                                    (partial valuei db :db-id))}))
+                      {:db/key k
+                       :db/inverse-relation (some-> v second (partial valuei ^DB db :db/id))}))
            db args)))
 
 #_(defn add-tag!

@@ -45,7 +45,8 @@
     [:test/date Date]
     [:test/instant Instant]
     [:test/class Class]
-    [:test/edn PersistentHashMap]])
+    [:test/edn PersistentHashMap]
+    ])
   (s/declare-to-one-relations! [[:test/parent]])
   (s/declare-to-many-relations! [[:test/children]])
   (s/declare-tags! [[:test/tag?]]))
@@ -107,16 +108,17 @@
                 :test/children (int-array [(c/value :db/id :hello/there)
                                            (c/value :db/id :hello/dude)])})))
 
+;;(c/create-db!)
+;;(declare-test-schema!)
+
 (defn with-persistentdb [f]
   (c/create-db!)
-  ;;(c/prime-db!)
   (declare-test-schema!)
   (insert-test-data!)
   (f))
 
 (defn with-rdb [f]
   (c/create-db!)
-  ;;(c/prime-db!)
   (declare-test-schema!)
   (insert-test-data!)
   (c/compact!)

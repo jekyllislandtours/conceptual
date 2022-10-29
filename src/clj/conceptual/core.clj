@@ -60,26 +60,73 @@
    {:db/key :db/fn? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}])
 
-(defn ^:private empty-persistent-db []
+(defn- empty-persistent-db []
   (PersistentDB. :default
                  default-unique-indices
                  default-keys
                  default-values
                  default-max-id))
 
-(defn empty-db
-  "Creates and empty persistent db."
-  ([] (empty-persistent-db)))
-
-(defn -create-db!
-  "Creates a default db."
-  ([] (-create-db! empty-db))
-  ([^IFn make-db-fn]
-   (reset! *db* (make-db-fn))))
-
 (defn db
   "Returns a database instance if it exists."
   [] @*db*)
+
+(defn key->id
+  "Given a keyword identity returns the id."
+  ([^Keyword k] (key->id ^DB (db) ^Keyword k))
+  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
+
+(defn- map->kvs [^DB db arg]
+  (let [items (->> arg
+                   (map (fn [[k v]] [(key->id ^DB db k) v]))
+                   (sort-by first <))
+        ks (int-array (map first items))
+        vs (object-array (map second items))]
+    [ks vs]))
+
+(defn- map->undefined-keys [^DB db arg]
+  (some->> arg keys (filter #(nil? (key->id ^DB db %)))))
+
+(defn create-db!
+  "Creates/resets *db* to a brand new database all bootstrapped and stuff."
+  []
+  ;; bootstrap
+  (reset! *db* (empty-persistent-db))
+  ;; insert :db/tag?
+  (let [[^ints ks #^Object vs] (map->kvs @*db* tag-default-concept)]
+    (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
+  ;; add :db/tag? to :db/tag? itself
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/tag?)]
+                             (.update ^DB db nil id id true))))
+  ;; add :db/tag? to :db/property?
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/property?)
+                                 kid (key->id ^DB db :db/tag?)]
+                             (.update ^DB db nil id kid true))))
+  ;; insert :db/unique?
+  (let [[^ints ks #^Object vs] (map->kvs @*db* unique-default-concept)]
+    (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
+  ;; tag :db/key as being unique so it gets indexed
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/key)
+                                 kid (key->id ^DB db :db/unique?)]
+                             (.update ^DB db nil id kid true))))
+  ;; add remaining items... should now index any :db/unique? keys
+  (swap! *db*
+         (fn [db]
+           (reduce (fn [^DB db c]
+                     (let [[^ints ks #^Object vs] (map->kvs db c)]
+                       (.insert ^DB db nil ks vs)))
+                   db extra-db-concepts)))
+  ;; now index all :db/ids, after this should be automatic
+  (swap! *db*
+         (fn [^DB db]
+           (->> (range (.count db))
+                (map #(vector % (.getKeys db %)))
+                (mapcat (fn [[id ks]] (map #(vector % id) ks)))
+                (group-by first)
+                (map #(vector (first %)
+                              (int-array (sort (into #{} (map second (second %)))))))
+                (reduce (fn [db [id v]]
+                          (.update ^DB db nil id (key->id db :db/ids) v)) db)))))
 
 ;; TODO push this into a utils
 (defn nsname
@@ -87,10 +134,6 @@
   Not sure why this isn't in clojure core or at least a method of Keyword."
   [^Keyword k] (str (.sym k)))
 
-(defn key->id
-  "Given a keyword identity returns the id."
-  ([^Keyword k] (key->id ^DB @*db* ^Keyword k))
-  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
 (defn keys->ids
   "Returns a sorted int array representing a collection of keywords."
@@ -142,12 +185,12 @@
 
 (declare seek)
 
-(defn insert-1!
+(defn insert-0!
   "Inserts an array of values given an array of keys. Must be a WritableDB"
   ([^ints ks #^Object vs]
-   (insert-1! nil ks vs))
+   (insert-0! nil ks vs))
   ([^IndexAggregator aggr ^ints ks #^Object vs]
-   (swap! *db* (fn [db] (insert-1! db aggr ks vs))))
+   (swap! *db* insert-0! aggr ks vs))
   ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
    (.insert ^WritableDB db
             ^IndexAggregator aggr
@@ -159,26 +202,22 @@
   and a new `:db/id` will be added."
   ([arg] (insert! nil arg))
   ([^IndexAggregator aggr arg]
-   (swap! *db* (fn [db] (insert! db aggr arg))))
+   (swap! *db* insert! aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (try
-     (when-not (seek ^DB db (:db/key arg))
-       (let [items (->> (seq (dissoc arg :db/id))
-                        (map (fn [[k v]] [(key->id ^DB db k) v]))
-                        (sort-by first <))
-             ks (int-array (map first items))
-             vs (object-array (map second items))]
-         (insert-1! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs)))
+     (if-not (key->id ^DB db (:db/key arg))
+       (let [[^ints ks #^Object vs] (map->kvs ^DB db (dissoc arg :db/id))]
+         (insert-0! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs))
+       db)
      (catch Throwable t
-       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+       (let [undefined-keys (map->undefined-keys arg)]
          (throw
           (ex-info (str "Error inserting concept:"
                         (.getMessage t)
                         (when (seq undefined-keys)
                           " undefined-key - update! requires all keys to be defined."))
                    {:arg arg
-                    :undefined-keys undefined-keys}
-                   t)))))))
+                    :undefined-keys undefined-keys} t)))))))
 
 (defn update-0!
   "Lowest level update fn. Updates a single key/value in the concept.
@@ -207,12 +246,8 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id db)
-          items (->> arg
-                     (map (fn [[k v]] [(key->id-fn k) v]))
-                     (sort-by first <))
-          ^ints ks (int-array (map first items))
-          #^Object vs (object-array (map second items))]
-      (update-1! db aggr ^int id ks vs))
+          [^ints ks #^Object vs] (map->kvs db (dissoc arg :db/id))]
+      (update-1! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
         (throw
@@ -221,8 +256,7 @@
                        (when (seq undefined-keys)
                          "undefined-key - update! requires all keys to be defined."))
                   {:arg arg
-                   :undefined-keys undefined-keys}
-                  t))))))
+                   :undefined-keys undefined-keys} t))))))
 
 (defn update!
   "Given a map which contains either a :db/id or a :db/key and value as well as the
@@ -262,12 +296,8 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id ^DB db)
-          items (->> arg
-                     (map (fn [[k v]] [(key->id-fn k) v]))
-                     (sort-by first <))
-          ^ints ks (int-array (map first items))
-          #^Object vs (object-array (map second items))]
-      (replace-0! db aggr ^int id ks vs))
+          [^ints ks #^Object vs] (map->kvs ^DB db (dissoc arg :db/id))]
+      (replace-0! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
         (throw
@@ -276,8 +306,7 @@
                        (when (seq undefined-keys)
                          "undefined-key - replace! requires all keys to be defined."))
                   {:arg arg
-                   :undefined-keys undefined-keys}
-                  t))))))
+                   :undefined-keys undefined-keys} t))))))
 
 (defn replace!
   "Given a map which contains either a :db/id or a :db/key will replace the
@@ -306,27 +335,6 @@
    (swap! *db* (fn [db] (update-inline! db aggr id ks vs))))
   ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
    (.updateInline ^WritableDB db aggr id ks vs)))
-
-(defn- prime-db-ids []
-  (doseq [[k v] (->> (range (.count db))
-                     (map #(vector % (.getKeys db %)))
-                     (mapcat (fn [[id ks]] (map #(vector % id) ks)))
-                     (group-by first)
-                     (map #(vector (first %) (int-array (sort (into #{} (map second (second %))))))))]
-    (update-0! k (key->id :db/ids) v)))
-
-(defn create-db!
-  []
-  (-create-db!)
-  (insert! tag-default-concept)
-  (update! {:db/key :db/property? :db/tag? true})
-  (insert! unique-default-concept)
-  (update! {:db/key :db/key :db/unique? true})
-  (doseq [c extra-db-concepts]
-    (insert! c))
-  (prime-db-ids))
-
-(def reset-db! create-db!)
 
 (defn max-id
   "Returns the max id for the database."

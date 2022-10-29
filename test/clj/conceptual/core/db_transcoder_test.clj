@@ -94,7 +94,7 @@
       ;; pickle round-trip
       (c/pickle! pickle-path)
       (c/load-pickle! :filename pickle-path)
-      (is (= 12 (c/max-id)))
+      (is (= 13 (c/max-id)))
 
       (io/delete-file pickle-path))))
 

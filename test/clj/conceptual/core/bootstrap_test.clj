@@ -17,14 +17,10 @@
 
 ;;(use-fixtures :once core-test/with-persistentdb)
 
-;;(c/-create-db!)
-;;(c/dump)
-
-(deftest -create-db-test!
-  (c/-create-db!)
-  (expect 3 (c/max-id))
-  (expect 0 (c/value :db/id :db/id))
-  (expect 1 (c/value :db/id :db/key))
-  (expect (range 3) (->> (range 3)
-                         (map (partial c/value :db/key))
-                         (map c/key->id))))
+(deftest create-db-test!
+  (c/create-db!)
+  (println @c/*db*)
+  (expect 13 (c/max-id))
+  (expect true (c/value :db/tag? :db/tag?))
+  (expect true (c/value :db/tag? :db/property?))
+  (expect 14 (count (c/value :db/ids :db/key))))
