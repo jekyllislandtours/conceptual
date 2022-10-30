@@ -52,6 +52,18 @@ public interface DB extends Counted {
      */
     int getKeyCount();
 
+    /**
+     * Returns the id for a given and object key and uniqueKey demarked with a :db/unique? tag.
+     *
+     * Effectively an alternate key lookup.
+     *
+     * :db/key is managed this way and can be used with the following code.
+     *
+     * @param uniqueKey the id for an :db/property? tagged with :db/unique?
+     * @param key the alternate key value to lookup a concept by.
+     */
+    Integer lookupId(int uniqueKey, Object key);
+
     // key to id
 
     /**
@@ -178,6 +190,15 @@ public interface DB extends Counted {
      * @return DBMap the map for a given concept.
      */
     DBMap get(int id);
+
+    /**
+     * Returns a map for a given concept.
+     *
+     * @param uniqueKey a key tagged as :db/unique?
+     * @param key the value for the given indexKey.
+     * @return DBMap the map for a given concept.
+     */
+    DBMap lookup(int uniqueKey, Object key);
 
     /**
      * Given a set of keys and a set of concept ids returns an array of values

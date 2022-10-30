@@ -76,6 +76,18 @@
   ([^Keyword k] (key->id ^DB (db) ^Keyword k))
   ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
+(defn lookup-id-0
+  ([unique-key-id ^Object key] (.lookupId ^DB (db) ^int unique-key-id ^Object key))
+  ([^DB db unique-key-id ^Object key] (.lookupId ^DB db ^int unique-key-id ^Object key)))
+
+(defn lookup-id
+  ([unique-key ^Object key] (lookup-id ^DB @*db* unique-key ^Object key))
+  ([^DB db unique-key ^Object key]
+   (if (instance? Number unique-key)
+     (lookup-id-0 db unique-key key)
+     (when (keyword? unique-key)
+       (lookup-id-0 db (key->id ^DB db unique-key) key)))))
+
 (defn- map->kvs [^DB db arg]
   (let [items (->> arg
                    (map (fn [[k v]] [(key->id ^DB db k) v]))
@@ -381,6 +393,15 @@
   "Reversed arguments from invoke."
   ([id key] (invoke @*db* key id))
   ([^DB db id key] (invoke db key id)))
+
+(defn lookup
+  "Given the id for a concept returns a lazy Map for that concept."
+  ([unique-key ^Object key] (lookup (db) unique-key key))
+  ([^DB db unique-key ^Object key]
+   (when-let [^int unique-key-id (if (keyword? unique-key)
+                                   (key->id ^DB db unique-key)
+                                   unique-key)]
+     (.lookup ^DB db ^int unique-key-id ^Object key))))
 
 (defn seek
   "Given the id for a concept returns a lazy Map for that concept."

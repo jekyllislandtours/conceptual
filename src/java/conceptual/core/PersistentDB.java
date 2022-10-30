@@ -75,14 +75,18 @@ public final class PersistentDB implements WritableDB {
     }
 
     @Override
-    public Integer keywordToId(Keyword key) {
+    public Integer lookupId(int uniqueKey, Object key) {
         Integer result = null;
-        // TODO: ensure keyIndex exists so this check isn't necessary
-        IPersistentMap keyIndex = (IPersistentMap) uniqueIndices.valAt(DB.KEY_ID);
+        IPersistentMap keyIndex = (IPersistentMap) uniqueIndices.valAt(uniqueKey);
         if (keyIndex != null) {
             result = (Integer) keyIndex.valAt(key);
         }
         return result;
+    }
+
+    @Override
+    public Integer keywordToId(Keyword key) {
+        return lookupId(DB.KEY_ID, key);
     }
 
     @Override
@@ -149,6 +153,12 @@ public final class PersistentDB implements WritableDB {
 
     @Override
     public DBMap get(int id) {
+        return new DBMap(this, id);
+    }
+
+    @Override
+    public DBMap lookup(int uniqueKey, Object key) {
+        int id = lookupId(uniqueKey, key);
         return new DBMap(this, id);
     }
 
