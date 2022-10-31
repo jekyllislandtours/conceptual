@@ -2,6 +2,7 @@ package conceptual.core;
 
 import clojure.lang.IPersistentMap;
 import clojure.lang.Keyword;
+import clojure.lang.PersistentHashMap;
 
 import conceptual.util.IntArrayPool;
 import conceptual.util.IntegerSets;
@@ -9,18 +10,18 @@ import conceptual.util.IntegerSets;
 public final class PersistentDB implements WritableDB {
 
     final Keyword identity;
-    final IPersistentMap keyIdIndex;
+    final IPersistentMap uniqueIndices;
     final IPersistentMap keyIndex;
     final IPersistentMap valIndex;
     final int maxId;
 
     public PersistentDB(Keyword identity,
-                        IPersistentMap keyIdIndex,
+                        IPersistentMap uniqueIndices,
                         IPersistentMap keyIndex,
                         IPersistentMap valIndex,
                         int maxId) {
         this.identity = identity;
-        this.keyIdIndex = keyIdIndex;
+        this.uniqueIndices = uniqueIndices;
         this.keyIndex = keyIndex;
         this.valIndex = valIndex;
         this.maxId = maxId;
@@ -74,8 +75,18 @@ public final class PersistentDB implements WritableDB {
     }
 
     @Override
+    public Integer lookupId(int uniqueKey, Object key) {
+        Integer result = null;
+        IPersistentMap keyIndex = (IPersistentMap) uniqueIndices.valAt(uniqueKey);
+        if (keyIndex != null) {
+            result = (Integer) keyIndex.valAt(key);
+        }
+        return result;
+    }
+
+    @Override
     public Integer keywordToId(Keyword key) {
-        return (Integer) keyIdIndex.valAt(key);
+        return lookupId(DB.KEY_ID, key);
     }
 
     @Override
@@ -83,7 +94,7 @@ public final class PersistentDB implements WritableDB {
         int kid = -1;
         if (key != null) {
             if (key instanceof Keyword) {
-                kid = (Integer) keyIdIndex.valAt(key);
+                kid = keywordToId((Keyword) key);
             } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
             } else if (key instanceof Integer) {
@@ -146,6 +157,12 @@ public final class PersistentDB implements WritableDB {
     }
 
     @Override
+    public DBMap lookup(int uniqueKey, Object key) {
+        int id = lookupId(uniqueKey, key);
+        return new DBMap(this, id);
+    }
+
+    @Override
     public Object[][] project(int[] keys, int[] ids) {
         final Object[][] result = new Object[ids.length][];
         Object[] tmp;
@@ -190,12 +207,13 @@ public final class PersistentDB implements WritableDB {
                 aggregator.add(key, id);
             }
         }
+        IPersistentMap updatedUniqueIndices = updateIndices(id, ks, vs);
         // vs[0] has to be the keyword by necessity... could check.
         return new PersistentDB(identity,
-                (ks[0] == KEY_ID) ? keyIdIndex.assoc(vs[0], id) : keyIdIndex,
-                keyIndex.assoc(id, ks1),
-                valIndex.assoc(id, vs1),
-                id);
+                                updatedUniqueIndices,
+                                keyIndex.assoc(id, ks1),
+                                valIndex.assoc(id, vs1),
+                                id);
     }
 
     @Override
@@ -211,11 +229,12 @@ public final class PersistentDB implements WritableDB {
             final Object[] vs1 = new Object[vs.length];
             System.arraycopy(vs, 0, vs1, 0, vs.length);
             vs1[idx] = val;
+            IPersistentMap updatedUniqueIndices = updateIndices(id, new int[] { key }, new Object[] { val });
             return new PersistentDB(identity,
-                    (key == KEY_ID) ? keyIdIndex.without(vs[idx]).assoc(val, id) : keyIdIndex,
-                    keyIndex,
-                    valIndex.assoc(id, vs1),
-                    maxId);
+                                    updatedUniqueIndices,
+                                    keyIndex,
+                                    valIndex.assoc(id, vs1),
+                                    maxId);
         } else if (idx < 0) {
             final int[] ks = getKeys(id);
             final int idx2 = IntegerSets.binarySearchGreater(ks, key);
@@ -238,11 +257,12 @@ public final class PersistentDB implements WritableDB {
             if (aggregator != null) {
                 aggregator.add(key, id);
             }
+            IPersistentMap updatedUniqueIndices = updateIndices(id, new int[] { key }, new Object[] { val });
             return new PersistentDB(identity,
-                    (key == KEY_ID) ? keyIdIndex.assoc(val, id) : keyIdIndex,
-                    keyIndex.assoc(id, ks1),
-                    valIndex.assoc(id, vs1),
-                    maxId);
+                                    updatedUniqueIndices,
+                                    keyIndex.assoc(id, ks1),
+                                    valIndex.assoc(id, vs1),
+                                    maxId);
         } else {
             throw new RuntimeException("update0 - Could not update " +
                     "(id: " + id + ", key: " + key + ", idx: " + idx + ")");
@@ -289,8 +309,9 @@ public final class PersistentDB implements WritableDB {
         if (idx >= 0) {
             dbKey = (Keyword) vals[idx];
         }
+        IPersistentMap updatedUniqueIndices = updateIndices(id, keys, vals);
         return new PersistentDB(identity,
-                                (dbKey != null) ? keyIdIndex.assoc(dbKey, id) : keyIdIndex,
+                                updatedUniqueIndices,
                                 keyIndex.assoc(id, ks),
                                 valIndex.assoc(id, vs),
                                 maxId);
@@ -300,7 +321,6 @@ public final class PersistentDB implements WritableDB {
     public WritableDB replace(final IndexAggregator aggregator, final int id,
                               final int[] keys, final Object[] vals) {
         final int[] prevKeys = getKeys(id);
-        //final Object[] prevVals = getValues(id);
 
         // remove id from dropped key's db/ids
         final int[] removedKeys = IntegerSets.difference(prevKeys, keys);
@@ -318,8 +338,9 @@ public final class PersistentDB implements WritableDB {
         if (idx >= 0) {
             dbKey = (Keyword) vals[idx];
         }
+        IPersistentMap replacedKeyIndices = replaceIndices(id, keys, vals, removedKeys);
         return new PersistentDB(identity,
-                                (dbKey != null) ? keyIdIndex.assoc(dbKey, id) : keyIdIndex,
+                                replacedKeyIndices,
                                 keyIndex.assoc(id, keys),
                                 valIndex.assoc(id, vals),
                                 maxId);
@@ -356,15 +377,34 @@ public final class PersistentDB implements WritableDB {
                     aggregator.add(key, id);
                 }
             }
+            IPersistentMap updatedUniqueIndices = updateIndices(id, keys, vals);
             return new PersistentDB(identity,
-                    keyIdIndex,
-                    keyIndex.assoc(id, ks1),
-                    valIndex.assoc(id, vs1),
-                    maxId);
+                                    uniqueIndices,
+                                    keyIndex.assoc(id, ks1),
+                                    valIndex.assoc(id, vs1),
+                                    maxId);
         } else {
             throw new RuntimeException("updateInline - Could not updateInline " +
                     "(id: " + id + ", keys: " + keys + ", idx: " + idx + ")");
         }
+    }
+
+    private boolean[] keysUnique(final int[] keys) {
+        boolean[] result = new boolean[keys.length];
+        for (int i=0; i < keys.length; i++) {
+            Object value = getValue(keys[i], DB.UNIQUE_TAG_ID);
+            result[i] = (value != null && value instanceof Boolean && true == ((Boolean) value));
+        }
+        return result;
+    }
+
+    private IPersistentMap updateIndices(final int id, final int[] keys, final Object[] vals) {
+        return IndexAggregator.updateIndices(uniqueIndices, id, keys, keysUnique(keys), vals);
+    }
+
+    private IPersistentMap replaceIndices(final int id, final int[] keys, final Object[] vals, final int[] keysToRemove) {
+        IPersistentMap result = IndexAggregator.removeFromIndices(uniqueIndices, keysToRemove, keysUnique(keysToRemove), vals);
+        return IndexAggregator.updateIndices(result, id, keys, keysUnique(keys), vals);
     }
 
     public DB compactToRDB() {
@@ -372,7 +412,7 @@ public final class PersistentDB implements WritableDB {
         for (int i=0; i <= maxId; i++) {
             cs[i] = new RDB.C((int[]) keyIndex.valAt(i, null), (Object[]) valIndex.valAt(i, null));
         }
-        return new RDB(identity, keyIdIndex, cs, maxId, new IntArrayPool());
+        return new RDB(identity, uniqueIndices, cs, maxId, new IntArrayPool());
     }
 
     @Override

@@ -1,5 +1,7 @@
 package conceptual.core;
 
+import clojure.lang.IPersistentMap;
+import clojure.lang.PersistentHashMap;
 import conceptual.util.IntegerSets;
 
 import java.util.*;
@@ -73,4 +75,42 @@ public class IndexAggregator {
         return result;
     }
 
+    public static IPersistentMap updateIndex(final IPersistentMap index, final int id, final int key, final Object val) {
+        return index.assoc(key, ((IPersistentMap) index.valAt(key, PersistentHashMap.EMPTY)).without(val).assoc(val, id));
+    }
+
+    public static IPersistentMap removeFromIndex(final IPersistentMap index, final int key, final Object val) {
+        return index.assoc(key, ((IPersistentMap) index.valAt(key, PersistentHashMap.EMPTY)).without(val));
+    }
+
+    public static IPersistentMap updateIndices(final IPersistentMap indices,
+                                               final int id,
+                                               final int[] keys,
+                                               final boolean[] key_tags,
+                                               final Object[] vals) {
+        IPersistentMap result = indices;
+        if (keys.length > 0) {
+            for (int i=0; i < keys.length; i++) {
+                if (key_tags[i]) {
+                    result = updateIndex(result, id, keys[i], vals[i]);
+                }
+            }
+        }
+        return result;
+    }
+
+    public static IPersistentMap removeFromIndices(final IPersistentMap indices,
+                                                   final int[] keys,
+                                                   final boolean[] key_tags,
+                                                   final Object[] vals) {
+        IPersistentMap result = indices;
+        if (keys.length > 0) {
+            for (int i=0; i < keys.length; i++) {
+                if (key_tags[i]) {
+                    result = removeFromIndex(result, keys[i], vals[i]);
+                }
+            }
+        }
+        return result;
+    }
 }

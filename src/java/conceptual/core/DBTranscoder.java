@@ -84,7 +84,8 @@ public class DBTranscoder {
             dos.writeInt(VERSION);
             dos.writeUTF(nsname(db.getIdentity()));
             dos.writeInt(db.getMaxId());
-            encodeKeyIdIndex(dos, db.keyIdIndex);
+            //encodeKeyIdIndex(dos, db.keyIdIndex);
+            encodeUniqueIndices(dos, db.uniqueIndices);
             encodeKeyIndex(dos, db);
             encodeValIndex(dos, db);
         }
@@ -96,7 +97,7 @@ public class DBTranscoder {
         if (oneIfNotNull == 1) {
             Keyword identity;
             int maxId;
-            IPersistentMap keyIdIndex;
+            IPersistentMap uniqueIndices;
             int[][] keyIndex;
             Object[][] valIndex;
             int version = dis.readInt();
@@ -105,7 +106,8 @@ public class DBTranscoder {
             }
             identity = Keyword.intern(dis.readUTF());
             maxId = dis.readInt();
-            keyIdIndex = decodeKeyIdIndex(dis);
+            //keyIdIndex = decodeKeyIdIndex(dis);
+            uniqueIndices = decodeUniqueIndices(dis);
             keyIndex = decodeKeyIndex(dis, verbose);
             valIndex = decodeValIndex(dis, verbose);
             RDB.C[] cs = new RDB.C[keyIndex.length];
@@ -128,7 +130,69 @@ public class DBTranscoder {
             if (verbose == true) {
                 System.out.println();
             }
-            result = new RDB(identity, keyIdIndex, cs, maxId, new IntArrayPool());
+            result = new RDB(identity, uniqueIndices, cs, maxId, new IntArrayPool());
+        }
+        return result;
+    }
+
+    public static void encodeUniqueIndices(final DataOutputStream dos, final IPersistentMap map) throws IOException {
+        if (map == null) {
+            dos.writeInt(0);
+        } else {
+            dos.writeInt(1);
+            int count = map.count();
+            dos.writeInt(count);
+            for (Iterator iter = map.iterator(); iter.hasNext(); ) {
+                MapEntry entry = (MapEntry) iter.next();
+                dos.writeInt((Integer) entry.key());
+                encodeUniqueIndex(dos, (IPersistentMap) entry.val());
+            }
+        }
+    }
+
+    public static IPersistentMap decodeUniqueIndices(final DataInputStream dis) throws IOException {
+        IPersistentMap result = null;
+        int oneIfNotNull = dis.readInt();
+        if (oneIfNotNull == 1) {
+            int count = dis.readInt();
+            Map<Integer, IPersistentMap> temp = new HashMap<Integer, IPersistentMap>(count);
+            for (int i=0; i < count; i++) {
+                int key = dis.readInt();
+                IPersistentMap value = decodeUniqueIndex(dis);
+                temp.put(key, value);
+            }
+            result = PersistentHashMap.create(temp);
+        }
+        return result;
+    }
+
+    public static void encodeUniqueIndex(final DataOutputStream dos, final IPersistentMap map) throws IOException {
+        if (map == null) {
+            dos.writeInt(0);
+        } else {
+            dos.writeInt(1);
+            int count = map.count();
+            dos.writeInt(count);
+            for (Iterator iter = map.iterator(); iter.hasNext(); ) {
+                MapEntry entry = (MapEntry) iter.next();
+                encodeVal(dos, entry.key());
+                dos.writeInt((Integer) entry.val());
+            }
+        }
+    }
+
+    public static IPersistentMap decodeUniqueIndex(final DataInputStream dis) throws IOException {
+        IPersistentMap result = null;
+        int oneIfNotNull = dis.readInt();
+        if (oneIfNotNull == 1) {
+            int count = dis.readInt();
+            Map<Object, Integer> temp = new HashMap<Object, Integer>(count);
+            for (int i=0; i < count; i++) {
+                Object key = decodeVal(dis);
+                int value = dis.readInt();
+                temp.put(key, value);
+            }
+            result = PersistentHashMap.create(temp);
         }
         return result;
     }

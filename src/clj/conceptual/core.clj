@@ -7,13 +7,18 @@
            [clojure.lang IFn Keyword]))
 
 ;; name of default implicit db
-(def ^:dynamic *default-identity* :default)
+
+(def ^{:dynamic true :tag DB} *db* (atom nil))
+
+(def ^{:dynamic true :tag IndexAggregator} *aggr*)
 
 ;; internal keys
 (def ^{:private true :const true} -id (int DB/ID_ID))
 (def ^{:private true :const true} -key (int DB/KEY_ID))
 (def ^{:private true :const true} -type (int DB/TYPE_ID))
 (def ^{:private true :const true} -property? (int DB/PROPERTY_TAG_ID))
+(def ^{:private true :const true} -tag? (int DB/TAG_TAG_ID))
+(def ^{:private true :const true} -unique? (int DB/UNIQUE_TAG_ID))
 
 (def ^:private default-max-id (int 3))
 
@@ -32,51 +37,108 @@
     (into (int-map/int-map) (map #(list %1 %2) ids obj-arrays))))
 
 (def ^:private default-keyword->id
-  {:db/id -id :db/key -key :db/type -type :db/property? -property?})
+  {:db/id -id
+   :db/key -key
+   :db/type -type
+   :db/property? -property?
+   :db/tag? -tag?
+   :db/unique? -unique?})
 
-(defn ^:private empty-persistent-db
-  ([] (empty-persistent-db *default-identity*))
-  ([ident]
-    (PersistentDB. ident
-                   default-keyword->id
-                   default-keys
-                   default-values
-                   default-max-id)))
+(def ^:private default-unique-indices
+  {-key default-keyword->id})
 
-(defn empty-db
-  "Creates and empty persistent db."
-  ([] (empty-persistent-db))
-  ([^Keyword ident] (empty-persistent-db ident)))
+(def ^:private tag-default-concept {:db/key :db/tag? :db/type Boolean :db/property? true})
+(def ^:private unique-default-concept {:db/key :db/unique? :db/type Boolean :db/property? true :db/tag? true})
 
-;; store all of the dbs in this atom
-(def ^:private dbs (atom {}))
+(def ^:private extra-db-concepts
+  [{:db/key :db/dont-index? :db/type Boolean :db/property? true :db/tag? true}
+   {:db/key :db/relation? :db/type Boolean :db/property? true :db/tag? true}
+   {:db/key :db/to-many-relation? :db/type Boolean :db/property? true :db/tag? true}
+   {:db/key :db/to-one-relation? :db/type Boolean :db/property? true :db/tag? true}
+   {:db/key :db/inverse-relation :db/type Integer :db/property? true :db/relation? true :db/to-one-relation? true}
+   {:db/key :db/ids :db/type int-array-class :db/relation? true :db/to-many-relation? true :db/property? true}
+   {:db/key :db/fn? :db/type Boolean :db/property? true :db/tag? true}
+   {:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}])
 
-(defn db-atom
-  "Given a db instance returns the atom containing it."
-  ([^DB -db] (@dbs (.getIdentity -db))))
-
-(defn create-db!
-  "Creates a default db."
-  ([] (create-db! *default-identity*))
-  ([^Keyword k] (create-db! k empty-db))
-  ([^Keyword k ^IFn make-db]
-   (let [new-db (make-db k)]
-     (if-let [-atom (k @dbs)]
-       (do
-         (reset! -atom new-db)
-         (swap! dbs assoc k -atom))
-       (swap! dbs assoc k (atom new-db)))
-     new-db)))
+(defn- empty-persistent-db []
+  (PersistentDB. :default
+                 default-unique-indices
+                 default-keys
+                 default-values
+                 default-max-id))
 
 (defn db
   "Returns a database instance if it exists."
-  ([] (db *default-identity*))
-  ([^Keyword k]
-   (when-let [a (k @dbs)] @a)))
+  [] @*db*)
 
-(def ^{:dynamic true :tag DB} *db* (db-atom (create-db!)))
+(defn key->id
+  "Given a keyword identity returns the id."
+  ([^Keyword k] (key->id ^DB (db) ^Keyword k))
+  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
-(def ^{:dynamic true :tag IndexAggregator} *aggr*)
+(defn lookup-id-0
+  ([unique-key-id ^Object key] (.lookupId ^DB (db) ^int unique-key-id ^Object key))
+  ([^DB db unique-key-id ^Object key] (.lookupId ^DB db ^int unique-key-id ^Object key)))
+
+(defn lookup-id
+  ([unique-key ^Object key] (lookup-id ^DB (db) unique-key ^Object key))
+  ([^DB db unique-key ^Object key]
+   (if (instance? Number unique-key)
+     (lookup-id-0 db unique-key key)
+     (when (keyword? unique-key)
+       (lookup-id-0 db (key->id ^DB db unique-key) key)))))
+
+(defn- map->kvs [^DB db arg]
+  (let [items (->> arg
+                   (map (fn [[k v]] [(key->id ^DB db k) v]))
+                   (sort-by first <))
+        ks (int-array (map first items))
+        vs (object-array (map second items))]
+    [ks vs]))
+
+(defn- map->undefined-keys [^DB db arg]
+  (some->> arg keys (filter #(nil? (key->id ^DB db %)))))
+
+(defn create-db!
+  "Creates/resets *db* to a brand new database all bootstrapped and stuff."
+  []
+  ;; bootstrap
+  (reset! *db* (empty-persistent-db))
+  ;; insert :db/tag?
+  (let [[^ints ks #^Object vs] (map->kvs (db) tag-default-concept)]
+    (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
+  ;; add :db/tag? to :db/tag? itself
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/tag?)]
+                             (.update ^DB db nil id id true))))
+  ;; add :db/tag? to :db/property?
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/property?)
+                                 kid (key->id ^DB db :db/tag?)]
+                             (.update ^DB db nil id kid true))))
+  ;; insert :db/unique?
+  (let [[^ints ks #^Object vs] (map->kvs (db) unique-default-concept)]
+    (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
+  ;; tag :db/key as being unique so it gets indexed
+  (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/key)
+                                 kid (key->id ^DB db :db/unique?)]
+                             (.update ^DB db nil id kid true))))
+  ;; add remaining items... should now index any :db/unique? keys
+  (swap! *db*
+         (fn [db]
+           (reduce (fn [^DB db c]
+                     (let [[^ints ks #^Object vs] (map->kvs db c)]
+                       (.insert ^DB db nil ks vs)))
+                   db extra-db-concepts)))
+  ;; now index all :db/ids, after this should be automatic
+  (swap! *db*
+         (fn [^DB db]
+           (->> (range (.count db))
+                (map #(vector % (.getKeys db %)))
+                (mapcat (fn [[id ks]] (map #(vector % id) ks)))
+                (group-by first)
+                (map #(vector (first %)
+                              (int-array (sort (into #{} (map second (second %)))))))
+                (reduce (fn [db [id v]]
+                          (.update ^DB db nil id (key->id db :db/ids) v)) db)))))
 
 ;; TODO push this into a utils
 (defn nsname
@@ -84,14 +146,10 @@
   Not sure why this isn't in clojure core or at least a method of Keyword."
   [^Keyword k] (str (.sym k)))
 
-(defn key->id
-  "Given a keyword identity returns the id."
-  ([^Keyword k] (key->id ^DB @*db* ^Keyword k))
-  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
 (defn keys->ids
   "Returns a sorted int array representing a collection of keywords."
-  ([ks] (keys->ids @*db* ks))
+  ([ks] (keys->ids (db) ks))
   ([^DB db ks]
    (let [f (partial key->id ^DB db)]
      (->> (map f ks)
@@ -101,7 +159,7 @@
 
 (defn key-ids
   "Returns the keys for an concept key."
-  ([key] (key-ids @*db* key))
+  ([key] (key-ids (db) key))
   ([^DB db key]
    (if (instance? Number key)
      (.getKeys ^DB db ^int key)
@@ -112,13 +170,13 @@
 (defn ordered-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
-  ([ks] (ordered-ids @*db* ks))
+  ([ks] (ordered-ids (db) ks))
   ([db ks] (let [f (partial key->id ^DB db)] (int-array (map f ks)))))
 
 (defn normalize-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
-  ([ks] (normalize-ids @*db* ks))
+  ([ks] (normalize-ids (db) ks))
   ([db ks] (cond
             (instance? int-array-class ks) ks
             (or (vector? ks)
@@ -128,100 +186,80 @@
 
 (defn id->key
   "Given and id returns the key."
-  ([id] (id->key @*db* ^int id))
+  ([id] (id->key (db) ^int id))
   ([^DB db id] (.getValue ^DB db ^int id ^int -key)))
 
 (defn ids->keys
   "Given a collection of ids returns a collection of keys."
-  ([^ints ids] (ids->keys @*db* ids))
+  ([^ints ids] (ids->keys (db) ids))
   ([^DB db ^ints ids]
    (let [f (partial id->key ^DB db)] (map f ids))))
 
 (declare seek)
 
-(defn insert-1!
+(defn insert-0!
   "Inserts an array of values given an array of keys. Must be a WritableDB"
   ([^ints ks #^Object vs]
-   (insert-1! @*db* nil ks vs))
+   (insert-0! nil ks vs))
   ([^IndexAggregator aggr ^ints ks #^Object vs]
-   (insert-1! @*db* aggr ks vs))
+   (swap! *db* insert-0! aggr ks vs))
   ([^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs]
-   (reset! (db-atom db)
-           (.insert ^WritableDB db
-                    ^IndexAggregator aggr
-                    ^ints ks
-                    #^Object vs))))
+   (.insert ^WritableDB db
+            ^IndexAggregator aggr
+            ^ints ks
+            #^Object vs)))
 
 (defn insert!
   "Inserts into db. Must be a WritableDB. The key `:db/id`, if specified in `arg`, is ignored
   and a new `:db/id` will be added."
-  ([arg] (insert! @*db* nil arg))
-  ([^IndexAggregator aggr arg] (insert! @*db* aggr arg))
+  ([arg] (insert! nil arg))
+  ([^IndexAggregator aggr arg]
+   (swap! *db* insert! aggr arg))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (try
-     (when-not (seek ^DB db (:db/key arg))
-       (let [items (->> (seq (dissoc arg :db/id))
-                        (map (fn [[k v]] [(key->id ^DB db k) v]))
-                        (sort-by first <))
-             ks (int-array (map first items))
-             vs (object-array (map second items))]
-         (insert-1! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs)))
+     (if-not (key->id ^DB db (:db/key arg))
+       (let [[^ints ks #^Object vs] (map->kvs ^DB db (dissoc arg :db/id))]
+         (insert-0! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs))
+       db)
      (catch Throwable t
-       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+       (let [undefined-keys (map->undefined-keys arg)]
          (throw
           (ex-info (str "Error inserting concept:"
                         (.getMessage t)
                         (when (seq undefined-keys)
                           " undefined-key - update! requires all keys to be defined."))
                    {:arg arg
-                    :undefined-keys undefined-keys}
-                   t)))))))
-
-(def ^:private db-entries
-  [{:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}
-   {:db/key :db/dont-index :db/type Boolean :db/property? true}
-   {:db/key :db/tag? :db/type Boolean :db/property? true}
-   {:db/key :db/fn? :db/type Boolean :db/property? true :db/tag? true}
-   {:db/key :db/relation? :db/type Boolean :db/property? true :db/tag? true}
-   {:db/key :db/to-many-relation? :db/type Boolean :db/property? true :db/tag? true}
-   {:db/key :db/to-one-relation? :db/type Boolean :db/property? true :db/tag? true}
-   {:db/key :db/inverse-relation :db/type Integer :db/property? true :db/relation? true :db/to-one-relation? true}
-   {:db/key :db/ids :db/type int-array-class :db/relation? true :db/to-many-relation? true :db/property? true}])
+                    :undefined-keys undefined-keys} t)))))))
 
 (defn update-0!
   "Lowest level update fn. Updates a single key/value in the concept.
    Expects an integer id, and an integer key."
   ([id k ^Object v]
-   (update-0! @*db* nil ^int id ^int k v))
+   (update-0! nil ^int id ^int k v))
   ([^IndexAggregator aggr id k ^Object v]
-   (update-0! @*db* aggr ^int id ^int k v))
+   (swap! *db* (fn [db] (update-0! db aggr ^int id ^int k v))))
   ([^WritableDB db ^IndexAggregator aggr id k ^Object v]
-   (reset! (db-atom db) (.update ^DB db ^IndexAggregator aggr ^int id ^int k v))))
+   (.update ^DB db ^IndexAggregator aggr ^int id ^int k v)))
 
 (defn update-1!
   "Updates an array of values given an array of keys."
   ([id ^ints ks #^Object vs]
-   (update-1! @*db* nil id ks vs))
+   (update-1! nil id ks vs))
   ([^IndexAggregator aggr id ^ints ks #^Object vs]
-   (update-1! @*db* aggr id ks vs))
+   (swap! *db* (fn [db] (update-1! db aggr id ks vs))))
   ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
-   (let [new-db (.update ^WritableDB db
-                         ^IndexAggregator aggr
-                         ^int id
-                         ^ints ks
-                         #^Object vs)]
-     (reset! (db-atom db) new-db))))
+   (.update ^WritableDB db
+            ^IndexAggregator aggr
+            ^int id
+            ^ints ks
+            #^Object vs)))
 
 (defn update-2!
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id db)
-          items (->> arg
-                     (map (fn [[k v]] [(key->id-fn k) v]))
-                     (sort-by first <))
-          ^ints ks (int-array (map first items))
-          #^Object vs (object-array (map second items))]
-      (update-1! db aggr ^int id ks vs))
+          [^ints ks #^Object vs] (map->kvs db (dissoc arg :db/id))]
+      (update-1! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
         (throw
@@ -230,20 +268,20 @@
                        (when (seq undefined-keys)
                          "undefined-key - update! requires all keys to be defined."))
                   {:arg arg
-                   :undefined-keys undefined-keys}
-                  t))))))
+                   :undefined-keys undefined-keys} t))))))
 
 (defn update!
   "Given a map which contains either a :db/id or a :db/key and value as well as the
   keys and values that need to added or updated, updates the concept.
   NOTE: use replace! to be able to remove keys."
-  ([arg] (update! @*db* nil arg))
-  ([^IndexAggregator aggr arg] (update! @*db* aggr arg))
+  ([arg] (update! nil arg))
+  ([^IndexAggregator aggr arg]
+   (swap! *db* (fn [db] (update! db aggr arg))))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (if (:db/id arg)
      (update-2! db aggr (:db/id arg) arg) ;; dissoc :db/id
      (if (:db/key arg)
-       (update-2! db aggr (key->id (:db/key arg)) arg)
+       (update-2! db aggr (key->id db (:db/key arg)) arg)
        (throw
         (ex-info (str "Error updating concept: "
                       (when-not (or (:db/id arg)
@@ -256,27 +294,22 @@
 (defn replace-0!
   "Updates an array of values given an array of keys."
   ([id ^ints ks #^Object vs]
-   (replace-0! @*db* nil id ks vs))
+   (replace-0! nil id ks vs))
   ([^IndexAggregator aggr id ^ints ks #^Object vs]
-   (replace-0! @*db* aggr id ks vs))
+   (swap! *db* (fn [db] (replace-0! db aggr id ks vs))))
   ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
-   (let [new-db (.replace ^WritableDB db
-                          ^IndexAggregator aggr
-                          ^int id
-                          ^ints ks
-                          #^Object vs)]
-     (reset! (db-atom db) new-db))))
+   (.replace ^WritableDB db
+             ^IndexAggregator aggr
+             ^int id
+             ^ints ks
+             #^Object vs)))
 
 (defn replace-1!
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
-    (let [key->id-fn (partial key->id db)
-          items (->> arg
-                     (map (fn [[k v]] [(key->id-fn k) v]))
-                     (sort-by first <))
-          ^ints ks (int-array (map first items))
-          #^Object vs (object-array (map second items))]
-      (replace-0! db aggr ^int id ks vs))
+    (let [key->id-fn (partial key->id ^DB db)
+          [^ints ks #^Object vs] (map->kvs ^DB db (dissoc arg :db/id))]
+      (replace-0! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
         (throw
@@ -285,15 +318,15 @@
                        (when (seq undefined-keys)
                          "undefined-key - replace! requires all keys to be defined."))
                   {:arg arg
-                   :undefined-keys undefined-keys}
-                  t))))))
+                   :undefined-keys undefined-keys} t))))))
 
 (defn replace!
   "Given a map which contains either a :db/id or a :db/key will replace the
    concept with the new keys and values.
   NOTE: use replace! to be able to remove properties."
-  ([arg] (replace! @*db* nil arg))
-  ([^IndexAggregator aggr arg] (replace! @*db* aggr arg))
+  ([arg] (replace! nil arg))
+  ([^IndexAggregator aggr arg]
+   (swap! *db* (fn [db] (replace! db aggr arg))))
   ([^WritableDB db ^IndexAggregator aggr arg]
    (if (:db/id arg)
      (replace-1! db aggr (:db/id arg) arg)
@@ -311,56 +344,24 @@
 ;; TODO: make this safe or remove
 (defn update-inline!
   ([^IndexAggregator aggr id ^ints ks #^Object vs]
-   (update-inline! @*db* aggr id ks vs))
+   (swap! *db* (fn [db] (update-inline! db aggr id ks vs))))
   ([^WritableDB db ^IndexAggregator aggr id ^ints ks #^Object vs]
-   (reset! (db-atom db) (.updateInline ^WritableDB db aggr id ks vs))))
-
-;; THIS FN is garbage.... gotta fix!!!!
-;; TODO break this up to allow updates on individual properties
-;; This is probably going away
-(defn index-ids
-  ([] (index-ids @*db*))
-  ([^WritableDB db]
-   (->> (range (.count db))
-        (map #(vector % (.getKeys db %)))
-        (mapcat (fn [[id ks]] (map #(vector % id) ks)))
-        (group-by first)
-        (map #(vector (first %) (int-array (sort (into #{} (map second (second %)))))))
-        (map (fn [[k v]] (update-0! k (key->id :db/ids) v)))
-        (count))))
-
-(defn prime-db!
-  ([] (prime-db! *default-identity*))
-  ([^Keyword k]
-   (when-let [-db (db-atom (db k))]
-     (doseq [c db-entries]
-       (insert! @-db nil c))
-     ;; TODO refactor
-     (update! {:db/key :db/property? :db/tag? true})
-     (index-ids)
-     )))
-
-(defn reset-db!
-  ([]
-   (reset-db! *default-identity*))
-  ([^Keyword k]
-   (create-db! k)
-   (prime-db! k)))
+   (.updateInline ^WritableDB db aggr id ks vs)))
 
 (defn max-id
   "Returns the max id for the database."
-  ([] (max-id ^DB @*db*))
+  ([] (max-id ^DB (db)))
   ([^DB db] (.getMaxId db)))
 
 (defn value-0
   "Lowest level interface to getValue. (swaps the order of id and key to better
   leverage the threading function ->>)."
-  ([key id] (.getValue ^DB @*db* ^int id ^int key))
+  ([key id] (.getValue ^DB (db) ^int id ^int key))
   ([^DB db key id] (.getValue db ^int id ^int key)))
 
 (defn ^:private value-1
   ([key id]
-   (value-1 ^DB @*db* key id))
+   (value-1 ^DB (db) key id))
   ([^DB db key id]
    (if (instance? Number key)
      (value-0 db ^int key ^int id)
@@ -369,7 +370,7 @@
 
 (defn value
   "Given a key and id returns the value for the key on the given id."
-  ([key id] (value ^DB @*db* key id))
+  ([key id] (value ^DB (db) key id))
   ([^DB db key id]
    (if (instance? Number id)
      (value-1 db key id) ;; do something else here
@@ -382,7 +383,7 @@
   ([^DB db id key] (value db key id)))
 
 (defn invoke
-  ([key id] (invoke @*db* key id))
+  ([key id] (invoke (db) key id))
   ([^DB db key id]
    (when-let [k-fn (value db :db/fn key)]
      (k-fn id ;;(value db key id)
@@ -390,12 +391,21 @@
 
 (defn invokei
   "Reversed arguments from invoke."
-  ([id key] (invoke @*db* key id))
+  ([id key] (invoke (db) key id))
   ([^DB db id key] (invoke db key id)))
+
+(defn lookup
+  "Given the id for a concept returns a lazy Map for that concept."
+  ([unique-key ^Object key] (lookup (db) unique-key key))
+  ([^DB db unique-key ^Object key]
+   (when-let [^int unique-key-id (if (keyword? unique-key)
+                                   (key->id ^DB db unique-key)
+                                   unique-key)]
+     (.lookup ^DB db ^int unique-key-id ^Object key))))
 
 (defn seek
   "Given the id for a concept returns a lazy Map for that concept."
-  ([id] (seek @*db* id))
+  ([id] (seek (db) id))
   ([^DB db id]
     (when-let [^int int-id (if (keyword? id) (key->id db id) id)]
      (.get db int-id))))
@@ -414,14 +424,14 @@
 
 (defn proj
   ([ks ^ints ids]
-   (proj ^DB @*db* ks ids))
+   (proj ^DB (db) ks ids))
   ([^DB db ks ^ints ids]
    (let [^ints key-ids (ordered-ids db ks)]
      (.project db key-ids ids))))
 
 (defn project
   ([ks ids]
-   (project ^DB @*db* ks ids))
+   (project ^DB (db) ks ids))
   ([^DB db ks ids]
    (let [^ints key-ids (normalize-ids db ks)]
      (map #(proj-0 db key-ids %) ids)
@@ -434,27 +444,29 @@
 
 (defn project-map
   ([ks ^ints ids]
-   (project-map @*db* ks ids))
+   (project-map (db) ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (keys->ids db ks)]
-     (for [^int id ids] (into {} (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids))))))
+   (let [^ints key-ids (normalize-ids db ks)]
+     (for [^int id ids]
+       (->> (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids)
+            (into {}))))))
 
 (defn ident
-  ([arg] (ident ^DB @*db* arg))
+  ([arg] (ident ^DB (db) arg))
   ([^DB db arg] (if (instance? DBMap arg)
                   (:db/key arg)
                   (value ^DB db :db/key arg))))
 
 (defn idents
   "Given a set i.e. has a :db/ids, returns the :db/key's for them"
-  ([aset] (idents @*db* aset))
+  ([aset] (idents (db) aset))
   ([^DB db aset]
    (map (comp :db/key (partial seek ^DB db))
         (if (keyword? aset)
           (ids ^DB db aset) aset))))
 
 (defn scan
-  ([args] (scan @*db* args))
+  ([args] (scan (db) args))
   ([^DB db args]
    (map (partial seek ^DB db)
         (if (keyword? args)
@@ -466,18 +478,17 @@
 (defn aggregator []
   (if (bound? #'*aggr*) *aggr* (IndexAggregator.)))
 
+
+;; TODO: go through keys and determine if they are of type :db/key?
+;; and if they are index them.
+
 (defn apply-aggregator!
-  ([^IndexAggregator aggr]
-   (apply-aggregator! ^Keyword *default-identity* aggr))
-  ([^Keyword db-key ^IndexAggregator aggr]
-   (doseq [k (.keys aggr)]
-     (let [-db (db db-key)]
-       (reset! (db-atom -db)
-               (.update ^DB -db aggr ^int k ^int (key->id ^DB -db :db/ids)
-                        (int-sets/difference (int-sets/union (ids ^DB -db k) (.ids aggr k))
-                                             (.removeIds aggr k)))))
-     #_(update-0! ^DB db k (key->id ^DB db :db/ids)
-                (int-sets/union (ids ^DB db k) (.ids aggr k))))))
+  [^IndexAggregator aggr]
+  (doseq [k (.keys aggr)]
+    (swap! *db*
+           (fn [db] (.update ^DB db aggr ^int k ^int (key->id ^DB db :db/ids)
+                             (int-sets/difference (int-sets/union (ids ^DB db k) (.ids aggr k))
+                                                  (.removeIds aggr k)))))))
 
 (defmacro with-aggr-0
   ([^DB db binding & bodies]
@@ -507,9 +518,9 @@
 
 (defn compact!
   ([] (compact! :r))
-  ([type] (compact! @*db* type))
+  ([type] (swap! *db* (fn [db] (compact! db type))))
   ([db type]
-   (reset! (db-atom db) (compact-db! db type))))
+   (compact-db! db type)))
 
 
 (defmulti pickle-db! (fn [db _filename] (db-type db)))
@@ -520,7 +531,7 @@
 
 ;; TODO: make this more versatile... only update selective indices
 (defn pickle!
-  ([^String filename] (pickle! @*db* filename))
+  ([^String filename] (swap! *db* (fn [db] (pickle! db filename))))
   ([^DB db ^String filename]
    (pickle-db! db filename)))
 
@@ -537,17 +548,16 @@
   ([& {:keys [filename type verbose db]
        :or {filename "pickle.sz"
             type :r
-            verbose false
-            db @*db*}}]
-   (reset! (db-atom db) (unpickle-db! type {:filename filename :verbose verbose}))))
+            verbose false}}]
+   (reset! *db* (unpickle-db! type {:filename filename :verbose verbose}))))
 
 ;; TODO: fix arity
 (defn reset-pickle! [& args]
-  (reset! (db-atom (get args :db @*db*)) (create-db!))
+  (reset! *db* (create-db!))
   (apply load-pickle! args))
 
 (defn dump
-  ([] (dump ^DB @*db*))
+  ([] (dump ^DB (db)))
   ([^DB db]
    (doseq [i (range (inc (max-id db)))]
      (clojure.pprint/pprint (seek db i)))))
