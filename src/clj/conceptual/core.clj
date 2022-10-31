@@ -446,8 +446,10 @@
   ([ks ^ints ids]
    (project-map (db) ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (keys->ids db ks)]
-     (for [^int id ids] (into {} (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids))))))
+   (let [^ints key-ids (normalize-ids db ks)]
+     (for [^int id ids]
+       (->> (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids)
+            (into {}))))))
 
 (defn ident
   ([arg] (ident ^DB (db) arg))
