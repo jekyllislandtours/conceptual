@@ -527,11 +527,11 @@
 
 (defmethod pickle-db! :default
   [db filename]
-  (conceptual.core.RDB/store db filename))
+  (conceptual.core.RDB/store ^conceptual.core.RDB db filename))
 
 ;; TODO: make this more versatile... only update selective indices
 (defn pickle!
-  ([^String filename] (pickle! db filename))
+  ([^String filename] (pickle! (db) filename))
   ([^DB db ^String filename]
    (pickle-db! db filename)))
 
