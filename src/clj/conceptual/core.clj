@@ -531,7 +531,7 @@
 
 ;; TODO: make this more versatile... only update selective indices
 (defn pickle!
-  ([^String filename] (swap! *db* (fn [db] (pickle! db filename))))
+  ([^String filename] (pickle! db filename))
   ([^DB db ^String filename]
    (pickle-db! db filename)))
 
