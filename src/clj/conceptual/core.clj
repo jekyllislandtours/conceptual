@@ -81,7 +81,7 @@
   ([^DB db unique-key-id ^Object key] (.lookupId ^DB db ^int unique-key-id ^Object key)))
 
 (defn lookup-id
-  ([unique-key ^Object key] (lookup-id ^DB @*db* unique-key ^Object key))
+  ([unique-key ^Object key] (lookup-id ^DB (db) unique-key ^Object key))
   ([^DB db unique-key ^Object key]
    (if (instance? Number unique-key)
      (lookup-id-0 db unique-key key)
@@ -105,7 +105,7 @@
   ;; bootstrap
   (reset! *db* (empty-persistent-db))
   ;; insert :db/tag?
-  (let [[^ints ks #^Object vs] (map->kvs @*db* tag-default-concept)]
+  (let [[^ints ks #^Object vs] (map->kvs (db) tag-default-concept)]
     (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
   ;; add :db/tag? to :db/tag? itself
   (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/tag?)]
@@ -115,7 +115,7 @@
                                  kid (key->id ^DB db :db/tag?)]
                              (.update ^DB db nil id kid true))))
   ;; insert :db/unique?
-  (let [[^ints ks #^Object vs] (map->kvs @*db* unique-default-concept)]
+  (let [[^ints ks #^Object vs] (map->kvs (db) unique-default-concept)]
     (swap! *db* (fn [^DB db] (.insert ^DB db nil ks vs))))
   ;; tag :db/key as being unique so it gets indexed
   (swap! *db* (fn [^DB db] (let [id (key->id ^DB db :db/key)
@@ -149,7 +149,7 @@
 
 (defn keys->ids
   "Returns a sorted int array representing a collection of keywords."
-  ([ks] (keys->ids @*db* ks))
+  ([ks] (keys->ids (db) ks))
   ([^DB db ks]
    (let [f (partial key->id ^DB db)]
      (->> (map f ks)
@@ -159,7 +159,7 @@
 
 (defn key-ids
   "Returns the keys for an concept key."
-  ([key] (key-ids @*db* key))
+  ([key] (key-ids (db) key))
   ([^DB db key]
    (if (instance? Number key)
      (.getKeys ^DB db ^int key)
@@ -170,13 +170,13 @@
 (defn ordered-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
-  ([ks] (ordered-ids @*db* ks))
+  ([ks] (ordered-ids (db) ks))
   ([db ks] (let [f (partial key->id ^DB db)] (int-array (map f ks)))))
 
 (defn normalize-ids
   "Like keys->ids but does not eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
-  ([ks] (normalize-ids @*db* ks))
+  ([ks] (normalize-ids (db) ks))
   ([db ks] (cond
             (instance? int-array-class ks) ks
             (or (vector? ks)
@@ -186,12 +186,12 @@
 
 (defn id->key
   "Given and id returns the key."
-  ([id] (id->key @*db* ^int id))
+  ([id] (id->key (db) ^int id))
   ([^DB db id] (.getValue ^DB db ^int id ^int -key)))
 
 (defn ids->keys
   "Given a collection of ids returns a collection of keys."
-  ([^ints ids] (ids->keys @*db* ids))
+  ([^ints ids] (ids->keys (db) ids))
   ([^DB db ^ints ids]
    (let [f (partial id->key ^DB db)] (map f ids))))
 
@@ -350,18 +350,18 @@
 
 (defn max-id
   "Returns the max id for the database."
-  ([] (max-id ^DB @*db*))
+  ([] (max-id ^DB (db)))
   ([^DB db] (.getMaxId db)))
 
 (defn value-0
   "Lowest level interface to getValue. (swaps the order of id and key to better
   leverage the threading function ->>)."
-  ([key id] (.getValue ^DB @*db* ^int id ^int key))
+  ([key id] (.getValue ^DB (db) ^int id ^int key))
   ([^DB db key id] (.getValue db ^int id ^int key)))
 
 (defn ^:private value-1
   ([key id]
-   (value-1 ^DB @*db* key id))
+   (value-1 ^DB (db) key id))
   ([^DB db key id]
    (if (instance? Number key)
      (value-0 db ^int key ^int id)
@@ -370,7 +370,7 @@
 
 (defn value
   "Given a key and id returns the value for the key on the given id."
-  ([key id] (value ^DB @*db* key id))
+  ([key id] (value ^DB (db) key id))
   ([^DB db key id]
    (if (instance? Number id)
      (value-1 db key id) ;; do something else here
@@ -383,7 +383,7 @@
   ([^DB db id key] (value db key id)))
 
 (defn invoke
-  ([key id] (invoke @*db* key id))
+  ([key id] (invoke (db) key id))
   ([^DB db key id]
    (when-let [k-fn (value db :db/fn key)]
      (k-fn id ;;(value db key id)
@@ -391,7 +391,7 @@
 
 (defn invokei
   "Reversed arguments from invoke."
-  ([id key] (invoke @*db* key id))
+  ([id key] (invoke (db) key id))
   ([^DB db id key] (invoke db key id)))
 
 (defn lookup
@@ -405,7 +405,7 @@
 
 (defn seek
   "Given the id for a concept returns a lazy Map for that concept."
-  ([id] (seek @*db* id))
+  ([id] (seek (db) id))
   ([^DB db id]
     (when-let [^int int-id (if (keyword? id) (key->id db id) id)]
      (.get db int-id))))
@@ -424,14 +424,14 @@
 
 (defn proj
   ([ks ^ints ids]
-   (proj ^DB @*db* ks ids))
+   (proj ^DB (db) ks ids))
   ([^DB db ks ^ints ids]
    (let [^ints key-ids (ordered-ids db ks)]
      (.project db key-ids ids))))
 
 (defn project
   ([ks ids]
-   (project ^DB @*db* ks ids))
+   (project ^DB (db) ks ids))
   ([^DB db ks ids]
    (let [^ints key-ids (normalize-ids db ks)]
      (map #(proj-0 db key-ids %) ids)
@@ -444,27 +444,27 @@
 
 (defn project-map
   ([ks ^ints ids]
-   (project-map @*db* ks ids))
+   (project-map (db) ks ids))
   ([^DB db ks ^ints ids]
    (let [^ints key-ids (keys->ids db ks)]
      (for [^int id ids] (into {} (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids))))))
 
 (defn ident
-  ([arg] (ident ^DB @*db* arg))
+  ([arg] (ident ^DB (db) arg))
   ([^DB db arg] (if (instance? DBMap arg)
                   (:db/key arg)
                   (value ^DB db :db/key arg))))
 
 (defn idents
   "Given a set i.e. has a :db/ids, returns the :db/key's for them"
-  ([aset] (idents @*db* aset))
+  ([aset] (idents (db) aset))
   ([^DB db aset]
    (map (comp :db/key (partial seek ^DB db))
         (if (keyword? aset)
           (ids ^DB db aset) aset))))
 
 (defn scan
-  ([args] (scan @*db* args))
+  ([args] (scan (db) args))
   ([^DB db args]
    (map (partial seek ^DB db)
         (if (keyword? args)
@@ -555,7 +555,7 @@
   (apply load-pickle! args))
 
 (defn dump
-  ([] (dump ^DB @*db*))
+  ([] (dump ^DB (db)))
   ([^DB db]
    (doseq [i (range (inc (max-id db)))]
      (clojure.pprint/pprint (seek db i)))))
