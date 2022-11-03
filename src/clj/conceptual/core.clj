@@ -258,7 +258,7 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id db)
-          [^ints ks #^Object vs] (map->kvs db (dissoc arg :db/id))]
+          [^ints ks #^Object vs] (map->kvs db arg)]
       (update-1! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
@@ -308,7 +308,7 @@
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
     (let [key->id-fn (partial key->id ^DB db)
-          [^ints ks #^Object vs] (map->kvs ^DB db (dissoc arg :db/id))]
+          [^ints ks #^Object vs] (map->kvs ^DB db arg)]
       (replace-0! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
       (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
