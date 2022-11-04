@@ -97,7 +97,7 @@
     [ks vs]))
 
 (defn- map->undefined-keys [^DB db arg]
-  (some->> arg keys (filter #(nil? (key->id ^DB db %)))))
+  (some->> arg keys (remove (partial key->id ^DB db))))
 
 (defn create-db!
   "Creates/resets *db* to a brand new database all bootstrapped and stuff."
@@ -222,7 +222,7 @@
          (insert-0! ^WritableDB db ^IndexAggregator aggr ^ints ks #^Object vs))
        db)
      (catch Throwable t
-       (let [undefined-keys (map->undefined-keys arg)]
+       (let [undefined-keys (map->undefined-keys db arg)]
          (throw
           (ex-info (str "Error inserting concept:"
                         (.getMessage t)
@@ -257,11 +257,10 @@
 (defn update-2!
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
-    (let [key->id-fn (partial key->id db)
-          [^ints ks #^Object vs] (map->kvs db arg)]
+    (let [[^ints ks #^Object vs] (map->kvs db arg)]
       (update-1! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
-      (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+      (let [undefined-keys (map->undefined-keys db arg)]
         (throw
          (ex-info (str "Error updating concept: "
                        (.getMessage t)
@@ -307,11 +306,10 @@
 (defn replace-1!
   [^WritableDB db ^IndexAggregator aggr id arg]
   (try
-    (let [key->id-fn (partial key->id ^DB db)
-          [^ints ks #^Object vs] (map->kvs ^DB db arg)]
+    (let [[^ints ks #^Object vs] (map->kvs ^DB db arg)]
       (replace-0! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
-      (let [undefined-keys (some->> arg keys (filter #(nil? (key->id ^DB db %))))]
+      (let [undefined-keys (map->undefined-keys db arg)]
         (throw
          (ex-info (str "Error replacing concept: "
                        (.getMessage t)
