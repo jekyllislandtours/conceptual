@@ -549,7 +549,7 @@
 (defn load-pickle!
   ([& {:keys [filename type verbose cipher db]
        :or {filename "pickle.sz"
-            type :r
+            type :default
             verbose false}}]
    (reset! *db* (unpickle-db! type
                               (cond-> {:filename filename
