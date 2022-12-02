@@ -556,7 +556,6 @@
                                        :verbose verbose}
                                 cipher (assoc :cipher cipher))))))
 
-;; TODO: fix arity
 (defn reset-pickle! [& args]
   (reset! *db* (create-db!))
   (apply load-pickle! args))
@@ -566,7 +565,5 @@
   ([^DB db]
    (doseq [i (range (inc (max-id db)))]
      (clojure.pprint/pprint (seek db i)))))
-
-;;(dump)
 
 (defn init! [])
