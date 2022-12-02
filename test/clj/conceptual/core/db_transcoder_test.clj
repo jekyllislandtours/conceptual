@@ -92,7 +92,7 @@
       (is (instance? conceptual.core.RDB (c/db)))
 
       ;; pickle round-trip
-      (c/pickle! pickle-path)
+      (c/pickle! :filename pickle-path)
       (c/load-pickle! :filename pickle-path)
       (is (= 13 (c/max-id)))
 
@@ -121,7 +121,7 @@
       (c/compact!)
 
       ;; pickle round-trip
-      (c/pickle! pickle-path)
+      (c/pickle! :filename pickle-path)
 
       (c/load-pickle! :filename pickle-path)
 
