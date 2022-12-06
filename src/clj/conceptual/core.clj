@@ -521,35 +521,41 @@
    (compact-db! db type)))
 
 
-(defmulti pickle-db! (fn [db _filename] (db-type db)))
+(defmulti pickle-db! (fn [-type _opts] (db-type db)))
 
 (defmethod pickle-db! :default
-  [db filename]
-  (conceptual.core.RDB/store ^conceptual.core.RDB db filename))
+  [_type {:keys [db filename verbose cipher]}]
+  (if cipher
+    (conceptual.core.RDB/store ^conceptual.core.RDB db filename cipher)
+    (conceptual.core.RDB/store ^conceptual.core.RDB db filename)))
 
-;; TODO: make this more versatile... only update selective indices
 (defn pickle!
-  ([^String filename] (pickle! (db) filename))
-  ([^DB db ^String filename]
-   (pickle-db! db filename)))
-
-(def pickle pickle!)
+  [& {:keys [db filename cipher]
+      :or {filename "pickle.sz"
+           db (db)}}]
+  (pickle-db! :default (cond-> {:db db
+                                :filename filename}
+                         cipher (assoc :cipher cipher))))
 
 
 (defmulti unpickle-db! (fn [-type _opts] -type))
 
 (defmethod unpickle-db! :default
-  [_type {:keys [filename verbose]}]
-  (conceptual.core.RDB/load filename verbose))
+  [_type {:keys [filename verbose cipher]}]
+  (if cipher
+    (conceptual.core.RDB/load filename verbose cipher)
+    (conceptual.core.RDB/load filename verbose)))
 
 (defn load-pickle!
-  ([& {:keys [filename type verbose db]
+  ([& {:keys [filename type verbose cipher db]
        :or {filename "pickle.sz"
-            type :r
+            type :default
             verbose false}}]
-   (reset! *db* (unpickle-db! type {:filename filename :verbose verbose}))))
+   (reset! *db* (unpickle-db! type
+                              (cond-> {:filename filename
+                                       :verbose verbose}
+                                cipher (assoc :cipher cipher))))))
 
-;; TODO: fix arity
 (defn reset-pickle! [& args]
   (reset! *db* (create-db!))
   (apply load-pickle! args))
@@ -559,7 +565,5 @@
   ([^DB db]
    (doseq [i (range (inc (max-id db)))]
      (clojure.pprint/pprint (seek db i)))))
-
-;;(dump)
 
 (defn init! [])

@@ -11,6 +11,11 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.HashSet;
 
+import javax.crypto.*;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+
 public final class RDB implements DB, WritableDB {
 
     public final Keyword identity;
@@ -674,6 +679,18 @@ public final class RDB implements DB, WritableDB {
         }
     }
 
+    public static DB load(final String filename, final boolean verbose, final Cipher cipher)
+        throws IOException
+    {
+        try (FileInputStream fis = new FileInputStream(filename);
+             BufferedInputStream bis = new BufferedInputStream(fis);
+             CipherInputStream cis = new CipherInputStream(bis, cipher);
+             InputStream zis = ZipTools.getCompressedInputStream(cis, filename);
+             DataInputStream dis = new DataInputStream(zis)) {
+            return DBTranscoder.decodeRDB(dis, verbose);
+        }
+    }
+
     public static void store(final RDB db, final String filename)
             throws IOException
     {
@@ -682,6 +699,23 @@ public final class RDB implements DB, WritableDB {
              OutputStream zos = ZipTools.getCompressedOutputStream(bos, filename);
              DataOutputStream dos = new DataOutputStream(zos)) {
             DBTranscoder.encode(dos, db);
+            dos.flush();
+            bos.flush();
+            zos.flush();
+            fos.flush();
+        }
+    }
+
+    public static void store(final RDB db, final String filename, final Cipher cipher)
+        throws IOException
+    {
+        try (FileOutputStream fos = new FileOutputStream(filename, false);
+             BufferedOutputStream bos = new BufferedOutputStream(fos);
+             CipherOutputStream cos = new CipherOutputStream(bos, cipher);
+             OutputStream zos = ZipTools.getCompressedOutputStream(cos, filename);
+             DataOutputStream dos = new DataOutputStream(zos)) {
+            DBTranscoder.encode(dos, db);
+            cos.flush();
             dos.flush();
             bos.flush();
             zos.flush();
