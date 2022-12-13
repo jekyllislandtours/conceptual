@@ -59,7 +59,6 @@
   (let [id (c/key->id :hello/world)]
     (expect true (contains? (c/seek :hello/world) :test/tag?))
     (expect true (contains? (set (c/ids :test/tag?)) id))
-
     (c/with-aggr [aggr]
       (c/replace! aggr (-> (c/seek :hello/world)
                            (dissoc :test/tag?))))
