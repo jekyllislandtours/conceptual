@@ -1,18 +1,18 @@
 {:deps {org.clojure/clojure {:mvn/version "1.11.1"}
         org.clojure/data.int-map {:mvn/version "1.0.0"}
-        clojure.java-time/clojure.java-time {:mvn/version "0.3.3"}
+        clojure.java-time/clojure.java-time {:mvn/version "1.1.0"}
         com.cognitect/transit-clj {:mvn/version "1.0.329"}
-        org.clojure/data.fressian {:mvn/version "0.2.1"}
-        com.taoensso/nippy {:mvn/version "3.1.1"}
+        org.clojure/data.fressian {:mvn/version "1.0.0"}
+        com.taoensso/nippy {:mvn/version "3.2.0"}
         org.cojen/cojen {:mvn/version "2.2.5"}
         org.cojen/tupl {:mvn/version "1.6.0"} ;;:exclusions [net.java.dev.jna/jna-platform]
         org.apache.commons/commons-pool2 {:mvn/version "2.11.1"}
-        org.apache.commons/commons-compress {:mvn/version "1.10"}
+        org.apache.commons/commons-compress {:mvn/version "1.22"}
         org.iq80.snappy/snappy {:mvn/version "0.4"}}
 
  :paths ["src/clj" "target/classes"]
 
- :aliases {:build {:deps {io.github.seancorfield/build-clj {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
+ :aliases {:build {:deps {io.github.seancorfield/build-clj {:git/tag "v0.8.5" :git/sha "de693d0"}}
                    :ns-default build}
 
            ;; the walkthrough requires some memory
@@ -21,19 +21,19 @@
            :dev {}
 
            :debug
-           {:extra-deps {djblue/portal                         {:mvn/version "0.31.0"}
-                         com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.0.231"}
-                         com.github.jpmonettas/flow-storm-inst {:mvn/version "3.0.231"}}}
+           {:extra-deps {djblue/portal                         {:mvn/version "0.35.0"}
+                         com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.2.283"}
+                         com.github.jpmonettas/flow-storm-inst {:mvn/version "3.2.283"}}}
 
            :cider
-           {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.6"}}
+           {:extra-deps {cider/cider-nrepl {:mvn/version "0.29.0"}}
             :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
 
            :test
            {:main-opts   ["-m" "kaocha.runner" "--config-file" "tests.edn"]
             :extra-paths ["test/clj" "test/resources"]
             :extra-deps
-            {lambdaisland/kaocha                     {:mvn/version "1.70.1086"}
+            {lambdaisland/kaocha                     {:mvn/version "1.71.1119"}
              org.clojure/test.check                  {:mvn/version "1.1.1"}
              com.github.seancorfield/expectations    {:mvn/version "2.0.160"}}}}
 
