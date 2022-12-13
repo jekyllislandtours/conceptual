@@ -482,9 +482,11 @@
 
 (defn apply-aggregator!
   [^IndexAggregator aggr]
+  ;;(println "apply-aggregator!" (vec (.keys aggr)))
   (doseq [k (.keys aggr)]
     (swap! *db*
-           (fn [db] (.update ^DB db aggr ^int k ^int (key->id ^DB db :db/ids)
+           (fn [db]
+             (.update ^DB db aggr ^int k ^int (key->id ^DB db :db/ids)
                              (int-sets/difference (int-sets/union (ids ^DB db k) (.ids aggr k))
                                                   (.removeIds aggr k)))))))
 

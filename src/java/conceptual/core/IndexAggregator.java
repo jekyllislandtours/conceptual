@@ -31,7 +31,9 @@ public class IndexAggregator {
 
     public int[] keys() {
         int[] result = null;
-        Set<Integer> keys = indexAddMap.keySet();
+        HashSet<Integer> keys = new HashSet<Integer>();
+        keys.addAll(indexAddMap.keySet());
+        keys.addAll(indexRemoveMap.keySet());
         int size = keys.size();
         if (size > 0) {
             result = new int[size];
@@ -59,9 +61,15 @@ public class IndexAggregator {
         return result;
     }
 
-    // TODO sort and remove dups
     public int[] ids(int key) {
-        return IntegerSets.listToIntArray(indexAddMap.get(key));
+        int[] result = null;
+        List<Integer> addList = indexAddMap.get(key);
+        if (addList != null) {
+            result = IntegerSets.listToIntArray(addList);
+        } else {
+            result = new int[] {};
+        }
+        return result;
     }
 
     public int[] removeIds(int key) {
