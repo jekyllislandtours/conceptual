@@ -197,8 +197,12 @@ public final class RDB implements DB, WritableDB {
 
     @Override
     public DBMap lookup(int uniqueKey, Object key) {
-        int id = lookupId(uniqueKey, key);
-        return new DBMap(this, id);
+        Integer id = lookupId(uniqueKey, key);
+        DBMap result = null;
+        if (id != null) {
+            result = new DBMap(this, id);
+        }
+        return result;
     }
 
     @Override
