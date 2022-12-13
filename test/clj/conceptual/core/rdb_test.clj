@@ -41,13 +41,28 @@
 
 (deftest project-map-test
   ;; keys->ids puts the keys in order
-  (expect '(0 1) (seq (c/keys->ids [:db/key :db/id])))
-  (expect '(1 0) (seq (c/normalize-ids [:db/key :db/id])))
-  (expect '(#:db{:id 0, :key :db/id} #:db{:id 1, :key :db/key})
+  (expect [0 1] (vec (c/keys->ids [:db/key :db/id])))
+  (expect [1 0] (vec (c/normalize-ids [:db/key :db/id])))
+  (expect [#:db{:id 0 :key :db/id} #:db{:id 1 :key :db/key}]
           (->> (c/ids :db/property?)
                (c/project-map [:db/id :db/key])
-               (take 2)))
-  (expect '(#:db{:id 0, :key :db/id} #:db{:id 1, :key :db/key})
+               (take 2)
+               vec))
+  (expect [#:db{:id 0 :key :db/id} #:db{:id 1 :key :db/key}]
           (->> (c/ids :db/property?)
                (c/project-map [:db/key :db/id])
-               (take 2))))
+               (take 2)
+               vec)))
+
+
+(deftest tag-ids-kept-up-to-date-test
+  (let [id (c/key->id :hello/world)]
+    (expect true (contains? (c/seek :hello/world) :test/tag?))
+    (expect true (contains? (set (c/ids :test/tag?)) id))
+
+    (c/with-aggr [aggr]
+      (c/replace! aggr (-> (c/seek :hello/world)
+                           (dissoc :test/tag?))))
+
+    (expect false (contains? (c/seek :hello/world) :test/tag?))
+    (expect false (contains? (set (c/ids :test/tag?)) id))))
