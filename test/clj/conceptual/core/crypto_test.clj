@@ -9,7 +9,9 @@
             [taoensso.nippy :as nippy])
   (:import [clojure.lang Keyword PersistentHashMap]
            [java.io FileOutputStream FileInputStream
-            PrintWriter]
+            PrintWriter
+            InputStreamReader
+            BufferedReader]
            [java.util Date]
            [java.time Instant]
            [javax.crypto Cipher KeyGenerator SecretKey
@@ -20,7 +22,6 @@
 
 
 (defn bytes->str [bytes]
-  (println "count:" (count bytes))
   (map identity bytes))
 
 
@@ -29,38 +30,38 @@
     (let [kg (KeyGenerator/getInstance "AES")
           _ (.init kg (SecureRandom. (byte-array [7 2 3])))
           key (.generateKey kg)
-          cipher (.. (Cipher/getInstance "AES")
-                     (init Cipher/ENCRYPT_MODE key))
+          cipher (Cipher/getInstance "AES")
+          _ (.init cipher Cipher/ENCRYPT_MODE key)
 
-          decipher (.. (Cipher/getInstance "AES")
-                       (init Cipher/DECRYPT_MODE key))
-          _ (println "format: " (.getFormat key))
-          _ (println "encoded: " (bytes->str (.getEncoded key)))
-          fos (FileOutoutStream. "cipher.txt")
+          decipher (Cipher/getInstance "AES")
+          _ (.init decipher Cipher/DECRYPT_MODE key)
+          fos (FileOutputStream. "cipher.txt")
           fis (FileInputStream. "cipher.txt")
-          cos (CipherOutputStream. fos)
+          cos (CipherOutputStream. fos cipher)
           pw (PrintWriter. cos)
           _ (.println pw "hello world")
           _ (.flush pw)
           _ (.close pw)
 
           cis (CipherInputStream. fis decipher)
-          ]
-      (is true)
-      )))
+          isr (InputStreamReader. cis)
+          br (BufferedReader. isr)
+          line (.readLine br)]
+      (is "hello world" line)
+      (io/delete-file "cipher.txt"))))
 
 
 (deftest pickle-encryption-test
   (testing "Pickle Encryption Test"
-    (let [pickle-path "temp/test_pickle.enc"
+    (let [pickle-path "temp/test_pickle.aes.sz"
           kg (KeyGenerator/getInstance "AES")
           _ (.init kg (SecureRandom. (byte-array [7 2 3])))
           key (.generateKey kg)
-          cipher (.. (Cipher/getInstance "AES")
-                     (init Cipher/ENCRYPT_MODE key))
+          cipher (Cipher/getInstance "AES")
+          _ (.init cipher Cipher/ENCRYPT_MODE key)
 
-          decipher (.. (Cipher/getInstance "AES")
-                       (init Cipher/DECRYPT_MODE key))
+          decipher (Cipher/getInstance "AES")
+          _ (.init decipher Cipher/DECRYPT_MODE key)
           ]
       ;; ensure pickle path
       (io/make-parents pickle-path)
@@ -76,10 +77,13 @@
       ;; type should be RDB
       (is (instance? conceptual.core.RDB (c/db)))
 
-      ;; pickle round-trip
-      (c/pickle! :filename pickle-path :cipher cipher)
-      (c/load-pickle! :filename pickle-path :cipher decipher)
+      ;; pickle
+      (c/pickle! :filename pickle-path
+                 :cipher cipher)
+
+      ;; reset then load the pickle
+      (c/reset-pickle! :filename pickle-path
+                       :cipher decipher)
       (is (= 13 (c/max-id)))
 
-      ;;(io/delete-file pickle-path)
-      )))
+      (io/delete-file pickle-path))))
