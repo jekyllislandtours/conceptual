@@ -10,8 +10,6 @@
   (:import [clojure.lang Keyword PersistentHashMap]
            [java.util Date]
            [java.time Instant]
-           [javax.crypto Cipher KeyGenerator]
-           [java.security    SecureRandom]
            [conceptual.core DBTranscoder RDB]))
 
 (defn declare-test-schema! []
@@ -144,34 +142,4 @@
                    (.getName)))))
 
       ;; cleanup
-      (io/delete-file pickle-path))))
-
-(deftest pickle-encryption-test
-  (testing "Pickle Encryption Test"
-    (let [pickle-path "temp/test_pickle.enc"
-          kg (KeyGenerator/getInstance "AES")
-          _ (.init kg (SecureRandom. (byte-array [7 2 3])))
-          key (.generateKey kg)
-          cipher (.. (Cipher/getInstance "AES")
-                     (init Cipher/ENCRYPT_MODE key))
-          ]
-      ;; ensure pickle path
-      (io/make-parents pickle-path)
-
-      ;; pickle setup
-      (c/create-db!)
-      (is (= 13 (c/max-id)))
-
-      ;; compact the PersistentDB into an RDB type
-      (c/compact!)
-      (is (= 13 (c/max-id)))
-
-      ;; type should be RDB
-      (is (instance? conceptual.core.RDB (c/db)))
-
-      ;; pickle round-trip
-      (c/pickle! :filename pickle-path :cipher cipher)
-      (c/load-pickle! :filename pickle-path :cipher cipher)
-      (is (= 13 (c/max-id)))
-
       (io/delete-file pickle-path))))
