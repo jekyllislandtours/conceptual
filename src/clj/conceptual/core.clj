@@ -545,7 +545,7 @@
 (defmethod unpickle-db! :default
   [_type {:keys [filename verbose cipher]}]
   (if cipher
-    (conceptual.core.RDB/load filename verbose cipher)
+    (conceptual.core.RDB/load filename true cipher)
     (conceptual.core.RDB/load filename verbose)))
 
 (defn load-pickle!

@@ -10,8 +10,6 @@
   (:import [clojure.lang Keyword PersistentHashMap]
            [java.util Date]
            [java.time Instant]
-           [javax.crypto Cipher KeyGenerator]
-           [java.security    SecureRandom]
            [conceptual.core DBTranscoder RDB]))
 
 (defn declare-test-schema! []
