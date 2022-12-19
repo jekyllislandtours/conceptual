@@ -18,6 +18,7 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * does not keep track of changes to values through time
 
 #### Architectural Design
+  * array based
   * in-memory
   * low-level kernel
   * embeddable
