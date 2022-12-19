@@ -7,6 +7,10 @@ import clojure.lang.PersistentHashMap;
 import conceptual.util.IntArrayPool;
 import conceptual.util.IntegerSets;
 
+
+import java.util.Set;
+import java.util.HashSet;
+
 public final class PersistentDB implements WritableDB {
 
     final Keyword identity;
@@ -14,6 +18,9 @@ public final class PersistentDB implements WritableDB {
     final IPersistentMap keyIndex;
     final IPersistentMap valIndex;
     final int maxId;
+
+
+    public final static Set<Keyword> unknownKeywords = new HashSet<Keyword>();
 
     public PersistentDB(Keyword identity,
                         IPersistentMap uniqueIndices,
@@ -91,10 +98,17 @@ public final class PersistentDB implements WritableDB {
 
     @Override
     public int keyToId(Object key) {
-        int kid = -1;
+        Integer kid = -1;
         if (key != null) {
             if (key instanceof Keyword) {
-                kid = keywordToId((Keyword) key);
+                final Keyword kw = (Keyword) key;
+                Object id = keywordToId(kw);
+                if (id != null) {
+                    kid = ((Integer) id);
+                } else if(!unknownKeywords.contains(kw)) {
+                    unknownKeywords.add(kw);
+                    System.err.println("WARN: conceptual.core.PersistentDB id not found for keyword: " + kw);
+                }
             } else if (key instanceof String) {
                 kid = keyToId(Keyword.intern((String) key));
             } else if (key instanceof Integer) {
