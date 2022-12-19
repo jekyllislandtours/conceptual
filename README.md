@@ -18,14 +18,13 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * does not keep track of changes to values through time
 
 #### Architectural Design
-  * array based
   * in-memory
   * low-level kernel
   * embeddable
   * simple declarative Clojure dsl
   * functionally an EAV/AEV triple store
   * row/column based indexing
-  * represented as co-indexed arrays
+  * default implementation represented as co-indexed arrays
 
 ### Usage
 
