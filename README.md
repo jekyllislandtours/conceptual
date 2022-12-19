@@ -24,6 +24,7 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * simple declarative Clojure dsl
   * functionally an EAV/AEV triple store
   * row/column based indexing
+  * can support many different backing stores
   * default implementation represented as co-indexed arrays
 
 ### Usage
