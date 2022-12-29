@@ -3,6 +3,8 @@
             [conceptual.core :refer [seek value]])
   (:import [conceptual.core DBMap]))
 
+(set! *warn-on-reflection* true)
+
 (defn db-map? [arg]
   (instance? DBMap arg))
 

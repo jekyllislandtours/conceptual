@@ -4,6 +4,8 @@
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]
            [java.nio ByteBuffer]))
 
+(set! *warn-on-reflection* true)
+
 (def object-array-class (Class/forName "[Ljava.lang.Object;"))
 (def int-array-class (Class/forName "[I"))
 (def byte-array-class (Class/forName "[B"))
