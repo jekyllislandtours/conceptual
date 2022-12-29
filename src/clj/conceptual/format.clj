@@ -2,6 +2,9 @@
   (:require [conceptual.core :as c])
   (:import [conceptual.core DBMap]))
 
+
+(set! *warn-on-reflection* true)
+
 (defn format-to-many-relation [r]
   (if (c/value :db/key (get r 0))
     (mapv (partial c/value :db/key) r)

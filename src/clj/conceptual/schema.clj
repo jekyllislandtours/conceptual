@@ -8,6 +8,9 @@
   (:import [conceptual.core DB IndexAggregator]
            [clojure.lang Keyword]))
 
+
+(set! *warn-on-reflection* true)
+
 (defn declare-property!
   "Given property specs of the form [key type] or [key type opts]
    declares a property."

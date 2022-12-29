@@ -2,6 +2,9 @@
   (:require [conceptual.core :refer [*db*]])
   (:import [conceptual.core DB]))
 
+
+(set! *warn-on-reflection* true)
+
 (defn keys-by-frequency
   ([ids] (.getKeysByFrequency ^DB @*db* ids))
   ([db ids] (.getKeysByFrequency ^DB db ids)))

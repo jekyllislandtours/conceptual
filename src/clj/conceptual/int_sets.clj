@@ -2,7 +2,11 @@
   (:refer-clojure :exclude [contains? conj disj])
   (:import [conceptual.util IntegerSets]))
 
+
+(set! *warn-on-reflection* true)
+
 (def +empty+ (int-array 0))
+
 
 ;;(def a (int-array [1 2 3 4 5 6 7]))
 ;;(seq a)
