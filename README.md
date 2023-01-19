@@ -1,4 +1,4 @@
-Conceptual 0.1.0
+Conceptual 0.1.70
 ================
 
 Conceptual is a fast JVM based in-memory concept database that can be used as a feature store, graph database, and more.
@@ -32,26 +32,26 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
 Add to :deps in your deps.edn:
 
 ```clojure
-conceptual {:mvn/version "0.1.0"}
+conceptual {:mvn/version "0.1.70"}
 ```
 
 Once published to Clojars it will be:
 
 ```clojure
-org.clojars.jekyllislandtours/conceptual {:mvn/version "0.1.32"}
+org.clojars.jekyllislandtours/conceptual {:mvn/version "0.1.70"}
 ```
 
 
 Add to your dependencies in your Leiningen project.clj:
 
 ``` clojure
-[conceptual "0.1.32"]
+[conceptual "0.1.70"]
 ```
 
 Once published to clojars it will be:
 
 ``` clojure
-[org.clojars.jekyllislandtours/conceptual "0.1.32"]
+[org.clojars.jekyllislandtours/conceptual "0.1.70"]
 ```
 
 ### Building
