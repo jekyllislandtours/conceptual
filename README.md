@@ -340,10 +340,10 @@ Projections can also be filtered similarly. The following projection filters ent
      (filter (comp not nil? second))
      (sort-by second)
 =>
-((:dbpedia/corey.haim 1.0)
- (:dbpedia/dana.plato 1.0)
- (:dbpedia/gary.coleman 1.0)
- (:dbpedia/macaulay.culkin 1.0)
+((:dbpedia/bob.glob 1.0)
+ (:dbpedia/hob.gob 1.0)
+ (:dbpedia/sam.jam 1.0)
+ (:dbpedia/sal.fal 1.0)
  ...)
 ```
 
