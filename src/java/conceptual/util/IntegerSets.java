@@ -20,6 +20,8 @@ import java.util.Random;
  */
 public final class IntegerSets {
 
+    public static int[] EMPTY = new int[0];
+
     private IntegerSets() {}
 
     /**
@@ -149,9 +151,8 @@ public final class IntegerSets {
      * @return an array of int.
      */
     public final static int[] getIntersection(int[] setA, int[] setB) {
-        int[] intersection = null;
+        int[] intersection = EMPTY;
         int i=0, j=0;
-        //System.out.println("lengths:" + setA.length + " " + setB.length);
         if (setA != null && setA.length > 0 && setB != null && setB.length > 0) {
             int count = 0;
             if (setA.length <= setB.length) {
@@ -177,10 +178,6 @@ public final class IntegerSets {
             int[] temp = new int[count];
             System.arraycopy(intersection, 0, temp, 0, count);
             intersection = temp;
-        } else if (setA != null && setA.length > 0) {
-            intersection = new int[] {};
-        } else if (setB != null && setB.length > 0) {
-            intersection = new int[] {};
         }
         return intersection;
     }
@@ -225,9 +222,8 @@ public final class IntegerSets {
      * @return an array of int.
      */
     public final static int[] getUnion(final int[] setA, final int[] setB) {
-        int[] sets = null;
+        int[] sets = EMPTY;
         int i=0, j=0;
-        //System.out.println("lengths:" + setA.length + " " + setB.length);
         if (setA != null && setA.length > 0 && setB != null && setB.length > 0) {
             int count = 0;
             sets = new int[setA.length + setB.length];
@@ -309,9 +305,8 @@ public final class IntegerSets {
      * @return an array of int.
      */
     public final static int[] getDifference(final int[] setA, final int[] setB) {
-        int[] difference = null;
+        int[] difference = EMPTY;
         int i=0, j=0;
-        //System.out.println("lengths:" + setA.length + " " + setB.length);
         if (setA != null && setA.length > 0 && setB != null && setB.length > 0) {
             int count = 0;
             difference = new int[setA.length];
@@ -337,8 +332,6 @@ public final class IntegerSets {
         } else if (setA != null && setA.length > 0) {
             difference = new int[setA.length];
             System.arraycopy(setA, 0, difference, 0, setA.length);
-        } else if (setB != null && setB.length > 0) {
-            difference = new int[] {};
         }
         return difference;
     }
