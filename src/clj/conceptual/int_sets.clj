@@ -5,7 +5,7 @@
 
 (set! *warn-on-reflection* true)
 
-(def +empty+ (int-array 0))
+(def +empty+ IntegerSets/EMPTY)
 
 
 ;;(def a (int-array [1 2 3 4 5 6 7]))
@@ -33,7 +33,7 @@
 
 (defn intersection
   "Returns the integer intersection of the given sorted int array sets."
-  ([] (int-array []))
+  ([] +empty+)
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/intersection a b))
   ([^ints a ^ints b ^ints c] (IntegerSets/intersection a b c))
@@ -43,14 +43,14 @@
   ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (IntegerSets/intersection a b c d e f g))
   ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (IntegerSets/intersection a b c d e f g h))
   ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
-     (chunked-reduce intersection (intersection a b c d e f g h) more 7)))
+   (chunked-reduce intersection (intersection a b c d e f g h) more 7)))
 
 ;;(seq (intersection a b))
 ;;(seq (apply intersection test-set))
 
 (defn union
   "Returns the integer union of the given sorted int array sets."
-  ([] (int-array []))
+  ([] +empty+)
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/union a b))
   ([^ints a ^ints b ^ints c] (IntegerSets/union a b c))
@@ -68,7 +68,7 @@
 (defn difference
   "Returns the integer difference of the given sorted int arrays. Everything is
   subtracted from the first sorted int array set."
-  ([] (int-array []))
+  ([] +empty+)
   ([^ints a] a)
   ([^ints a ^ints b] (IntegerSets/difference a b))
   ([^ints a ^ints b ^ints c] (difference a (union b c)))
@@ -149,10 +149,24 @@
   ([key begin end ^ints coll]
      (IntegerSets/binarySearch coll key begin end)))
 
-(defn equals
+(defn equals?
   "Returns true if a and b are equal in contents."
   [^ints a ^ints b]
   (IntegerSets/equals a b))
+
+(def ^:deprecated equals equals?)
+
+
+(defn subset?
+  "Is set1 a subset of set2?"
+  [^ints set1 ^ints set2]
+  (equals? (intersection set1 set2) set1))
+
+(defn superset?
+  "Is set1 a superset of set2?"
+  [^ints set1 ^ints set2]
+  (equals? (intersection set1 set2) set2))
+
 
 (defn encode
   "Encodes and integer array into a byte array."
