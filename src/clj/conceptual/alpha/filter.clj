@@ -5,11 +5,11 @@
             [conceptual.int-sets :as i]))
 
 ;; prevent slow index scans by default
-(def ^:dynamic *index-scan-enabled?* false)
+(def ^:dynamic *enable-index-scan* false)
 
-(defn set-index-scan-enabled!
+(defn enable-index-scan!
   [enabled?]
-  (alter-var-root #'*index-scan-enabled?* (constantly enabled?)))
+  (alter-var-root #'*enable-index-scan* (constantly enabled?)))
 
 (def +comparison-operators+
   '#{= > >= < <=})
@@ -90,7 +90,7 @@
   "`init-ids` is the starting sorted int set, could be nil"
   ([pred filter-info] (index-scan-filter pred filter-info nil))
   ([pred {field :filter/field [_val-type -value] :filter/value sexp-type :filter/sexp-type anding? :anding?} init-ids]
-   (when-not *index-scan-enabled?*
+   (when-not *enable-index-scan*
      (throw (ex-info "Index scan not enabled." {:field field})))
    (let [field (keyword field)]
      (loop [[id & ids] (cond-> (c/ids field)

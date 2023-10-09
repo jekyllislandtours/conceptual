@@ -75,7 +75,7 @@
 
 
 (deftest simple-evaluate-numbers-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "= op field value"
       (expect #{:hello/friend :hello/dude}
               (eval-sexp '(= test/int 3456))))
@@ -101,7 +101,7 @@
               (eval-sexp '(>= 2345 test/int))))))
 
 (deftest simple-evaluate-strings-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "= op field value"
       (expect #{:hello/dude}
               (eval-sexp '(= test/string "Dude"))))
@@ -128,7 +128,7 @@
 
 
 (deftest simple-tag-test
-  ;; NB doesn't require f/*index-scan-enabled?* binding to be set
+  ;; NB doesn't require f/*enable-index-scan* binding to be set
   (testing "true op field value"
     (expect #{:hello/world :hello/there :hello/dude}
             (eval-sexp '(= test/tag? true))))
@@ -147,7 +147,7 @@
 
 
 (deftest and-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "degenerate case"
       (expect #{:hello/dude :hello/there :hello/world}
               (eval-sexp '(and (= test/tag? true)))))
@@ -188,7 +188,7 @@
 
 
 (deftest or-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "degenerate case"
       (expect #{:hello/dude :hello/there :hello/world}
               (eval-sexp '(or (= test/tag? true)))))
@@ -218,7 +218,7 @@
 
 
 (deftest and-or-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "base"
       (expect #{:hello/friend}
               (eval-sexp '(and (= test/int 3456)
@@ -237,7 +237,7 @@
 
 
 (deftest or-and-test
-  (binding [f/*index-scan-enabled?* true]
+  (binding [f/*enable-index-scan* true]
     (testing "base"
       (expect #{:hello/friend :hello/dude :hello/there}
               (eval-sexp '(or (= test/int 3456) ;; friend and dude
