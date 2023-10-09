@@ -35,6 +35,7 @@
 (defn declare-test-schema! []
   (s/declare-properties!
    [[:test/string String]
+    [:test/id Keyword]
     [:test/keyword Keyword]
     [:test/int Integer]
     [:test/long Long]
@@ -53,6 +54,7 @@
 
 (def +test-data+
   [{:db/key :hello/world
+    :test/id :hello/world
     :test/string "World"
     :test/keyword :hello/world
     :test/int 1234
@@ -67,6 +69,7 @@
     :test/edn {:hello "world" 1 [2 3]}
     :test/tag? true}
    {:db/key :hello/there
+    :test/id :hello/there
     :test/string "There"
     :test/keyword :hello/there
     :test/int 2345
@@ -81,6 +84,7 @@
     :test/edn {:hello "there" 2 [3 4]}
     :test/tag? true}
    {:db/key :hello/dude
+    :test/id :hello/dude
     :test/string "Dude"
     :test/keyword :hello/dude
     :test/int 3456
@@ -93,7 +97,21 @@
     :test/instant (Instant/now)
     :test/class (class (Instant/now))
     :test/edn {:hello "dude" 1 [5 6]}
-    :test/tag? true}])
+    :test/tag? true}
+   {:db/key :hello/friend
+    :test/id :hello/friend
+    :test/string "Friend"
+    :test/keyword :hello/friend
+    :test/int 3456
+    :test/long 44444444444
+    :test/float 3.14159
+    :test/double 2.71828
+    :test/character \d
+    :test/boolean false
+    :test/date (Date.)
+    :test/instant (Instant/now)
+    :test/class (class (Instant/now))
+    :test/edn {:hello "friend" 2 [9 7]}}])
 
 (defn insert-test-data! []
   (c/with-aggr [aggr]

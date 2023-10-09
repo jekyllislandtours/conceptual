@@ -32,6 +32,11 @@
    :depends [build:jar]
    :task (shell "clojure -T:build deploy")}
 
+
+  cider
+  {:doc "Runs the repl"
+   :task (shell "clj -M:dev:test:debug:cider")}
+
   test
   {:doc "Runs clojure tests"
    :depends [compile:java]
