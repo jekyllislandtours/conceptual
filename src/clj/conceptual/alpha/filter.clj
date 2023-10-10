@@ -12,10 +12,10 @@
   (alter-var-root #'*enable-index-scan* (constantly enabled?)))
 
 (def +comparison-operators+
-  '#{= > >= < <=})
+  '#{= > >= < <= not=})
 
 (def +set-operators+
-  '#{in intersects? subset? superset?})
+  '#{in not-in intersects? subset? superset?})
 
 (def +operators+ (set/union +comparison-operators+ +set-operators+))
 
@@ -65,7 +65,7 @@
         :sexp/op ::op-sexp))
 
 (def +comparison-operator->fn+
-  {'= = '> > '>= >= '< < '<= <=})
+  {'= = '> > '>= >= '< < '<= <= 'not= not=})
 
 (defn conform
   [sexp]
@@ -80,16 +80,20 @@
 
 (defn filter-expr-value-collection?
   [{[val-type] :filter/value}]
-  (contains? (#{:type/strings-coll
-                :type/strings-set
-                :type/numbers-coll
-                :type/numbers-set}) val-type))
+  (contains? #{:type/strings-coll
+               :type/strings-set
+               :type/numbers-coll
+               :type/numbers-set} val-type))
 
 
 (defn index-scan-filter
-  "`init-ids` is the starting sorted int set, could be nil"
+  "`init-ids` is the starting sorted int set, could be nil.
+  NB negations ie not= only operate on concepts that have the field
+  for performance reasons."
   ([pred filter-info] (index-scan-filter pred filter-info nil))
-  ([pred {field :filter/field [_val-type -value] :filter/value sexp-type :filter/sexp-type anding? :anding?} init-ids]
+  ([pred {field :filter/field [_val-type the-value] :filter/value sexp-type :filter/sexp-type
+          :keys [anding? field-xform]
+          :or {field-xform identity}} init-ids]
    (when-not *enable-index-scan*
      (throw (ex-info "Index scan not enabled." {:field field})))
    (let [field (keyword field)]
@@ -99,57 +103,103 @@
        (if-not id
          (-> ans persistent! sort int-array)
          (if-some [found (c/value field id)]
-           (let [outcome? (case sexp-type
-                            :sexp/op-field-val (pred found -value)
-                            :sexp/op-val-field (pred -value found))
+           (let [found (field-xform found)
+                 outcome? (case sexp-type
+                            :sexp/op-field-val (pred found the-value)
+                            :sexp/op-val-field (pred the-value found))
                  ans (cond-> ans
                        outcome? (conj! id))]
              (recur ids ans))
            (recur ids ans)))))))
 
 
-(defn in-reducer
-  [{field :filter/field [_v-type] :filter/value :as filter-info} ids]
+(def +scalar-types+
+  #{Boolean Byte Character Short Integer Long Double BigDecimal BigInteger String
+    java.time.Instant java.util.Date java.util.UUID})
+
+(defn scalar?
+  [field]
+  (-> field keyword c/seek :db/type +scalar-types+ some?))
+
+
+(defn collection?
+  [field]
+  (->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
+
+(defn- in-reducer*
+  [pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value
+         sexp-type :filter/sexp-type :as filter-info} ids]
   (when-not (filter-expr-value-collection? filter-info)
-    (throw (ex-info "`in` requires a collection" {:field field})))
-  (index-scan-filter contains? filter-info ids))
+    (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
+  (when (and (= :sexp/op-field-val sexp-type)
+             (scalar? field))
+    (throw (ex-info "Scalar field in wrong position" {:field field})))
+  ;; field is a scalar and it is in :sexp/op-field-val then throw
+  (index-scan-filter pred filter-info ids))
+
+(defn in-reducer
+  [filter-info ids]
+  (in-reducer* contains? filter-info ids))
+
+
+(defn not-in-reducer
+  [filter-info ids]
+  (in-reducer* (complement contains?) filter-info ids))
+
+(defn- ensure-set
+  [x]
+  (cond
+    (set? x) x
+    (coll? x) (set x)
+    :else #{x}))
+
+(defn- set-op-reducer
+  [pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
+  (when-not (filter-expr-value-collection? filter-info)
+    (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
+  (when-not (collection? field)
+    (throw (ex-info (format "field `%s` is not a collection" field) {:field field})))
+  (index-scan-filter pred (assoc filter-info :field-xform ensure-set) ids))
+
 
 (defn subset-reducer
-  [filter-info _ids]
-  (throw (ex-info "subset? not yet implemented" filter-info)))
+  [filter-info ids]
+  (set-op-reducer set/subset? filter-info ids))
 
 (defn superset-reducer
-  [filter-info _ids]
-  (throw (ex-info "superset? not yet implemented" filter-info)))
+  [filter-info ids]
+  (set-op-reducer set/superset? filter-info ids))
 
 
 (defn intersection-reducer
-  [filter-info _ids]
-  (throw (ex-info "intersect? not yet implemented" filter-info)))
+  [filter-info ids]
+  (set-op-reducer (comp not-empty set/intersection) filter-info ids))
 
 (defn comparison-reducer
   [{[_op-type op] :filter/op field :filter/field [val-type] :filter/value :as filter-info} ids]
   (let [op-fn (+comparison-operator->fn+ op)]
     (assert op-fn (str "No fn for op: " op))
     (when (and (= val-type :type/string)
-               (not= op '=))
-      (throw (ex-info "Strings support only `=`" {:field field :op op})))
+               (not (#{'= 'not=} op)))
+      (throw (ex-info "Strings support only `=` or `not=`" {:field field :op op})))
     (index-scan-filter op-fn filter-info ids)))
 
 (defn tag-reducer
-  [{[_op-type op] :filter/op field :filter/field [val-type -value] :filter/value anding? :anding?} ids]
+  [{[_op-type op] :filter/op field :filter/field [val-type the-value] :filter/value anding? :anding?} ids]
   (when (not= :type/boolean val-type)
     (throw (ex-info "tag comparison values must be a boolean true or false" {:field field :op op})))
-  (when (not= '= op)
-    (throw (ex-info "tag comparison values use `=`" {:field field :op op})))
+  (when-not (#{'= 'not=} op)
+    (throw (ex-info "tag comparison values may only use `=` or `not=`" {:field field :op op})))
   (let [tagged-ids (c/ids (keyword field))
-        set-op (if -value i/intersection i/difference)]
+        the-value (if (= '= op) the-value (not the-value))
+        set-op (if the-value i/intersection i/difference)]
     (if (or anding? (nil? anding?)) ;; anding? is nil for lone sexp
       (set-op ids tagged-ids)
       tagged-ids)))
 
 (def +set-op->reducer-fn+
   {'in in-reducer
+   'not-in not-in-reducer
    'intersects? intersection-reducer
    'subset? subset-reducer
    'superset? superset-reducer})

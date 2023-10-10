@@ -7,7 +7,7 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest testing is]]
             [taoensso.nippy :as nippy])
-  (:import [clojure.lang Keyword PersistentHashMap]
+  (:import [clojure.lang Keyword PersistentHashMap PersistentVector]
            [java.util Date]
            [java.time Instant]
            [conceptual.core DBTranscoder RDB]))
@@ -47,7 +47,7 @@
     [:test/instant Instant]
     [:test/class Class]
     [:test/edn PersistentHashMap]
-    ])
+    [:test/collection PersistentVector]])
   (s/declare-to-one-relations! [[:test/parent]])
   (s/declare-to-many-relations! [[:test/children]])
   (s/declare-tags! [[:test/tag?]]))
@@ -67,7 +67,8 @@
     :test/instant (Instant/now)
     :test/class (class (Instant/now))
     :test/edn {:hello "world" 1 [2 3]}
-    :test/tag? true}
+    :test/tag? true
+    :test/collection [100 101 102]}
    {:db/key :hello/there
     :test/id :hello/there
     :test/string "There"
@@ -82,7 +83,8 @@
     :test/instant (Instant/now)
     :test/class (class (Instant/now))
     :test/edn {:hello "there" 2 [3 4]}
-    :test/tag? true}
+    :test/tag? true
+    :test/collection [200 201 202]}
    {:db/key :hello/dude
     :test/id :hello/dude
     :test/string "Dude"
@@ -97,7 +99,8 @@
     :test/instant (Instant/now)
     :test/class (class (Instant/now))
     :test/edn {:hello "dude" 1 [5 6]}
-    :test/tag? true}
+    :test/tag? true
+    :test/collection [300 201 202]}
    {:db/key :hello/friend
     :test/id :hello/friend
     :test/string "Friend"
@@ -111,7 +114,8 @@
     :test/date (Date.)
     :test/instant (Instant/now)
     :test/class (class (Instant/now))
-    :test/edn {:hello "friend" 2 [9 7]}}])
+    :test/edn {:hello "friend" 2 [9 7]}
+    :test/collection ["abc" "def" "ghi"]}])
 
 (defn insert-test-data! []
   (c/with-aggr [aggr]

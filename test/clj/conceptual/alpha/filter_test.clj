@@ -146,6 +146,142 @@
             (eval-sexp '(= false test/tag?)))))
 
 
+(deftest not=-test
+  (c/with-aggr [aggr]
+    (c/insert! aggr {:test/id :bye/bye
+                     :test/long 999999999999}))
+
+  ;; bye/bye appears because init-ids is set of concept ids having :test/id
+  ;; which :bye/bye is part of and we
+  (testing "not= tag true"
+    (expect #{:hello/friend :bye/bye}
+            (eval-sexp '(not= test/tag? true))))
+
+  (testing "not= tag false"
+    (expect #{:hello/world :hello/there :hello/dude}
+            (eval-sexp '(not= test/tag? false))))
+
+  (binding [f/*enable-index-scan* true]
+    (testing "not= int"
+      (expect #{:hello/world :hello/there}
+              (eval-sexp '(not= test/int 3456))))
+
+    (testing "not= string"
+      (expect #{:hello/friend :hello/world :hello/there}
+              (eval-sexp '(not= test/string "Dude"))))
+
+
+    (testing "not= on field that may not exist"
+      ;; note :bye/bye not in result since test/int not present
+      (expect #{:hello/world :hello/there}
+              (eval-sexp '(not= test/int 3456))))))
+
+(deftest in-test
+  (binding [f/*enable-index-scan* true]
+    (testing "in 1 int"
+      (expect #{:hello/friend :hello/dude}
+              (eval-sexp '(in [3456] test/int))))
+
+    (testing "in multiple ints"
+      (expect #{:hello/friend :hello/dude :hello/world}
+              (eval-sexp '(in [3456 1234] test/int))))
+
+    (testing "in 1 string"
+      (expect #{:hello/world}
+              (eval-sexp '(in ["World"] test/string))))
+
+    (testing "in multiple strings"
+      (expect #{:hello/dude :hello/world}
+              (eval-sexp '(in ["World" "Dude"] test/string))))
+
+    (testing "wrong order"
+      (expect ExceptionInfo
+              (eval-sexp '(in test/int [3456]))))))
+
+(deftest not-in-test
+  (binding [f/*enable-index-scan* true]
+    (testing "in 1 int"
+      (expect #{:hello/there :hello/world}
+              (eval-sexp '(not-in [3456] test/int))))
+
+    (testing "in multiple ints"
+      (expect #{:hello/there}
+              (eval-sexp '(not-in [3456 1234] test/int))))
+
+    (testing "in 1 string"
+      (expect #{:hello/friend :hello/there :hello/dude}
+              (eval-sexp '(not-in ["World"] test/string))))
+
+    (testing "in multiple strings"
+      (expect #{:hello/friend :hello/there}
+              (eval-sexp '(not-in ["World" "Dude"] test/string))))
+
+    (testing "wrong order"
+      (expect ExceptionInfo
+              (eval-sexp '(in test/int [3456]))))))
+
+(deftest intersects?-test
+  (binding [f/*enable-index-scan* true]
+    (testing "intersects? no results"
+      (expect #{}
+              (eval-sexp '(intersects? [999999 8888] test/collection))))
+
+    (testing "intersects? 1 int"
+      (expect #{:hello/world}
+              (eval-sexp '(intersects? [100] test/collection))))
+
+    (testing "intersects? multiple"
+      (expect #{:hello/there :hello/world}
+              (eval-sexp '(intersects? [100 200] test/collection))))
+
+
+    (testing "intersects? multiple string"
+      (expect #{:hello/friend}
+              (eval-sexp '(intersects? ["abc" "def"] test/collection))))
+
+    (testing "intersects? order indifferent"
+      (expect true
+              (= #{:hello/there :hello/dude}
+                 (eval-sexp '(intersects? [201 300] test/collection))
+                 (eval-sexp '(intersects? test/collection [201 300])))))))
+
+
+(deftest subset?-test
+  (binding [f/*enable-index-scan* true]
+    (testing "subset? no results"
+      (expect #{}
+              (eval-sexp '(subset? [999999 8888] test/collection))))
+
+    (testing "subset? 1 int"
+      (expect #{:hello/world}
+              (eval-sexp '(subset? [100] test/collection))))
+
+    (testing "subset? multiple no results"
+      (expect #{}
+              (eval-sexp '(subset? [100 200] test/collection))))
+
+
+    (testing "subset? multiple"
+      (expect #{:hello/there :hello/dude}
+              (eval-sexp '(subset? [201 202] test/collection))))))
+
+
+(deftest superset?-test
+  (binding [f/*enable-index-scan* true]
+    (testing "superset? no results"
+      (expect #{}
+              (eval-sexp '(superset? [999999 8888] test/collection))))
+
+    (expect #{:hello/dude}
+            (eval-sexp '(superset? [300 201 202] test/collection)))
+
+    (expect #{:hello/there :hello/dude}
+            (eval-sexp '(superset? [300 201 202 200] test/collection)))
+
+    (expect #{:hello/there :hello/dude}
+            (eval-sexp '(superset? test/collection [201 202])))))
+
+
 (deftest and-test
   (binding [f/*enable-index-scan* true]
     (testing "degenerate case"
