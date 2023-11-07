@@ -379,3 +379,22 @@
               (eval-sexp '(or (= test/int 3456) ;; friend and dude
                                (and (= test/boolean false) ;; there
                                     (= test/string "There"))))))))
+
+
+
+
+(deftest custom-reducer-test
+  (let [counter (volatile! 0)
+        custom-fn (fn [_filter-info ids]
+                    (vswap! counter inc)
+                    ids)]
+    (try
+      ;; register method that just returns ids and increments counter
+      (defmethod f/custom-reducer '[= test/int] [_] custom-fn)
+
+      (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+              (eval-sexp '(= test/int 3456)))
+      (expect 1 @counter)
+
+      (finally
+        (remove-method f/custom-reducer '[= test/int])))))
