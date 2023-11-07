@@ -30,7 +30,17 @@
           (s/conform ::f/op-sexp '(in foo/bar [23 42])))
 
   (expect false (s/valid? ::f/op-sexp '(-> 23 foo/bar)))
-  (expect false (s/valid? ::f/op-sexp '(= 23 foo/bar 45))))
+  (expect false (s/valid? ::f/op-sexp '(= 23 foo/bar 45)))
+
+  (expect false (s/valid? ::f/sexp '(and ((= foo/bar 23))))))
+
+
+(deftest normalize-test
+  (expect '(and (= foo/bar 23)) (f/normalize '(= foo/bar 23)))
+  (expect '(and (= foo/bar 23)) (f/normalize '(and (= foo/bar 23))))
+  (expect '(or (= foo/bar 23)) (f/normalize '(or (= foo/bar 23))))
+  ;; not semantically correct but the output is acceptable
+  (expect '(and ((= foo/bar 23))) (f/normalize '((= foo/bar 23)))))
 
 (deftest sexp-test
   (expect [:sexp/op

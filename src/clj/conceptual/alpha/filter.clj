@@ -67,9 +67,17 @@
 (def +comparison-operator->fn+
   {'= = '> > '>= >= '< < '<= <= 'not= not=})
 
+
+(defn normalize
+  [sexp]
+  (if (#{'or 'and} (first sexp))
+    sexp
+    (list 'and sexp)))
+
 (defn conform
   [sexp]
-  (let [ans (s/conform ::sexp sexp)]
+  (let [norm-sexp (normalize sexp)
+        ans (s/conform ::sexp norm-sexp)]
     (when (= ::s/invalid ans)
       (throw (ex-info "Conform failed"
                       {:sexp sexp
