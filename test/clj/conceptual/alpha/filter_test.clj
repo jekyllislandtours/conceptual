@@ -76,10 +76,17 @@
                                     (> life/answer 42)))))
 
 
+
+(defn test-db-ids
+  []
+  (c/ids :test/id))
+
 (defn eval-sexp
-  ([sexp] (eval-sexp sexp (c/ids :test/id)))
+  ([sexp] (eval-sexp sexp (test-db-ids)))
   ([sexp init-ids]
-   (->> (f/evaluate sexp init-ids)
+   (eval-sexp {} sexp init-ids))
+  ([ctx sexp init-ids]
+   (->> (f/evaluate ctx sexp init-ids)
         (map (partial c/value :test/id))
         set)))
 
@@ -394,17 +401,47 @@
 
 
 (deftest custom-reducer-test
-  (let [counter (volatile! 0)
-        custom-fn (fn [_filter-info ids]
-                    (vswap! counter inc)
-                    ids)]
+  (let [tuple-counter (volatile! 0)
+        field-counter (volatile! 0)
+        context-counter (volatile! 0)
+        tuple-custom-fn (fn [_ctx _filter-info ids]
+                          (vswap! tuple-counter inc)
+                          ids)
+        field-custom-fn (fn [_ctx _filter-info ids]
+                          (vswap! field-counter inc)
+                          ids)
+        context-custom-fn (fn [_ctx _filter-info ids]
+                            (vswap! context-counter inc)
+                            ids)]
     (try
-      ;; register method that just returns ids and increments counter
-      (defmethod f/custom-reducer '[= test/int] [_] custom-fn)
+      ;; register methods that just returns ids and increments counter
+      (defmethod f/custom-reducer '[= test/int] [_ _] tuple-custom-fn)
+      (defmethod f/custom-reducer 'test/string [_ _] field-custom-fn)
+      (defmethod f/custom-reducer 'test/keyword [{:keys [custom?]} _]
+        (when custom? context-custom-fn))
 
       (expect #{:hello/there :hello/world :hello/friend :hello/dude}
               (eval-sexp '(= test/int 3456)))
-      (expect 1 @counter)
+      (expect 1 @tuple-counter)
+
+      (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+              (eval-sexp '(= test/string "non-existing-value")))
+      (expect 1 @field-counter)
+
+
+      (testing "custom-reducer with context"
+        (binding [f/*enable-index-scan* true]
+          ;; as expected no matching value
+          (expect #{} (eval-sexp {:custom? false} '(= test/keyword :non-existent-ii3j8ejafajeija) (test-db-ids)))
+
+          (expect 0 @context-counter)
+
+          ;; custom reducer invoked that returns all ids passed in
+          (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+                  (eval-sexp {:custom? true} '(= test/keyword :non-existent-ii3j8ejafajeija) (test-db-ids)))
+          (expect 1 @context-counter)))
 
       (finally
-        (remove-method f/custom-reducer '[= test/int])))))
+        (remove-method f/custom-reducer '[= test/int])
+        (remove-method f/custom-reducer 'test/string)
+        (remove-method f/custom-reducer 'test/keyword)))))
