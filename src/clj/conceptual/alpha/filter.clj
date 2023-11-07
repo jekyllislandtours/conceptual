@@ -204,14 +204,25 @@
    'subset? subset-reducer
    'superset? superset-reducer})
 
+
+(defmulti custom-reducer
+  "Input is a tuple [op-symbol field-symbol]. This should return a fn
+  that takes in a `filter-info` and `ids` and returns modified `ids`."
+  identity)
+
+(defmethod custom-reducer :default
+  [_]
+  nil)
+
 (defn lookup-reducer
   [{[op-type op] :filter/op field :filter/field :as filter-expr}]
-  (cond
-    (-> field keyword c/seek :db/tag?) tag-reducer
-    (= :op/comparison op-type) comparison-reducer
-    (= :op/set op-type) (+set-op->reducer-fn+ op)
-    :else
-    (throw (ex-info "Can't handle filter-expr" filter-expr))))
+  (or (custom-reducer [op field])
+      (cond
+        (-> field keyword c/seek :db/tag?) tag-reducer
+        (= :op/comparison op-type) comparison-reducer
+        (= :op/set op-type) (+set-op->reducer-fn+ op)
+        :else
+        (throw (ex-info "Can't handle filter-expr" filter-expr)))))
 
 
 
@@ -249,6 +260,11 @@
       or (or-sexps sexp-info init-ids))))
 
 
+(defn evaluate-conformed
+  [conformed-sexp init-ids]
+  (evaluate-sexp conformed-sexp nil init-ids))
+
 (defn evaluate
+  "`sexp` is an s-expression "
   [sexp init-ids]
-  (evaluate-sexp (conform sexp) nil init-ids))
+  (evaluate-conformed (conform sexp) init-ids))
