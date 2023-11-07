@@ -29,6 +29,7 @@
 
 (s/def ::value
   (s/or :type/string string?
+        :type/keyword keyword?
         :type/boolean boolean?
         :type/number number?
         :type/strings-coll (s/coll-of string? :kind vector? :into #{})
@@ -85,7 +86,6 @@
                        :explanation (s/explain-data ::sexp sexp)})))
     ans))
 
-
 (defn filter-expr-value-collection?
   [{[val-type] :filter/value}]
   (contains? #{:type/strings-coll
@@ -98,27 +98,29 @@
   "`init-ids` is the starting sorted int set, could be nil.
   NB negations ie not= only operate on concepts that have the field
   for performance reasons."
-  ([pred filter-info] (index-scan-filter pred filter-info nil))
-  ([pred {field :filter/field [_val-type the-value] :filter/value sexp-type :filter/sexp-type
-          :keys [anding? field-xform]
-          :or {field-xform identity}} init-ids]
-   (when-not *enable-index-scan*
-     (throw (ex-info "Index scan not enabled." {:field field})))
-   (let [field (keyword field)]
-     (loop [[id & ids] (cond-> (c/ids field)
-                         anding? (i/intersection init-ids))
-            ans (transient [])]
-       (if-not id
-         (-> ans persistent! sort int-array)
-         (if-some [found (c/value field id)]
-           (let [found (field-xform found)
-                 outcome? (case sexp-type
-                            :sexp/op-field-val (pred found the-value)
-                            :sexp/op-val-field (pred the-value found))
-                 ans (cond-> ans
-                       outcome? (conj! id))]
-             (recur ids ans))
-           (recur ids ans)))))))
+  [{::keys [anding?] :as _ctx}
+   pred
+   {field :filter/field [_val-type the-value] :filter/value sexp-type :filter/sexp-type
+    :keys [field-xform]
+    :or {field-xform identity}}
+   init-ids]
+  (when-not *enable-index-scan*
+    (throw (ex-info "Index scan not enabled." {:field field})))
+  (let [field (keyword field)]
+    (loop [[id & ids] (cond-> (c/ids field)
+                        anding? (i/intersection init-ids))
+           ans (transient [])]
+      (if-not id
+        (-> ans persistent! sort int-array)
+        (if-some [found (c/value field id)]
+          (let [found (field-xform found)
+                outcome? (case sexp-type
+                           :sexp/op-field-val (pred found the-value)
+                           :sexp/op-val-field (pred the-value found))
+                ans (cond-> ans
+                      outcome? (conj! id))]
+            (recur ids ans))
+          (recur ids ans))))))
 
 
 (def +scalar-types+
@@ -135,24 +137,26 @@
   (->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
 
 (defn- in-reducer*
-  [pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value
-         sexp-type :filter/sexp-type :as filter-info} ids]
+  [ctx
+   pred
+   {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value
+    sexp-type :filter/sexp-type :as filter-info} ids]
   (when-not (filter-expr-value-collection? filter-info)
     (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
   (when (and (= :sexp/op-field-val sexp-type)
              (scalar? field))
     (throw (ex-info "Scalar field in wrong position" {:field field})))
   ;; field is a scalar and it is in :sexp/op-field-val then throw
-  (index-scan-filter pred filter-info ids))
+  (index-scan-filter ctx pred filter-info ids))
 
 (defn in-reducer
-  [filter-info ids]
-  (in-reducer* contains? filter-info ids))
+  [ctx filter-info ids]
+  (in-reducer* ctx contains? filter-info ids))
 
 
 (defn not-in-reducer
-  [filter-info ids]
-  (in-reducer* (complement contains?) filter-info ids))
+  [ctx filter-info ids]
+  (in-reducer* ctx (complement contains?) filter-info ids))
 
 (defn- ensure-set
   [x]
@@ -162,38 +166,42 @@
     :else #{x}))
 
 (defn- set-op-reducer
-  [pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
+  [ctx pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
   (when-not (filter-expr-value-collection? filter-info)
     (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
   (when-not (collection? field)
     (throw (ex-info (format "field `%s` is not a collection" field) {:field field})))
-  (index-scan-filter pred (assoc filter-info :field-xform ensure-set) ids))
+  (index-scan-filter ctx pred (assoc filter-info :field-xform ensure-set) ids))
 
 
 (defn subset-reducer
-  [filter-info ids]
-  (set-op-reducer set/subset? filter-info ids))
+  [ctx filter-info ids]
+  (set-op-reducer ctx set/subset? filter-info ids))
 
 (defn superset-reducer
-  [filter-info ids]
-  (set-op-reducer set/superset? filter-info ids))
+  [ctx filter-info ids]
+  (set-op-reducer ctx set/superset? filter-info ids))
 
 
 (defn intersection-reducer
-  [filter-info ids]
-  (set-op-reducer (comp not-empty set/intersection) filter-info ids))
+  [ctx filter-info ids]
+  (set-op-reducer ctx (comp not-empty set/intersection) filter-info ids))
 
 (defn comparison-reducer
-  [{[_op-type op] :filter/op field :filter/field [val-type] :filter/value :as filter-info} ids]
+  [ctx
+   {[_op-type op] :filter/op field :filter/field [val-type] :filter/value :as filter-info}
+   ids]
   (let [op-fn (+comparison-operator->fn+ op)]
     (assert op-fn (str "No fn for op: " op))
     (when (and (= val-type :type/string)
                (not (#{'= 'not=} op)))
       (throw (ex-info "Strings support only `=` or `not=`" {:field field :op op})))
-    (index-scan-filter op-fn filter-info ids)))
+    (index-scan-filter ctx op-fn filter-info ids)))
 
 (defn tag-reducer
-  [{[_op-type op] :filter/op field :filter/field [val-type the-value] :filter/value anding? :anding?} ids]
+  [{::keys [anding?] :as _ctx}
+   {[_op-type op] :filter/op field :filter/field [val-type the-value] :filter/value}
+   ids]
   (when (not= :type/boolean val-type)
     (throw (ex-info "tag comparison values must be a boolean true or false" {:field field :op op})))
   (when-not (#{'= 'not=} op)
@@ -214,65 +222,70 @@
 
 
 (defmulti custom-reducer
-  "Input is a tuple [op-symbol field-symbol]. This should return a fn
-  that takes in a `filter-info` and `ids` and returns modified `ids`."
-  identity)
+  "Dispatch is off of a tuple [op-symbol field-symbol] or just a `field-symbol`.
+  This should return either `nil` or a fn that takes in a `ctx`, `filter-info` and `ids`
+  and returns modified `ids`. `nil` return value implies using the default logic.
+  The `ctx` has key `::sexp` which is the conformed s-expression."
+  (fn [_ctx tuple-or-sym] tuple-or-sym))
 
-(defmethod custom-reducer :default
-  [_]
-  nil)
+(defmethod custom-reducer :default [_ _] nil)
 
 (defn lookup-reducer
-  [{[op-type op] :filter/op field :filter/field :as filter-expr}]
-  (or (custom-reducer [op field])
-      (cond
-        (-> field keyword c/seek :db/tag?) tag-reducer
-        (= :op/comparison op-type) comparison-reducer
-        (= :op/set op-type) (+set-op->reducer-fn+ op)
-        :else
-        (throw (ex-info "Can't handle filter-expr" filter-expr)))))
+  [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
+  (let [ctx (assoc ctx ::sexp filter-expr)]
+    (or (custom-reducer ctx [op field])
+        (custom-reducer ctx field)
+        (cond
+          (-> field keyword c/seek :db/tag?) tag-reducer
+          (= :op/comparison op-type) comparison-reducer
+          (= :op/set op-type) (+set-op->reducer-fn+ op)
+          :else
+          (throw (ex-info "Can't handle filter-expr" filter-expr))))))
 
 
 
-(defmulti evaluate-sexp (fn [conformed-sexp _anding? _ids] (first conformed-sexp)))
+(defmulti evaluate-sexp (fn [_ctx conformed-sexp _ids] (first conformed-sexp)))
 
 (defmethod evaluate-sexp :sexp/op
-  [[_ [op-sexp-type filter-info]] anding? ids]
+  [ctx [_ [op-sexp-type filter-info]] ids]
   (assert #{:sexp/op-field-val :sexp/op-val-field} op-sexp-type)
-  (let [filter-info (assoc filter-info :filter/sexp-type op-sexp-type :anding? anding?)
-        reducer (lookup-reducer filter-info)]
-    (reducer filter-info ids)))
+  (let [filter-info (assoc filter-info :filter/sexp-type op-sexp-type)]
+    ((lookup-reducer ctx filter-info) ctx filter-info ids)))
 
 (defn and-sexps
-  [sexp-info init-ids]
+  [ctx sexp-info init-ids]
   (loop [[sexp & more] (:list/sexp sexp-info)
          ids init-ids]
     (if-not sexp
       ids
       ;; need this intersection because sexp might be an or expr for example
-      (recur more (i/intersection ids (evaluate-sexp sexp true ids))))))
+      (recur more (i/intersection ids (evaluate-sexp (assoc ctx ::anding? true) sexp ids))))))
 
 (defn or-sexps
-  [sexp-info init-ids]
+  [ctx sexp-info init-ids]
   (loop [[sexp & more] (:list/sexp sexp-info)
          ids-coll []]
     (if-not sexp
       (apply i/union ids-coll)
-      (recur more (conj ids-coll (evaluate-sexp sexp false init-ids))))))
+      (recur more (conj ids-coll (evaluate-sexp (dissoc ctx ::anding?) sexp init-ids))))))
 
 (defmethod evaluate-sexp :sexp/logical
-  [[_ sexp-info] _anding? init-ids]
+  [ctx [_ sexp-info] init-ids]
   (let [{boolean-op :op/boolean} sexp-info]
     (case boolean-op
-      and (and-sexps sexp-info init-ids)
-      or (or-sexps sexp-info init-ids))))
+      and (and-sexps ctx sexp-info init-ids)
+      or (or-sexps ctx sexp-info init-ids))))
 
 
 (defn evaluate-conformed
-  [conformed-sexp init-ids]
-  (evaluate-sexp conformed-sexp nil init-ids))
+  ([conformed-sexp init-ids]
+   (evaluate-sexp {} conformed-sexp init-ids))
+  ([ctx conformed-sexp init-ids]
+   (evaluate-sexp ctx conformed-sexp init-ids)))
 
 (defn evaluate
-  "`sexp` is an s-expression "
-  [sexp init-ids]
-  (evaluate-conformed (conform sexp) init-ids))
+  "`sexp` is an s-expression. `init-ids` is a sorted int array"
+  ([sexp init-ids]
+   (evaluate {} sexp init-ids))
+  ([ctx sexp init-ids]
+   (evaluate-conformed ctx (conform sexp) init-ids)))
