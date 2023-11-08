@@ -93,25 +93,19 @@
                :type/numbers-coll
                :type/numbers-set} val-type))
 
-
-(defn index-scan-filter
-  "`init-ids` is the starting sorted int set, could be nil.
-  NB negations ie not= only operate on concepts that have the field
-  for performance reasons."
-  [{::keys [anding?] :as _ctx}
-   pred
+(defn filter-ids
+  "Checks to see if concepts represented by `init-ids` with field have a value that
+  satisfies `pred` and returns a subset of `init-ids`. NB. `init-ids` must be sorted."
+  [pred
    {field :filter/field [_val-type the-value] :filter/value sexp-type :filter/sexp-type
     :keys [field-xform]
     :or {field-xform identity}}
    init-ids]
-  (when-not *enable-index-scan*
-    (throw (ex-info "Index scan not enabled." {:field field})))
   (let [field (keyword field)]
-    (loop [[id & ids] (cond-> (c/ids field)
-                        anding? (i/intersection init-ids))
+    (loop [[id & ids] init-ids
            ans (transient [])]
       (if-not id
-        (-> ans persistent! sort int-array)
+        (-> ans persistent! int-array)
         (if-some [found (c/value field id)]
           (let [found (field-xform found)
                 outcome? (case sexp-type
@@ -121,6 +115,22 @@
                       outcome? (conj! id))]
             (recur ids ans))
           (recur ids ans))))))
+
+
+(defn index-scan-filter
+  "`init-ids` is the starting sorted int set, could be nil.
+  NB negations ie not= only operate on concepts that have the field
+  for performance reasons."
+  [{::keys [anding?] :as _ctx}
+   pred
+   {field :filter/field :as filter-info}
+   init-ids]
+  (when-not *enable-index-scan*
+    (throw (ex-info "Index scan not enabled." {:field field})))
+  ;; looks up all concept ids that have said field
+  (let [ids (cond-> (c/ids (keyword field))
+              anding? (i/intersection init-ids))]
+    (filter-ids pred filter-info ids)))
 
 
 (def +scalar-types+
