@@ -29,7 +29,7 @@
 
   deploy
   {:doc "Deploy to clojars."
-   :depends [build:jar]
+   :depends [build:check build:jar]
    :task (shell "clojure -T:build deploy")}
 
 

@@ -19,8 +19,13 @@
 
 (def +operators+ (set/union +comparison-operators+ +set-operators+))
 
+
+(defmulti custom-op? identity)
+(defmethod custom-op? :default [_] false)
+
 (s/def ::op (s/or :op/comparison +comparison-operators+
-                  :op/set +set-operators+))
+                  :op/set +set-operators+
+                  :op/custom custom-op?))
 
 (def +boolean-operators+ '#{and or})
 (s/def ::boolean-op +boolean-operators+)
@@ -48,9 +53,18 @@
                       :filter/value ::value
                       :filter/field ::field)))
 
+(s/def ::op-val-form
+  (s/and list? (s/cat :filter/op ::op
+                      :filter/value ::value)))
+
+(s/def ::op-form
+  (s/and list? (s/cat :filter/op ::op)))
+
 (s/def ::op-sexp
   (s/or :sexp/op-field-val ::op-field-val-form
-        :sexp/op-val-field ::op-val-field-form))
+        :sexp/op-val-field ::op-val-field-form
+        :sexp/op-val ::op-val-form
+        :sexp/op ::op-form))
 
 (s/def ::op-sexps
   (s/and list? (s/+ ::op-sexp)))
@@ -240,17 +254,24 @@
 
 (defmethod custom-reducer :default [_ _] nil)
 
+
+(defmulti custom-op-reducer (fn [_ctx op-sym] op-sym))
+(defmethod custom-op-reducer :default [_ op-sym]
+  (throw (ex-info "no custom-op-reducer method for dispatch op" {:op op-sym})))
+
 (defn lookup-reducer
   [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
   (let [ctx (assoc ctx ::sexp filter-expr)]
-    (or (custom-reducer ctx [op field])
-        (custom-reducer ctx field)
-        (cond
-          (-> field keyword c/seek :db/tag?) tag-reducer
-          (= :op/comparison op-type) comparison-reducer
-          (= :op/set op-type) (+set-op->reducer-fn+ op)
-          :else
-          (throw (ex-info "Can't handle filter-expr" filter-expr))))))
+    (if (= :op/custom op-type)
+      (custom-op-reducer ctx op)
+      (or (custom-reducer ctx [op field])
+          (custom-reducer ctx field)
+          (cond
+            (-> field keyword c/seek :db/tag?) tag-reducer
+            (= :op/comparison op-type) comparison-reducer
+            (= :op/set op-type) (+set-op->reducer-fn+ op)
+            :else
+            (throw (ex-info "Can't handle filter-expr" filter-expr)))))))
 
 
 
@@ -258,7 +279,6 @@
 
 (defmethod evaluate-sexp :sexp/op
   [ctx [_ [op-sexp-type filter-info]] ids]
-  (assert #{:sexp/op-field-val :sexp/op-val-field} op-sexp-type)
   (let [filter-info (assoc filter-info :filter/sexp-type op-sexp-type)]
     ((lookup-reducer ctx filter-info) ctx filter-info ids)))
 

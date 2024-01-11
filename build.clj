@@ -21,8 +21,9 @@
   (b/javac {:src-dirs ["src/java"]
             :class-dir (bb/default-class-dir)
             :basis (bb/default-basis)
-            :javac-opts [;;"-source" "8" "-target" "8"
-                         "-Xlint:deprecation" "-Xlint:unchecked"]}))
+            :javac-opts ["--release" "11"
+                         "-Xlint:deprecation" "-Xlint:unchecked"
+                         "-proc:none"]}))
 
 
 (defn compile-clj [_]
@@ -34,7 +35,6 @@
 (defn jar [_]
   (clean nil)
   (compile-java nil)
-  (compile-clj nil)
   (bb/jar {:lib lib
            :version version
            :src-dirs ["src/clj"]}))
