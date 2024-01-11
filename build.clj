@@ -7,6 +7,8 @@
 (def version (format "0.1.%s" (b/git-count-revs nil)))
 (def class-dir "target/classes")
 (def jar-file (format "target/%s-%s.jar" (name lib) version))
+(def clj-src-dirs ["src/clj"])
+(def java-src-dirs ["src/java"])
 
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 
@@ -22,7 +24,7 @@
 
 (defn compile-java [_]
   (println "Compiling java...")
-  (b/javac {:src-dirs ["src/java"]
+  (b/javac {:src-dirs java-src-dirs
             :class-dir class-dir
             :basis @basis
             :javac-opts ["--release" "11"
@@ -32,7 +34,7 @@
 
 (defn compile-clj [_]
   (println "Compiling clj...")
-  (b/compile-clj {:src-dirs ["src/clj"]
+  (b/compile-clj {:src-dirs clj-src-dirs
                   :class-dir class-dir
                   :basis @basis}))
 
@@ -60,9 +62,9 @@
                 :lib lib
                 :version version
                 :basis @basis
-                :src-dirs ["src/clj"]
+                :src-dirs clj-src-dirs
                 :pom-data (pom-template version)})
-  (b/copy-dir {:src-dirs ["src" "resources"]
+  (b/copy-dir {:src-dirs (conj clj-src-dirs "resources")
                :target-dir class-dir})
   (b/jar {:class-dir class-dir
           :jar-file jar-file}))
@@ -72,7 +74,7 @@
   (println "Installing jar into local Maven repo cache...")
   (b/install {:lib lib
               :version version
-              :src-dirs ["src/clj"]}))
+              :src-dirs clj-src-dirs}))
 
 (defn deploy [_]
   (dd/deploy {:installer :remote
