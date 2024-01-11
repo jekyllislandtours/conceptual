@@ -445,3 +445,46 @@
         (remove-method f/custom-reducer '[= test/int])
         (remove-method f/custom-reducer 'test/string)
         (remove-method f/custom-reducer 'test/keyword)))))
+
+
+(deftest custom-op-val-form-test
+  (let [search-counter (volatile! 0)
+        search-op-fn (fn [_ctx _filter-info ids]
+                       (vswap! search-counter inc)
+                       ids)]
+
+    (expect false (s/valid? ::f/sexp '(search "hello")))
+    (try
+      ;; register methods that just returns ids and increments counter
+      (defmethod f/custom-op? 'search [_] true)
+      (defmethod f/custom-op-reducer 'search [_ _] search-op-fn)
+
+      (f/evaluate '(search "hello") (int-array []))
+
+      (expect 1 @search-counter)
+
+      (finally
+        (remove-method f/custom-op? 'search)
+        (remove-method f/custom-op-reducer 'search)))))
+
+
+
+(deftest custom-op-form-test
+  (let [full-moon-counter (volatile! 0)
+        full-moon-op-fn (fn [_ctx _filter-info ids]
+                          (vswap! full-moon-counter inc)
+                          ids)]
+
+    (expect false (s/valid? ::f/sexp '(full-moon?)))
+    (try
+      ;; register methods that just returns ids and increments counter
+      (defmethod f/custom-op? 'full-moon? [_] true)
+      (defmethod f/custom-op-reducer 'full-moon? [_ _] full-moon-op-fn)
+
+      (f/evaluate '(full-moon?) (int-array []))
+
+      (expect 1 @full-moon-counter)
+
+      (finally
+        (remove-method f/custom-op? 'full-moon?)
+        (remove-method f/custom-op-reducer 'full-moon?)))))
