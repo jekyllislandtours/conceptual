@@ -32,6 +32,10 @@
 
 (s/def ::field qualified-symbol?)
 
+
+(def +scalar-types+
+  #{:type/string :type/keyword :type/boolean :type/number})
+
 (s/def ::value
   (s/or :type/string string?
         :type/keyword keyword?
@@ -147,40 +151,9 @@
     (filter-ids pred filter-info ids)))
 
 
-(def +scalar-types+
-  #{Boolean Byte Character Short Integer Long Double BigDecimal BigInteger String
-    java.time.Instant java.util.Date java.util.UUID})
-
-(defn scalar?
-  [field]
-  (-> field keyword c/seek :db/type +scalar-types+ some?))
-
-
 (defn collection?
   [field]
   (->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
-
-(defn- in-reducer*
-  [ctx
-   pred
-   {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value
-    sexp-type :filter/sexp-type :as filter-info} ids]
-  (when-not (filter-expr-value-collection? filter-info)
-    (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
-  (when (and (= :sexp/op-field-val sexp-type)
-             (scalar? field))
-    (throw (ex-info "Scalar field in wrong position" {:field field})))
-  ;; field is a scalar and it is in :sexp/op-field-val then throw
-  (index-scan-filter ctx pred filter-info ids))
-
-(defn in-reducer
-  [ctx filter-info ids]
-  (in-reducer* ctx contains? filter-info ids))
-
-
-(defn not-in-reducer
-  [ctx filter-info ids]
-  (in-reducer* ctx (complement contains?) filter-info ids))
 
 (defn- ensure-set
   [x]
@@ -188,6 +161,42 @@
     (set? x) x
     (coll? x) (set x)
     :else #{x}))
+
+(defn- in-reducer-coll-literal-sym
+  [ctx pred filter-info ids]
+  ;; make sure the value is a collection literal
+  (when-not (filter-expr-value-collection? filter-info)
+    (let [[_op-type op] (:filter/op filter-info)
+          field (:filter/field filter-info)]
+      (throw (ex-info (format "op `%s` requires a collection" op) {:field field}))))
+  (index-scan-filter ctx pred filter-info ids))
+
+(defn- in-reducer-coll-sym-scalar-val
+  [ctx pred filter-info ids]
+  ;; make sure the field is a collection and value is a scalar
+  (let [field (:filter/field filter-info)
+        [v-type] (:filter/value filter-info)]
+    (when-not (collection? field)
+      (throw (ex-info (format "field %s is not a collection" field) {:field field})))
+    (when-not (contains? +scalar-types+ v-type)
+      (throw (ex-info (format "value for field %s must be a scalar" field) {:field field
+                                                                            :v-type v-type}))))
+  (index-scan-filter ctx pred (assoc filter-info :field-xform ensure-set) ids))
+
+
+(defn in-reducer
+  ([ctx filter-info ids]
+   (in-reducer ctx contains? filter-info ids))
+  ([ctx pred filter-info ids]
+   (let [in-fn (case (:filter/sexp-type filter-info)
+                 :sexp/op-val-field in-reducer-coll-literal-sym
+                 :sexp/op-field-val in-reducer-coll-sym-scalar-val)]
+     (in-fn ctx pred filter-info ids))))
+
+
+(defn not-in-reducer
+  [ctx filter-info ids]
+  (in-reducer ctx (complement contains?) filter-info ids))
 
 (defn- set-op-reducer
   [ctx pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
