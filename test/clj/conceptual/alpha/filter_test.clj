@@ -215,6 +215,20 @@
       (expect ExceptionInfo
               (eval-sexp '(in test/int [3456]))))))
 
+
+(deftest in-sym-is-coll-test
+  (binding [f/*enable-index-scan* true]
+    (expect #{:hello/dude}
+            (eval-sexp '(in test/collection 300)))
+
+    (testing "val should be a scalar"
+      (expect ExceptionInfo
+              (eval-sexp '(in test/collection [300]))))
+
+    (testing "wrong order"
+      (expect ExceptionInfo
+              (eval-sexp '(in 300 test/collection))))))
+
 (deftest not-in-test
   (binding [f/*enable-index-scan* true]
     (testing "in 1 int"
@@ -236,6 +250,19 @@
     (testing "wrong order"
       (expect ExceptionInfo
               (eval-sexp '(in test/int [3456]))))))
+
+(deftest not-in-sym-is-coll-test
+  (binding [f/*enable-index-scan* true]
+    (expect #{:hello/there :hello/world :hello/friend}
+            (eval-sexp '(not-in test/collection 300)))
+
+    (testing "val should be a scalar"
+      (expect ExceptionInfo
+              (eval-sexp '(not-in test/collection [300]))))
+
+    (testing "wrong order"
+      (expect ExceptionInfo
+              (eval-sexp '(not-in 300 test/collection))))))
 
 (deftest intersects?-test
   (binding [f/*enable-index-scan* true]
