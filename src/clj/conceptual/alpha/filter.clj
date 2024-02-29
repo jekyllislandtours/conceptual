@@ -145,7 +145,8 @@
    {field :filter/field :as filter-info}
    init-ids]
   (when-not *enable-index-scan*
-    (throw (ex-info "Index scan not enabled." {::error ::index-scan-disabled :field field})))
+    (throw (ex-info "Index scan not enabled." {::error ::index-scan-disabled
+                                               :field field})))
   ;; looks up all concept ids that have said field
   (let [ids (cond-> (c/ids (keyword field))
               anding? (i/intersection init-ids))]
@@ -154,7 +155,7 @@
 
 (defn collection?
   [field]
-  (->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
+  (some->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
 
 (defn- ensure-set
   [x]

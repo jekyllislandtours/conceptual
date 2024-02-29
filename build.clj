@@ -74,7 +74,9 @@
   (println "Installing jar into local Maven repo cache...")
   (b/install {:lib lib
               :version version
-              :src-dirs clj-src-dirs}))
+              :basis @basis
+              :class-dir class-dir
+              :jar-file jar-file}))
 
 (defn deploy [_]
   (dd/deploy {:installer :remote
