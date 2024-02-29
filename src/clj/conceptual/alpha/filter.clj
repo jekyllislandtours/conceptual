@@ -99,7 +99,8 @@
         ans (s/conform ::sexp norm-sexp)]
     (when (= ::s/invalid ans)
       (throw (ex-info "Conform failed"
-                      {:sexp sexp
+                      {::error ::invalid-syntax
+                       :sexp sexp
                        :spec ::sexp
                        :explanation (s/explain-data ::sexp sexp)})))
     ans))
@@ -144,7 +145,7 @@
    {field :filter/field :as filter-info}
    init-ids]
   (when-not *enable-index-scan*
-    (throw (ex-info "Index scan not enabled." {:field field})))
+    (throw (ex-info "Index scan not enabled." {::error ::index-scan-disabled :field field})))
   ;; looks up all concept ids that have said field
   (let [ids (cond-> (c/ids (keyword field))
               anding? (i/intersection init-ids))]
@@ -168,7 +169,9 @@
   (when-not (filter-expr-value-collection? filter-info)
     (let [[_op-type op] (:filter/op filter-info)
           field (:filter/field filter-info)]
-      (throw (ex-info (format "op `%s` requires a collection" op) {:field field}))))
+      (throw (ex-info (format "op `%s` requires a collection" op) {::error ::collection-required
+                                                                   :op op
+                                                                   :field field}))))
   (index-scan-filter ctx pred filter-info ids))
 
 (defn- in-reducer-coll-sym-scalar-val
@@ -177,10 +180,12 @@
   (let [field (:filter/field filter-info)
         [v-type] (:filter/value filter-info)]
     (when-not (collection? field)
-      (throw (ex-info (format "field %s is not a collection" field) {:field field})))
+      (throw (ex-info (format "field %s is not a collection" field) {::error ::field-not-a-collection
+                                                                     :field field})))
     (when-not (contains? +scalar-types+ v-type)
-      (throw (ex-info (format "value for field %s must be a scalar" field) {:field field
-                                                                            :v-type v-type}))))
+      (throw (ex-info (format "value for field %s must be a scalar" field) {::error ::scalar-value-required
+                                                                            :field field
+                                                                            :value-type v-type}))))
   (index-scan-filter ctx pred (assoc filter-info :field-xform ensure-set) ids))
 
 
@@ -201,9 +206,12 @@
 (defn- set-op-reducer
   [ctx pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
   (when-not (filter-expr-value-collection? filter-info)
-    (throw (ex-info (format "op `%s` requires a collection" op) {:field field})))
+    (throw (ex-info (format "op `%s` requires a collection" op) {::error ::collection-required
+                                                                 :op op
+                                                                 :field field})))
   (when-not (collection? field)
-    (throw (ex-info (format "field `%s` is not a collection" field) {:field field})))
+    (throw (ex-info (format "field `%s` is not a collection" field) {::error ::field-not-a-collection
+                                                                     :field field})))
   (index-scan-filter ctx pred (assoc filter-info :field-xform ensure-set) ids))
 
 
@@ -228,7 +236,9 @@
     (assert op-fn (str "No fn for op: " op))
     (when (and (= val-type :type/string)
                (not (#{'= 'not=} op)))
-      (throw (ex-info "Strings support only `=` or `not=`" {:field field :op op})))
+      (throw (ex-info "Strings support only `=` or `not=`" {::error ::unsupported-operator
+                                                            :op op
+                                                            :field field})))
     (index-scan-filter ctx op-fn filter-info ids)))
 
 (defn tag-reducer
@@ -236,9 +246,13 @@
    {[_op-type op] :filter/op field :filter/field [val-type the-value] :filter/value}
    ids]
   (when (not= :type/boolean val-type)
-    (throw (ex-info "tag comparison values must be a boolean true or false" {:field field :op op})))
+    (throw (ex-info "tag comparison values must be a boolean true or false" {::error ::invalid-tag-comparison-value
+                                                                             :op op
+                                                                             :field field})))
   (when-not (#{'= 'not=} op)
-    (throw (ex-info "tag comparison values may only use `=` or `not=`" {:field field :op op})))
+    (throw (ex-info "tag comparison values may only use `=` or `not=`" {::error ::unsupported-operator
+                                                                        :op op
+                                                                        :field field})))
   (let [tagged-ids (c/ids (keyword field))
         the-value (if (= '= op) the-value (not the-value))
         set-op (if the-value i/intersection i/difference)]
@@ -280,7 +294,8 @@
             (= :op/comparison op-type) comparison-reducer
             (= :op/set op-type) (+set-op->reducer-fn+ op)
             :else
-            (throw (ex-info "Can't handle filter-expr" filter-expr)))))))
+            (throw (ex-info "Can't handle filter-expr" {::error ::unsupported-expression
+                                                        :expr filter-expr})))))))
 
 
 
@@ -328,3 +343,12 @@
    (evaluate {} sexp init-ids))
   ([ctx sexp init-ids]
    (evaluate-conformed ctx (conform sexp) init-ids)))
+
+
+(defn error-code
+  [ex]
+  (::error (ex-data ex)))
+
+(defn error?
+  [ex]
+  (some? (error-code ex)))

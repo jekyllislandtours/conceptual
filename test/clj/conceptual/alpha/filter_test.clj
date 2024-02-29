@@ -11,6 +11,12 @@
 
 (use-fixtures :each test.core/with-rdb)
 
+(defmacro expect-error
+  [error-kw expr]
+  `(try
+     ~expr
+     (catch ExceptionInfo ex#
+       (expect ~error-kw (f/error-code ex#)))))
 
 (deftest op-sexp-test
   (expect [:sexp/op-field-val
@@ -117,6 +123,7 @@
       (expect #{:hello/world :hello/there}
               (eval-sexp '(>= 2345 test/int))))))
 
+
 (deftest simple-evaluate-strings-test
   (binding [f/*enable-index-scan* true]
     (testing "= op field value"
@@ -128,19 +135,19 @@
               (eval-sexp '(= "Dude" test/string))))
 
     (testing "> throws"
-      (expect ExceptionInfo
-              (eval-sexp '(> "Dude" test/string))))
+      (expect-error ::f/unsupported-operator
+                    (eval-sexp '(> "Dude" test/string))))
 
     (testing ">= throws"
-      (expect ExceptionInfo
+      (expect-error ::f/unsupported-operator
               (eval-sexp '(>= "Dude" test/string))))
 
     (testing "< throws"
-      (expect ExceptionInfo
+      (expect-error ::f/unsupported-operator
               (eval-sexp '(< "Dude" test/string))))
 
     (testing "<= throws"
-      (expect ExceptionInfo
+      (expect-error ::f/unsupported-operator
               (eval-sexp '(<= "Dude" test/string))))))
 
 
@@ -212,7 +219,7 @@
               (eval-sexp '(in ["World" "Dude"] test/string))))
 
     (testing "wrong order"
-      (expect ExceptionInfo
+      (expect-error ::f/scalar-value-required
               (eval-sexp '(in test/int [3456]))))))
 
 
@@ -222,11 +229,11 @@
             (eval-sexp '(in test/collection 300)))
 
     (testing "val should be a scalar"
-      (expect ExceptionInfo
+      (expect-error ::f/scalar-value-required
               (eval-sexp '(in test/collection [300]))))
 
-    (testing "wrong order"
-      (expect ExceptionInfo
+    (testing "collection required as first arg to in"
+      (expect-error ::f/collection-required
               (eval-sexp '(in 300 test/collection))))))
 
 (deftest not-in-test
@@ -247,9 +254,9 @@
       (expect #{:hello/friend :hello/there}
               (eval-sexp '(not-in ["World" "Dude"] test/string))))
 
-    (testing "wrong order"
-      (expect ExceptionInfo
-              (eval-sexp '(in test/int [3456]))))))
+    (testing "scalar required for 2nd arg to not-in"
+      (expect-error ::f/scalar-value-required
+              (eval-sexp '(not-in test/int [3456]))))))
 
 (deftest not-in-sym-is-coll-test
   (binding [f/*enable-index-scan* true]
@@ -257,11 +264,11 @@
             (eval-sexp '(not-in test/collection 300)))
 
     (testing "val should be a scalar"
-      (expect ExceptionInfo
+      (expect-error ::f/scalar-value-required
               (eval-sexp '(not-in test/collection [300]))))
 
     (testing "wrong order"
-      (expect ExceptionInfo
+      (expect-error ::f/collection-required
               (eval-sexp '(not-in 300 test/collection))))))
 
 (deftest intersects?-test
