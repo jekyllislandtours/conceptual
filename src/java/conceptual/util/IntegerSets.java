@@ -75,9 +75,11 @@ public final class IntegerSets {
      * @return an array of int.
      */
     public final static int[] getIntersection(final int[]... sets) {
+        if (sets.length == 0 || sets[0] == null) { return EMPTY; }
         int smallestLength = sets[0].length;
         int smallestIndex = 0;
         for (int i=1; i < sets.length; i++) {
+            if (sets[i] == null) { return EMPTY; }
             if (sets[i].length < smallestLength) {
                 smallestIndex = i;
                 smallestLength = sets[i].length;
