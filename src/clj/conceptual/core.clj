@@ -180,8 +180,7 @@
   ([ks] (normalize-ids (db) ks))
   ([db ks] (cond
             (instance? int-array-class ks) ks
-            (or (vector? ks)
-                (list? ks)
+            (or (sequential? ks)
                 (set? ks)) (let [f (partial key->id ^DB db)]
                              (int-array (map f ks))))))
 
