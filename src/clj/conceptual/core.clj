@@ -11,7 +11,7 @@
 
 (def ^{:dynamic true :tag DB} *db* (atom nil))
 
-(def ^{:dynamic true :tag IndexAggregator} *aggr*)
+(def ^{:dynamic true :tag IndexAggregator} *aggr* nil)
 
 ;; internal keys
 (def ^{:private true :const true} -id (int DB/ID_ID))
@@ -70,19 +70,19 @@
 
 (defn db
   "Returns a database instance if it exists."
-  [] @*db*)
+  ^DB [] @*db*)
 
-(defn ^Integer key->id
-  "Given a keyword identity returns the id."
-  ([^Keyword k] (key->id ^DB (db) ^Keyword k))
-  ([^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
+(defn key->id
+  "Given a keyword identity returns the id or `nil`."
+  (^Integer [^Keyword k] (key->id (db) ^Keyword k))
+  (^Integer [^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
 
 (defn lookup-id-0
-  ([unique-key-id ^Object key] (.lookupId ^DB (db) ^int unique-key-id ^Object key))
+  ([unique-key-id ^Object key] (.lookupId (db) ^int unique-key-id ^Object key))
   ([^DB db unique-key-id ^Object key] (.lookupId ^DB db ^int unique-key-id ^Object key)))
 
 (defn lookup-id
-  ([unique-key ^Object key] (lookup-id ^DB (db) unique-key ^Object key))
+  ([unique-key ^Object key] (lookup-id (db) unique-key ^Object key))
   ([^DB db unique-key ^Object key]
    (if (instance? Number unique-key)
      (lookup-id-0 db unique-key key)
@@ -91,14 +91,14 @@
 
 (defn- map->kvs [^DB db arg]
   (let [items (->> arg
-                   (map (fn [[k v]] [(key->id ^DB db k) v]))
+                   (map (fn [[k v]] [(key->id db k) v]))
                    (sort-by first <))
         ks (int-array (map first items))
         vs (object-array (map second items))]
     [ks vs]))
 
 (defn- map->undefined-keys [^DB db arg]
-  (some->> arg keys (remove (partial key->id ^DB db))))
+  (some->> arg keys (remove (partial key->id db))))
 
 (defn create-db!
   "Creates/resets *db* to a brand new database all bootstrapped and stuff."
@@ -349,18 +349,18 @@
 
 (defn max-id
   "Returns the max id for the database."
-  ([] (max-id ^DB (db)))
+  ([] (max-id (db)))
   ([^DB db] (.getMaxId db)))
 
 (defn value-0
   "Lowest level interface to getValue. (swaps the order of id and key to better
   leverage the threading function ->>)."
-  ([key id] (.getValue ^DB (db) ^int id ^int key))
+  ([key id] (.getValue (db) ^int id ^int key))
   ([^DB db key id] (.getValue db ^int id ^int key)))
 
 (defn ^:private value-1
   ([key id]
-   (value-1 ^DB (db) key id))
+   (value-1 (db) key id))
   ([^DB db key id]
    (if (instance? Number key)
      (value-0 db ^int key ^int id)
@@ -369,7 +369,7 @@
 
 (defn value
   "Given a key and id returns the value for the key on the given id."
-  ([key id] (value ^DB (db) key id))
+  ([key id] (value (db) key id))
   ([^DB db key id]
    (if (instance? Number id)
      (value-1 db key id) ;; do something else here
@@ -423,14 +423,14 @@
 
 (defn proj
   ([ks ^ints ids]
-   (proj ^DB (db) ks ids))
+   (proj (db) ks ids))
   ([^DB db ks ^ints ids]
    (let [^ints key-ids (ordered-ids db ks)]
      (.project db key-ids ids))))
 
 (defn project
   ([ks ids]
-   (project ^DB (db) ks ids))
+   (project (db) ks ids))
   ([^DB db ks ids]
    (let [^ints key-ids (normalize-ids db ks)]
      (map #(proj-0 db key-ids %) ids)
@@ -524,10 +524,10 @@
    (compact-db! db type)))
 
 
-(defmulti pickle-db! (fn [-type _opts] (db-type db)))
+(defmulti pickle-db! (fn [_type _opts] (db-type db)))
 
 (defmethod pickle-db! :default
-  [_type {:keys [db filename verbose cipher]}]
+  [_type {:keys [db filename cipher]}]
   (if cipher
     (conceptual.core.RDB/store ^conceptual.core.RDB db filename cipher)
     (conceptual.core.RDB/store ^conceptual.core.RDB db filename)))
@@ -550,7 +550,7 @@
     (conceptual.core.RDB/load filename verbose)))
 
 (defn load-pickle!
-  ([& {:keys [filename type verbose cipher db]
+  ([& {:keys [filename type verbose cipher]
        :or {filename "pickle.sz"
             type :default
             verbose false}}]
@@ -564,7 +564,7 @@
   (apply load-pickle! args))
 
 (defn dump
-  ([] (dump ^DB (db)))
+  ([] (dump (db)))
   ([^DB db]
    (doseq [i (range (inc (max-id db)))]
      (clojure.pprint/pprint (seek db i)))))
