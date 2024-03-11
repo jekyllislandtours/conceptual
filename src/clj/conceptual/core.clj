@@ -6,12 +6,12 @@
   (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
            [clojure.lang Keyword]))
 
-;; name of default implicit db
 (set! *warn-on-reflection* true)
 
-(def ^{:dynamic true :tag DB} *db* (atom nil))
+;; name of default implicit db
+(defonce ^{:dynamic true :tag DB} *db* (atom nil))
 
-(def ^{:dynamic true :tag IndexAggregator} *aggr* nil)
+(defonce ^{:dynamic true :tag IndexAggregator} *aggr* nil)
 
 ;; internal keys
 (def ^{:private true :const true} -id (int DB/ID_ID))
@@ -74,26 +74,33 @@
 
 (defn key->id
   "Given a keyword identity returns the id or `nil`."
-  (^Integer [^Keyword k] (key->id (db) ^Keyword k))
-  (^Integer [^DB db ^Keyword k] (.keywordToId ^DB db ^Keyword k)))
+  (^Integer [^Keyword k] (key->id (db) k))
+  (^Integer [^DB db ^Keyword k] (.keywordToId db k)))
+
+(defn key->id-or-throw
+  "Given a keyword identity returns the id or throw."
+  (^Integer [^Keyword k] (key->id-or-throw (db) k))
+  (^Integer [^DB db ^Keyword k]
+   (or (.keywordToId db k)
+       (throw (ex-info (str "Unknown key: " k) {:unknown-key k})))))
 
 (defn lookup-id-0
-  ([unique-key-id ^Object key] (.lookupId (db) ^int unique-key-id ^Object key))
-  ([^DB db unique-key-id ^Object key] (.lookupId ^DB db ^int unique-key-id ^Object key)))
+  ([unique-key-id ^Object key] (.lookupId (db) unique-key-id key))
+  ([^DB db unique-key-id ^Object key] (.lookupId db unique-key-id key)))
 
 (defn lookup-id
-  ([unique-key ^Object key] (lookup-id (db) unique-key ^Object key))
+  ([unique-key key] (lookup-id (db) unique-key key))
   ([^DB db unique-key ^Object key]
    (if (instance? Number unique-key)
      (lookup-id-0 db unique-key key)
      (when (keyword? unique-key)
-       (lookup-id-0 db (key->id ^DB db unique-key) key)))))
+       (lookup-id-0 db (key->id db unique-key) key)))))
 
-(defn- map->kvs [^DB db arg]
-  (let [items (sort-by first < (for [[k v] arg]
-                                 (if-let [id (key->id db k)]
-                                   [id v]
-                                   (throw (ex-info (str "unknown key " k) {:key k})))))
+(defn- map->kvs
+  "Returns a pair `[ks vs`] where `ks` is an int array and `vs` is an object array."
+  [^DB db m]
+  (let [items (sort-by first < (for [[k v] m]
+                                 [(key->id-or-throw db k) v]))
         ks (int-array (map first items))
         vs (object-array (map second items))]
     [ks vs]))
@@ -153,7 +160,7 @@
   "Returns a sorted int array representing a collection of keywords."
   ([ks] (keys->ids (db) ks))
   ([^DB db ks]
-   (let [f (partial key->id ^DB db)]
+   (let [f (partial key->id db)]
      (->> (map f ks)
           (into #{})
           (sort)
@@ -195,8 +202,6 @@
   ([^ints ids] (ids->keys (db) ids))
   ([^DB db ^ints ids]
    (let [f (partial id->key ^DB db)] (map f ids))))
-
-(declare seek)
 
 (defn insert-0!
   "Inserts an array of values given an array of keys. Must be a WritableDB"
@@ -365,7 +370,7 @@
    (if (instance? Number key)
      (value-0 db ^int key ^int id)
      (when (keyword? key)
-       (value-0 db ^int (key->id db key) ^int id)))))
+       (value-0 db (key->id-or-throw db key) id)))))
 
 (defn value
   "Given a key and id returns the value for the key on the given id."

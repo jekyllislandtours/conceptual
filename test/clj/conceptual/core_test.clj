@@ -21,4 +21,4 @@
                     (some-> ex ex-data))))]
     (expect [[0] [1]] (mapv vec (f {:db/id 1})))
     (expect [[0 1] [1 :hello]] (mapv vec (f {:db/id 1 :db/key :hello})))
-    (expect {:key :unknown/key} (try-f {:db/id 1 :unknown/key :hello}))))
+    (expect {:unknown-key :unknown/key} (try-f {:db/id 1 :unknown/key :hello}))))
