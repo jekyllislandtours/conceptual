@@ -31,6 +31,11 @@
   (expect [1] (vec (i/intersection (int-array [1]) (int-array [1]))))
   (expect [3 5] (vec (i/intersection (int-array [2 3 5]) (int-array [3 4 5]))))
   (expect [] (vec (i/intersection (int-array [2 3 5]) (int-array [6 7 8 9]))))
+
+  (testing "issue 63"
+    ;; This was a bug identified in https://github.com/jekyllislandtours/conceptual/issues/63
+    (expect [] (vec (i/intersection nil nil nil))))
+
   (testing "expected incorrect result because of unsorted set"
     (expect [] (vec (i/intersection (int-array [2 3 5]) (int-array [6 7 8 9 3]))))))
 
