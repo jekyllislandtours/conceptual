@@ -90,9 +90,10 @@
        (lookup-id-0 db (key->id ^DB db unique-key) key)))))
 
 (defn- map->kvs [^DB db arg]
-  (let [items (->> arg
-                   (map (fn [[k v]] [(key->id db k) v]))
-                   (sort-by first <))
+  (let [items (sort-by first < (for [[k v] arg]
+                                 (if-let [id (key->id db k)]
+                                   [id v]
+                                   (throw (ex-info (str "unknown key " k) {:key k})))))
         ks (int-array (map first items))
         vs (object-array (map second items))]
     [ks vs]))
