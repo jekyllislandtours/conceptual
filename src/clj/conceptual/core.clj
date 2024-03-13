@@ -82,7 +82,9 @@
   (^Integer [^Keyword k] (key->id-or-throw (db) k))
   (^Integer [^DB db ^Keyword k]
    (or (.keywordToId db k)
-       (throw (ex-info (str "Unknown key: " k) {:unknown-key k})))))
+       (throw (ex-info (str "Unknown key: " k)
+                       {:conceptual/error :conceptual/unknown-key-error
+                        :unknown-key k})))))
 
 (defn lookup-id-0
   ([unique-key-id ^Object key] (.lookupId (db) unique-key-id key))
@@ -105,8 +107,8 @@
         vs (object-array (map second items))]
     [ks vs]))
 
-(defn- map->undefined-keys [^DB db arg]
-  (some->> arg keys (remove (partial key->id db))))
+(defn- map->undefined-keys [^DB db m]
+  (some->> m keys (remove (partial key->id db))))
 
 (defn create-db!
   "Creates/resets *db* to a brand new database all bootstrapped and stuff."
@@ -203,6 +205,31 @@
   ([^DB db ^ints ids]
    (let [f (partial id->key ^DB db)] (map f ids))))
 
+(defn- write-error
+  [db m ^Throwable t]
+  (let [undefined-keys (map->undefined-keys db m)
+        msg (str "Error handling concept:"
+                 (.getMessage t)
+                 (when (seq undefined-keys)
+                   " undefined-key - all keys must be defined."))]
+    (ex-info msg
+             (cond-> {:conceptual/error :conceptual/write-error
+                      :concept m}
+               (seq undefined-keys)
+               (assoc :undefined-keys undefined-keys))
+             t)))
+
+(defn- missing-id-error
+  [m]
+  (ex-info (str "Error handling concept: "
+                (when-not (or (:db/id m)
+                              (:db/key m))
+                  (format "either :db/id (%d) or :db/key (%s) is required in the concept"
+                          (:db/id m)
+                          (str (:db/key m)))))
+           {:conceptual/error :conceptual/missing-id-error
+            :concept m}))
+
 (defn insert-0!
   "Inserts an array of values given an array of keys. Must be a WritableDB"
   ([^ints ks vs]
@@ -228,14 +255,7 @@
          (insert-0! db aggr ks vs))
        db)
      (catch Throwable t
-       (let [undefined-keys (map->undefined-keys db arg)]
-         (throw
-          (ex-info (str "Error inserting concept:"
-                        (.getMessage t)
-                        (when (seq undefined-keys)
-                          " undefined-key - update! requires all keys to be defined."))
-                   {:arg arg
-                    :undefined-keys undefined-keys} t)))))))
+       (throw (write-error db arg t))))))
 
 (defn update-0!
   "Lowest level update fn. Updates a single key/value in the concept.
@@ -266,14 +286,7 @@
     (let [[ks vs] (map->kvs db arg)]
       (update-1! db aggr id ks vs))
     (catch Throwable t
-      (let [undefined-keys (map->undefined-keys db arg)]
-        (throw
-         (ex-info (str "Error updating concept: "
-                       (.getMessage t)
-                       (when (seq undefined-keys)
-                         "undefined-key - update! requires all keys to be defined."))
-                  {:arg arg
-                   :undefined-keys undefined-keys} t))))))
+      (throw (write-error db arg t)))))
 
 (defn update!
   "Given a map which contains either a :db/id or a :db/key and value as well as the
@@ -287,14 +300,7 @@
      (update-2! db aggr (:db/id arg) arg) ;; dissoc :db/id
      (if (:db/key arg)
        (update-2! db aggr (key->id db (:db/key arg)) arg)
-       (throw
-        (ex-info (str "Error updating concept: "
-                      (when-not (or (:db/id arg)
-                                    (:db/key arg))
-                        (format "\n\tmissing id - update! requires a :db/id (%d) or :db/key (%s) in the argument."
-                                (:db/id arg)
-                                (str (:db/key arg)))))
-                 {:arg arg}))))))
+       (throw (missing-id-error arg))))))
 
 (defn replace-0!
   "Updates an array of values given an array of keys."
@@ -315,14 +321,7 @@
     (let [[^ints ks #^Object vs] (map->kvs ^DB db arg)]
       (replace-0! db aggr ^int id ^ints ks #^Object vs))
     (catch Throwable t
-      (let [undefined-keys (map->undefined-keys db arg)]
-        (throw
-         (ex-info (str "Error replacing concept: "
-                       (.getMessage t)
-                       (when (seq undefined-keys)
-                         "undefined-key - replace! requires all keys to be defined."))
-                  {:arg arg
-                   :undefined-keys undefined-keys} t))))))
+      (throw (write-error db arg t)))))
 
 (defn replace!
   "Given a map which contains either a :db/id or a :db/key will replace the
@@ -336,14 +335,7 @@
      (replace-1! db aggr (:db/id arg) arg)
      (if (:db/key arg)
        (replace-1! db aggr (key->id (:db/key arg)) arg)
-       (throw
-        (ex-info (str "Error replacing concept: "
-                      (when-not (or (:db/id arg)
-                                    (:db/key arg))
-                        (format "\n\tmissing id - replace! requires a :db/id (%d) or :db/key (%s) in the argument."
-                                (:db/id arg)
-                                (str (:db/key arg)))))
-                 {:arg arg}))))))
+       (throw (missing-id-error arg))))))
 
 ;; TODO: make this safe or remove
 (defn update-inline!
