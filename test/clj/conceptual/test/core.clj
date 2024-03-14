@@ -47,7 +47,8 @@
     [:test/instant Instant]
     [:test/class Class]
     [:test/edn PersistentHashMap]
-    [:test/collection PersistentVector]])
+    [:test/collection PersistentVector]
+    [:test/external-id String]])
   (s/declare-to-one-relations! [[:test/parent]])
   (s/declare-to-many-relations! [[:test/children]])
   (s/declare-tags! [[:test/tag?]]))
@@ -68,7 +69,8 @@
     :test/class (class (Instant/now))
     :test/edn {:hello "world" 1 [2 3]}
     :test/tag? true
-    :test/collection [100 101 102]}
+    :test/collection [100 101 102]
+    :test/external-id "external-id-4-world"}
    {:db/key :hello/there
     :test/id :hello/there
     :test/string "There"
@@ -100,7 +102,8 @@
     :test/class (class (Instant/now))
     :test/edn {:hello "dude" 1 [5 6]}
     :test/tag? true
-    :test/collection [300 201 202]}
+    :test/collection [300 201 202]
+    :test/external-id "external-id-4-dude"}
    {:db/key :hello/friend
     :test/id :hello/friend
     :test/string "Friend"

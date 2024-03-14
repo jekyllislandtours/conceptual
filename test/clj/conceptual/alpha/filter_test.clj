@@ -332,6 +332,12 @@
     (expect #{:hello/there :hello/dude}
             (eval-sexp '(superset? test/collection [201 202])))))
 
+(deftest exists?-test
+  (testing "exists? no results"
+    (expect #{}
+            (eval-sexp '(exists? this-is/not-a-field)))
+    (expect #{:hello/world :hello/dude}
+            (eval-sexp '(exists? test/external-id)))))
 
 (deftest and-test
   (binding [f/*enable-index-scan* true]
@@ -348,6 +354,11 @@
       (expect #{:hello/dude}
               (eval-sexp '(and (= test/tag? true)
                                (> test/int 2000)
+                               (= test/string "Dude")))))
+
+    (testing "exists"
+      (expect #{:hello/dude}
+              (eval-sexp '(and (exists? test/external-id)
                                (= test/string "Dude")))))
 
     (testing "order indifferent"
@@ -389,6 +400,11 @@
       (expect #{:hello/friend :hello/world}
               (eval-sexp '(or (= test/string "World")
                               (= test/string "Friend")))))
+
+    (testing "exists"
+      (expect #{:hello/dude :hello/world :hello/there}
+              (eval-sexp '(or (exists? test/external-id)
+                              (= test/string "There")))))
 
     (testing "order indifferent"
       (expect true

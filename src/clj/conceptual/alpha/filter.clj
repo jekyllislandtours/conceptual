@@ -15,7 +15,7 @@
   '#{= > >= < <= not=})
 
 (def +set-operators+
-  '#{in not-in intersects? subset? superset?})
+  '#{in not-in intersects? subset? superset? exists?})
 
 (def +operators+ (set/union +comparison-operators+ +set-operators+))
 
@@ -61,6 +61,10 @@
   (s/and list? (s/cat :filter/op ::op
                       :filter/value ::value)))
 
+(s/def ::op-field-form
+  (s/and list? (s/cat :filter/op ::op
+                      :filter/field ::field)))
+
 (s/def ::op-form
   (s/and list? (s/cat :filter/op ::op)))
 
@@ -68,6 +72,7 @@
   (s/or :sexp/op-field-val ::op-field-val-form
         :sexp/op-val-field ::op-val-field-form
         :sexp/op-val ::op-val-form
+        :sexp/op-field ::op-field-form
         :sexp/op ::op-form))
 
 (s/def ::op-sexps
@@ -261,12 +266,23 @@
       (set-op ids tagged-ids)
       tagged-ids)))
 
+(defn exists-reducer
+  [_ctx
+   {field :filter/field [_val-type the-value] :filter/value}
+   ids]
+  (when the-value
+    (throw (ex-info "value not allowed for exists? " {::error ::unexpected-value
+                                                      :op 'exists?
+                                                      :field field})))
+  (i/intersection ids (c/ids (keyword field))))
+
 (def +set-op->reducer-fn+
   {'in in-reducer
    'not-in not-in-reducer
    'intersects? intersection-reducer
    'subset? subset-reducer
-   'superset? superset-reducer})
+   'superset? superset-reducer
+   'exists? exists-reducer})
 
 
 (defmulti custom-reducer
@@ -290,6 +306,7 @@
       (custom-op-reducer ctx op)
       (or (custom-reducer ctx [op field])
           (custom-reducer ctx field)
+          (custom-reducer ctx op)
           (cond
             (-> field keyword c/seek :db/tag?) tag-reducer
             (= :op/comparison op-type) comparison-reducer
