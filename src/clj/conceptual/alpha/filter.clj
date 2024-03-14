@@ -306,7 +306,6 @@
       (custom-op-reducer ctx op)
       (or (custom-reducer ctx [op field])
           (custom-reducer ctx field)
-          (custom-reducer ctx op)
           (cond
             (-> field keyword c/seek :db/tag?) tag-reducer
             (= :op/comparison op-type) comparison-reducer
