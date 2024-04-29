@@ -1,5 +1,17 @@
 {:tasks
- {clean
+ {:requires
+  ([clojure.edn :as edn]
+   [clojure.string :as str])
+
+  :init
+  (do
+    (defn cli-args-map
+      []
+      (->> *command-line-args*
+           (map (comp edn/read-string str/trim))
+           (apply hash-map))))
+
+  clean
   {:doc "Cleans up any build artifacts"
    :task (shell "clojure -T:build clean")}
 
@@ -51,4 +63,12 @@
    :task (let [named-test (first *command-line-args*)]
            (when-not named-test
              (lib/sys-exit 1 "no namespace or fully qualified var specified"))
-           (shell (str "clojure -M:dev:test --focus " named-test)))}}}
+           (shell (str "clojure -M:dev:test --focus " named-test)))}
+
+
+  outdated
+  {:doc "Lists outdated dependencies"
+   :task (let [{:keys [upgrade]} (cli-args-map)
+               upgrade-flags (if upgrade "--upgrade --force --download" "")
+               cmd (format "clojure -M:outdated %s" upgrade-flags)]
+           (shell {:continue true} cmd))}}}
