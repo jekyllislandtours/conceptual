@@ -1,6 +1,6 @@
 (ns conceptual.core
   (:require [conceptual.arrays :refer [int-array-class]]
-            [conceptual.int-sets :as int-sets]
+            [conceptual.int-sets :as i]
             [clojure.data.int-map :as int-map]
             [clojure.pprint])
   (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
@@ -412,7 +412,7 @@
   ([id]
    (ids @*db* id))
   ([db id]
-   (or (:db/ids (seek db id)) int-sets/+empty+)))
+   (or (:db/ids (seek db id)) i/+empty+)))
 
 (defn proj-0
   ([^ints ks id] (proj-0 db ks id))
@@ -485,8 +485,8 @@
     (swap! *db*
            (fn [db]
              (.update ^WritableDB db aggr ^int k (key->id db :db/ids)
-                             (int-sets/difference (int-sets/union (ids db k) (.ids aggr k))
-                                                  (.removeIds aggr k)))))))
+                             (i/difference (i/union (ids db k) (.ids aggr k))
+                                           (.removeIds aggr k)))))))
 
 (defmacro with-aggr-0
   ([^DB db binding & bodies]
