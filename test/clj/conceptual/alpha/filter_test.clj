@@ -30,10 +30,10 @@
           (s/conform ::f/op-sexp '(= 23 foo/bar)))
 
   (expect [:sexp/op-field-val
-           #:filter{:op [:op/set 'in],
+           #:filter{:op [:op/set 'contains?],
                     :field 'foo/bar,
                     :value [:type/numbers-coll #{23 42}]}]
-          (s/conform ::f/op-sexp '(in foo/bar [23 42])))
+          (s/conform ::f/op-sexp '(contains? foo/bar [23 42])))
 
   (expect false (s/valid? ::f/op-sexp '(-> 23 foo/bar)))
   (expect false (s/valid? ::f/op-sexp '(= 23 foo/bar 45)))
@@ -51,10 +51,10 @@
 (deftest sexp-test
   (expect [:sexp/op
            [:sexp/op-field-val
-            #:filter{:op [:op/set 'in]
+            #:filter{:op [:op/set 'contains?]
                      :field 'life/answer
                      :value [:type/numbers-coll #{99 42}]}]]
-          (s/conform ::f/sexp '(in life/answer [42 99])))
+          (s/conform ::f/sexp '(contains? life/answer [42 99])))
 
   (expect [:sexp/logical
            {:op/boolean 'and
@@ -200,76 +200,76 @@
       (expect #{:hello/world :hello/there}
               (eval-sexp '(not= test/int 3456))))))
 
-(deftest in-test
+(deftest contains?-test
   (binding [f/*enable-index-scan* true]
-    (testing "in 1 int"
+    (testing "contains? 1 int"
       (expect #{:hello/friend :hello/dude}
-              (eval-sexp '(in [3456] test/int))))
+              (eval-sexp '(contains? [3456] test/int))))
 
-    (testing "in multiple ints"
+    (testing "contains? multiple ints"
       (expect #{:hello/friend :hello/dude :hello/world}
-              (eval-sexp '(in [3456 1234] test/int))))
+              (eval-sexp '(contains? [3456 1234] test/int))))
 
-    (testing "in 1 string"
+    (testing "contains? 1 string"
       (expect #{:hello/world}
-              (eval-sexp '(in ["World"] test/string))))
+              (eval-sexp '(contains? ["World"] test/string))))
 
-    (testing "in multiple strings"
+    (testing "contains? multiple strings"
       (expect #{:hello/dude :hello/world}
-              (eval-sexp '(in ["World" "Dude"] test/string))))
+              (eval-sexp '(contains? ["World" "Dude"] test/string))))
 
     (testing "wrong order"
       (expect-error ::f/scalar-value-required
-              (eval-sexp '(in test/int [3456]))))))
+              (eval-sexp '(contains? test/int [3456]))))))
 
 
-(deftest in-sym-is-coll-test
+(deftest contains?-sym-is-coll-test
   (binding [f/*enable-index-scan* true]
     (expect #{:hello/dude}
-            (eval-sexp '(in test/collection 300)))
+            (eval-sexp '(contains? test/collection 300)))
 
     (testing "val should be a scalar"
       (expect-error ::f/scalar-value-required
-              (eval-sexp '(in test/collection [300]))))
+              (eval-sexp '(contains? test/collection [300]))))
 
-    (testing "collection required as first arg to in"
+    (testing "collection required as first arg to contains?"
       (expect-error ::f/collection-required
-              (eval-sexp '(in 300 test/collection))))))
+              (eval-sexp '(contains? 300 test/collection))))))
 
-(deftest not-in-test
+(deftest not-contains?-test
   (binding [f/*enable-index-scan* true]
-    (testing "in 1 int"
+    (testing "not-contains? 1 int"
       (expect #{:hello/there :hello/world}
-              (eval-sexp '(not-in [3456] test/int))))
+              (eval-sexp '(not-contains? [3456] test/int))))
 
-    (testing "in multiple ints"
+    (testing "not-contains? multiple ints"
       (expect #{:hello/there}
-              (eval-sexp '(not-in [3456 1234] test/int))))
+              (eval-sexp '(not-contains? [3456 1234] test/int))))
 
-    (testing "in 1 string"
+    (testing "not-contains? 1 string"
       (expect #{:hello/friend :hello/there :hello/dude}
-              (eval-sexp '(not-in ["World"] test/string))))
+              (eval-sexp '(not-contains? ["World"] test/string))))
 
-    (testing "in multiple strings"
+    (testing "not-contains? multiple strings"
       (expect #{:hello/friend :hello/there}
-              (eval-sexp '(not-in ["World" "Dude"] test/string))))
+              (eval-sexp '(not-contains? ["World" "Dude"] test/string))))
 
-    (testing "scalar required for 2nd arg to not-in"
+    (testing "scalar required for 2nd arg to not-contains?"
       (expect-error ::f/scalar-value-required
-              (eval-sexp '(not-in test/int [3456]))))))
+              (eval-sexp '(not-contains? test/int [3456]))))))
 
-(deftest not-in-sym-is-coll-test
+(deftest not-contains?-sym-is-coll-test
   (binding [f/*enable-index-scan* true]
     (expect #{:hello/there :hello/world :hello/friend}
-            (eval-sexp '(not-in test/collection 300)))
+            (eval-sexp '(not-contains? test/collection 300)))
 
     (testing "val should be a scalar"
       (expect-error ::f/scalar-value-required
-              (eval-sexp '(not-in test/collection [300]))))
+              (eval-sexp '(not-contains? test/collection [300]))))
 
     (testing "wrong order"
       (expect-error ::f/collection-required
-              (eval-sexp '(not-in 300 test/collection))))))
+              (eval-sexp '(not-contains? 300 test/collection))))))
 
 (deftest intersects?-test
   (binding [f/*enable-index-scan* true]
