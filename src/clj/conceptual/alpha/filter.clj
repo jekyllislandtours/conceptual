@@ -15,7 +15,7 @@
   '#{= > >= < <= not=})
 
 (def +set-operators+
-  '#{in not-in intersects? subset? superset? exists?})
+  '#{contains? not-contains? intersects? subset? superset? exists?})
 
 (def +operators+ (set/union +comparison-operators+ +set-operators+))
 
@@ -169,7 +169,7 @@
     (coll? x) (set x)
     :else #{x}))
 
-(defn- in-reducer-coll-literal-sym
+(defn- contains?-reducer-coll-literal-sym
   [ctx pred filter-info ids]
   ;; make sure the value is a collection literal
   (when-not (filter-expr-value-collection? filter-info)
@@ -180,7 +180,7 @@
                                                                    :field field}))))
   (index-scan-filter ctx pred filter-info ids))
 
-(defn- in-reducer-coll-sym-scalar-val
+(defn- contains?-reducer-coll-sym-scalar-val
   [ctx pred filter-info ids]
   ;; make sure the field is a collection and value is a scalar
   (let [field (:filter/field filter-info)
@@ -195,19 +195,19 @@
   (index-scan-filter ctx pred (assoc filter-info :field-xform ensure-set) ids))
 
 
-(defn in-reducer
+(defn contains?-reducer
   ([ctx filter-info ids]
-   (in-reducer ctx contains? filter-info ids))
+   (contains?-reducer ctx contains? filter-info ids))
   ([ctx pred filter-info ids]
    (let [in-fn (case (:filter/sexp-type filter-info)
-                 :sexp/op-val-field in-reducer-coll-literal-sym
-                 :sexp/op-field-val in-reducer-coll-sym-scalar-val)]
+                 :sexp/op-val-field contains?-reducer-coll-literal-sym
+                 :sexp/op-field-val contains?-reducer-coll-sym-scalar-val)]
      (in-fn ctx pred filter-info ids))))
 
 
-(defn not-in-reducer
+(defn not-contains?-reducer
   [ctx filter-info ids]
-  (in-reducer ctx (complement contains?) filter-info ids))
+  (contains?-reducer ctx (complement contains?) filter-info ids))
 
 (defn- set-op-reducer
   [ctx pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
@@ -277,8 +277,8 @@
   (i/intersection ids (c/ids (keyword field))))
 
 (def +set-op->reducer-fn+
-  {'in in-reducer
-   'not-in not-in-reducer
+  {'contains? contains?-reducer
+   'not-contains? not-contains?-reducer
    'intersects? intersection-reducer
    'subset? subset-reducer
    'superset? superset-reducer
@@ -302,17 +302,16 @@
 (defn lookup-reducer
   [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
   (let [ctx (assoc ctx ::sexp filter-expr)]
-    (if (= :op/custom op-type)
-      (custom-op-reducer ctx op)
-      (or (custom-reducer ctx [op field])
-          (custom-reducer ctx field)
-          (cond
-            (-> field keyword c/seek :db/tag?) tag-reducer
-            (= :op/comparison op-type) comparison-reducer
-            (= :op/set op-type) (+set-op->reducer-fn+ op)
-            :else
-            (throw (ex-info "Can't handle filter-expr" {::error ::unsupported-expression
-                                                        :expr filter-expr})))))))
+    (or (custom-reducer ctx [op field])
+        (custom-reducer ctx field)
+        (when (= :op/custom op-type) (custom-op-reducer ctx op))
+        (cond
+          (-> field keyword c/seek :db/tag?) tag-reducer
+          (= :op/comparison op-type) comparison-reducer
+          (= :op/set op-type) (+set-op->reducer-fn+ op)
+          :else
+          (throw (ex-info "Can't handle filter-expr" {::error ::unsupported-expression
+                                                      :expr filter-expr}))))))
 
 
 
