@@ -1,7 +1,5 @@
 package conceptual.core;
 
-import org.cojen.util.BeanComparator;
-
 import java.util.Comparator;
 
 /**
@@ -11,8 +9,16 @@ public class KeyFrequencyPair {
     public int key;
     public int frequency;
 
+    // This sorts by frequency in descending order
     public static final Comparator<KeyFrequencyPair> KeyFrequencyPairComparator =
-            BeanComparator.forClass(KeyFrequencyPair.class).orderBy("-frequency");
+        new Comparator<KeyFrequencyPair>() {
+            public int compare(KeyFrequencyPair x, KeyFrequencyPair y) {
+                if (y.frequency == x.frequency) {
+                    return 0;
+                }
+                return (y.frequency > x.frequency) ? 1 : -1;
+            }
+        };
 
     public KeyFrequencyPair(int key, int frequency) {
         this.key = key;
