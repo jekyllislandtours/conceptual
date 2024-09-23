@@ -1,15 +1,11 @@
 package conceptual.util;
 
-import org.cojen.tupl.io.Utils;
-
 import org.fressian.FressianReader;
 import org.fressian.FressianWriter;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
-import static java.lang.System.arraycopy;
 
 public final class Bytes {
 
@@ -60,16 +56,4 @@ public final class Bytes {
             default: return null;
         }
     }
-
-    /** Copied from org.cojen.tupl.Utils -- (author: Brian O'Neill)
-        they were package protected and now removed */
-
-    public static final void encodeIntPairBE(byte[] b, int offset, int x, int y) {
-        Utils.encodeLongBE(b, 0, (((long) x) << 32) | (y & 0xffffffffL));
-    }
-
-    public static final int[] decodeIntPairBE(byte[] b, int offset) {
-        return new int[] {Utils.decodeIntBE(b, offset), Utils.decodeIntBE(b, offset + 4)};
-    }
-
 }
