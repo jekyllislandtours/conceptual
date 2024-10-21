@@ -34,7 +34,7 @@
 (defn intersection
   "Returns the integer intersection of the given sorted int array sets."
   ([] +empty+)
-  ([^ints a] a)
+  ([^ints a] (or a +empty+))
   ([^ints a ^ints b] (IntegerSets/intersection a b))
   ([^ints a ^ints b ^ints c] (IntegerSets/intersection a b c))
   ([^ints a ^ints b ^ints c ^ints d] (IntegerSets/intersection a b c d))
@@ -51,7 +51,7 @@
 (defn union
   "Returns the integer union of the given sorted int array sets."
   ([] +empty+)
-  ([^ints a] a)
+  ([^ints a] (or a +empty+))
   ([^ints a ^ints b] (IntegerSets/union a b))
   ([^ints a ^ints b ^ints c] (IntegerSets/union a b c))
   ([^ints a ^ints b ^ints c ^ints d] (IntegerSets/union a b c d))
@@ -69,7 +69,7 @@
   "Returns the integer difference of the given sorted int arrays. Everything is
   subtracted from the first sorted int array set."
   ([] +empty+)
-  ([^ints a] a)
+  ([^ints a] (or a +empty+))
   ([^ints a ^ints b] (IntegerSets/difference a b))
   ([^ints a ^ints b ^ints c] (difference a (union b c)))
   ([^ints a ^ints b ^ints c ^ints d] (difference a (union b c d)))
