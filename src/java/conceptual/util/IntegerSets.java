@@ -346,8 +346,11 @@ public final class IntegerSets {
      * @return a int.
      */
     public static int contains(int[] sortedIntSet, int key) {
-        return binarySearch
-            (sortedIntSet, key, 0, sortedIntSet.length);
+        int idx = -1;
+        if (sortedIntSet != null) {
+            idx = binarySearch(sortedIntSet, key, 0, sortedIntSet.length);
+        }
+        return idx;
     }
 
     /**

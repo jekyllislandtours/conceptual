@@ -63,3 +63,20 @@
   (expect false (i/superset? (int-array []) (int-array [1])))
   (expect false (i/superset? (int-array [1 2 3]) (int-array [1 2 5])))
   (expect false (i/superset? (int-array [1 3 5]) (int-array [1 2]))))
+
+
+(deftest index-of-test
+  (expect 0 (i/index-of 1 (int-array [1 2])))
+  (expect 1 (i/index-of 2 (int-array [1 2])))
+  (expect -1 (i/index-of 3 (int-array [1 2])))
+  (expect -1 (i/index-of 3 nil)))
+
+(deftest member?-test
+  (expect true (i/member? 2 (int-array [1 2])))
+  (expect false (i/member? 3 (int-array [1 2])))
+  (expect false (i/member? 3 nil)))
+
+(deftest contains?-test
+  (expect true (i/contains? (int-array [1 2]) 2))
+  (expect false (i/contains? (int-array [1 2]) 3))
+  (expect false (i/contains? nil 3)))
