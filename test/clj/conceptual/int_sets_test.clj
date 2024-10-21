@@ -24,7 +24,14 @@
   ;; returns sorted int set
   (expect [2 3 5 6 7 8 9 10] (vec (i/union (int-array [2 3 5 10]) (int-array [3 6 7 8 9]))))
   (testing "expected incorrect result because of unsorted set"
-    (expect [2 6 7 8 9 10 3] (vec (i/union (int-array [2 10 3]) (int-array [6 7 8 9]))))))
+    (expect [2 6 7 8 9 10 3] (vec (i/union (int-array [2 10 3]) (int-array [6 7 8 9])))))
+
+
+  (testing "issue 83"
+    ;; Bug https://github.com/jekyllislandtours/conceptual/issues/83
+    (let [ans (apply i/union [nil])]
+      (expect some? ans)
+      (expect empty? ans))))
 
 (deftest intersection-test
   (expect some? (i/intersection (int-array []) (int-array [])))
@@ -36,6 +43,12 @@
     ;; This was a bug identified in https://github.com/jekyllislandtours/conceptual/issues/63
     (expect [] (vec (i/intersection nil nil nil))))
 
+  (testing "issue 83"
+    ;; Bug https://github.com/jekyllislandtours/conceptual/issues/83
+    (let [ans (apply i/intersection [nil])]
+      (expect some? ans)
+      (expect empty? ans)))
+
   (testing "expected incorrect result because of unsorted set"
     (expect [] (vec (i/intersection (int-array [2 3 5]) (int-array [6 7 8 9 3]))))))
 
@@ -45,6 +58,13 @@
   (expect [] (vec (i/difference (int-array [1]) (int-array [1]))))
   (expect [2] (vec (i/difference (int-array [2 3 5]) (int-array [3 4 5]))))
   (expect [2 3 5] (vec (i/difference (int-array [2 3 5]) (int-array [6 7 8 9]))))
+
+  (testing "issue 83"
+    ;; Bug https://github.com/jekyllislandtours/conceptual/issues/83
+    (let [ans (apply i/difference [nil])]
+      (expect some? ans)
+      (expect empty? ans)))
+
   (testing "expected incorrect result because of unsorted set"
     (expect [2 3 5] (vec (i/difference (int-array [2 3 5]) (int-array [6 7 8 9 3]))))))
 
