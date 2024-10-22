@@ -10,7 +10,7 @@
   (expect #{:test/string :test/keyword :test/id :test/edn
             :test/boolean :test/collection :test/character :test/parent
             :test/class :test/external-id :test/long :test/double :test/children
-            :test/tag? :test/float :test/instant :test/int :test/date}
+            :test/tag? :test/float :test/instant :test/int :test/date :test/nice?}
           (debug/known-keys)))
 
 (deftest unknown-keys-test

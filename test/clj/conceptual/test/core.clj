@@ -51,7 +51,8 @@
     [:test/external-id String]])
   (s/declare-to-one-relations! [[:test/parent]])
   (s/declare-to-many-relations! [[:test/children]])
-  (s/declare-tags! [[:test/tag?]]))
+  (s/declare-tags! [[:test/tag?]
+                    [:test/nice?]]))
 
 (def +test-data+
   [{:db/key :hello/world
@@ -102,6 +103,7 @@
     :test/class (class (Instant/now))
     :test/edn {:hello "dude" 1 [5 6]}
     :test/tag? true
+    :test/nice? true
     :test/collection [300 201 202]
     :test/external-id "external-id-4-dude"}
    {:db/key :hello/friend

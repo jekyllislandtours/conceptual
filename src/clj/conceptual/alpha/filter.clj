@@ -82,7 +82,8 @@
 (s/def ::logical-sexp
   (s/and list? (s/cat :op/boolean ::boolean-op
                       :list/sexp (s/+ (s/or :sexp/logical ::logical-sexp
-                                            :sexp/op ::op-sexp)))))
+                                            :sexp/op ::op-sexp
+                                            :sexp/field ::field)))))
 
 (s/def ::sexp
   (s/or :sexp/logical ::logical-sexp
@@ -94,9 +95,10 @@
 
 (defn normalize
   [sexp]
-  (if (#{'or 'and} (first sexp))
-    sexp
-    (list 'and sexp)))
+  (cond
+    (qualified-symbol? sexp) (list 'and sexp)
+    (#{'or 'and} (first sexp)) sexp
+    :else (list 'and sexp)))
 
 (defn conform
   [sexp]
@@ -321,6 +323,11 @@
   [ctx [_ [op-sexp-type filter-info]] ids]
   (let [filter-info (assoc filter-info :filter/sexp-type op-sexp-type)]
     ((lookup-reducer ctx filter-info) ctx filter-info ids)))
+
+(defmethod evaluate-sexp :sexp/field
+  [{::keys [anding?] :as _ctx} [_ field] ids]
+  (let [op (if anding? i/intersection i/union)]
+    (op ids (c/ids (keyword field)))))
 
 (defn and-sexps
   [ctx sexp-info init-ids]
