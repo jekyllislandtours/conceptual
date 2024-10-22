@@ -366,6 +366,19 @@
     (expect #{:hello/world :hello/dude}
             (eval-sexp '(exists? test/external-id)))))
 
+(deftest exists-and-field-predicate-equivalent?-test
+  (testing "exists? no results"
+    (expect true
+            (= #{}
+               (eval-sexp '(exists? this-is/not-a-field))
+               (eval-sexp '(and this-is/not-a-field))
+               (eval-sexp 'this-is/not-a-field)))
+    (expect true
+            (= #{:hello/world :hello/dude}
+               (eval-sexp '(exists? test/external-id))
+               (eval-sexp '(and test/external-id))
+               (eval-sexp 'test/external-id)))))
+
 (deftest and-test
   (binding [f/*enable-index-scan* true]
     (testing "degenerate case"
