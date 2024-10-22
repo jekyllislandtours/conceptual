@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest use-fixtures testing]]
             [conceptual.test.core :as test.core]
             [conceptual.core :as c]
+            [conceptual.int-sets :as i]
             [clojure.spec.alpha :as s]
             [conceptual.alpha.filter :as f]
             [expectations.clojure.test :refer [expect]])
@@ -41,10 +42,36 @@
   (expect false (s/valid? ::f/sexp '(and ((= foo/bar 23))))))
 
 
+(deftest logical-sexp-test
+  (expect true (s/valid? ::f/logical-sexp '(and a/tag?)))
+  (expect true (s/valid? ::f/logical-sexp '(and a/tag? b/tag?)))
+  (expect true (s/valid? ::f/logical-sexp '(and a/tag? foo/bar)))
+  (expect true (s/valid? ::f/logical-sexp '(and a/tag? foo/bar (exists? hello/bye)))))
+
+
+(deftest logical-sexp-conform-test
+  (expect {:op/boolean 'and
+           :list/sexp [[:sexp/field 'a/tag?]]}
+          (s/conform ::f/logical-sexp '(and a/tag?)))
+
+  (expect {:op/boolean 'and
+           :list/sexp [[:sexp/field 'a/tag?]
+                       [:sexp/field 'b/tag?]]}
+          (s/conform ::f/logical-sexp '(and a/tag? b/tag?)))
+
+  (expect {:op/boolean 'and
+           :list/sexp [[:sexp/field 'a/tag?]
+                       [:sexp/field 'b/tag?]
+                       [:sexp/op [:sexp/op-field {:filter/op [:op/set 'exists?]
+                                                  :filter/field 'hello/bye}]]]}
+          (s/conform ::f/logical-sexp '(and a/tag? b/tag? (exists? hello/bye)))))
+
+
 (deftest normalize-test
   (expect '(and (= foo/bar 23)) (f/normalize '(= foo/bar 23)))
   (expect '(and (= foo/bar 23)) (f/normalize '(and (= foo/bar 23))))
   (expect '(or (= foo/bar 23)) (f/normalize '(or (= foo/bar 23))))
+  (expect '(and foo/bar) (f/normalize 'foo/bar))
   ;; not semantically correct but the output is acceptable
   (expect '(and ((= foo/bar 23))) (f/normalize '((= foo/bar 23)))))
 
@@ -382,7 +409,22 @@
       (expect #{:hello/dude}
               (eval-sexp '(and (= test/tag? true)
                                (and (> test/int 2000)
-                                    (= test/string "Dude"))))))))
+                                    (= test/string "Dude"))))))
+
+
+    (testing "fields as predicates"
+      (expect #{:hello/dude :hello/there :hello/world}
+              (eval-sexp '(and test/tag?)))
+
+      (expect #{:hello/dude :hello/there}
+              (eval-sexp '(and test/tag?
+                               (and (> test/int 2000)))))
+
+      (expect #{:hello/world :hello/dude}
+              (eval-sexp '(and test/external-id)))
+
+      (expect #{:hello/dude}
+              (eval-sexp '(and test/external-id test/tag? test/nice?))))))
 
 
 (deftest or-test
@@ -417,7 +459,18 @@
     (testing "oddly structured"
       (expect #{:hello/friend :hello/world}
               (eval-sexp '(or (= test/string "World")
-                              (or (= test/string "Friend"))))))))
+                              (or (= test/string "Friend"))))))
+
+
+    (testing "fields as predicates"
+      (expect #{:hello/dude :hello/there :hello/world}
+              (eval-sexp '(or test/tag?) i/+empty+))
+
+      (expect #{:hello/dude :hello/world}
+              (eval-sexp '(or test/external-id) i/+empty+))
+
+      (expect #{:hello/dude :hello/world}
+              (eval-sexp '(or test/external-id test/nice?) i/+empty+)))))
 
 
 (deftest and-or-test
@@ -436,7 +489,27 @@
                                       (= test/string "Friend"))))
                  (eval-sexp '(and (or (= test/string "World")
                                       (= test/string "Friend"))
-                                  (= test/int 3456))))))))
+                                  (= test/int 3456))))))
+
+    (testing "fields as predicates"
+      (expect #{}
+              (eval-sexp '(and (= test/int 3456)
+                               test/nice?
+                               (or (= test/string "World")
+                                   (= test/string "Friend")))))
+
+      (expect #{:hello/friend :hello/dude}
+              (eval-sexp '(and (= test/int 3456)
+                               (or test/nice?
+                                   (= test/string "World")
+                                   (= test/string "Friend")))))
+
+      (expect #{:hello/dude}
+              (eval-sexp '(and (= test/int 3456)
+                               test/tag?
+                               (or test/nice?
+                                   (= test/string "World")
+                                   (= test/string "Friend"))))))))
 
 
 (deftest or-and-test
@@ -538,3 +611,25 @@
       (finally
         (remove-method f/custom-op? 'full-moon?)
         (remove-method f/custom-op-reducer 'full-moon?)))))
+
+
+
+(deftest namespaced-custom-op-form-test
+  (let [full-moon-counter (volatile! 0)
+        full-moon-op-fn (fn [_ctx _filter-info ids]
+                          (vswap! full-moon-counter inc)
+                          ids)]
+
+    (expect false (s/valid? ::f/sexp '(astro/full-moon?)))
+    (try
+      ;; register methods that just returns ids and increments counter
+      (defmethod f/custom-op? 'astro/full-moon? [_] true)
+      (defmethod f/custom-op-reducer 'astro/full-moon? [_ _] full-moon-op-fn)
+
+      (f/evaluate '(astro/full-moon?) (int-array []))
+
+      (expect 1 @full-moon-counter)
+
+      (finally
+        (remove-method f/custom-op? 'astro/full-moon?)
+        (remove-method f/custom-op-reducer 'astro/full-moon?)))))

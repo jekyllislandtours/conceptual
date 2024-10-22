@@ -104,5 +104,6 @@
 
 (deftest set-test
   (expect (class (int-array 0)) (class (i/set [])))
+  (expect (class (int-array 0)) (class (i/set nil)))
   (expect [] (vec (i/set [])))
   (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
