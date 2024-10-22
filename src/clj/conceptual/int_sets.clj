@@ -1,5 +1,5 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj])
+  (:refer-clojure :exclude [contains? conj disj set])
   (:import [conceptual.util IntegerSets]))
 
 
@@ -177,3 +177,14 @@
   "Decodes an encoded integer array back into into an integer array."
   [^bytes s]
   (IntegerSets/decode s))
+
+(defn set
+  "If `coll` is an int array, returns it as is. Otherwise,
+  removes nil elements, sorts and returns an int array."
+  [coll]
+  (if (= (class coll) (class +empty+))
+    coll
+    (->> coll
+         (filter identity)
+         sort
+         int-array)))

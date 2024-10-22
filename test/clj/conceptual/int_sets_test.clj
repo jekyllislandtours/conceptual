@@ -100,3 +100,9 @@
   (expect true (i/contains? (int-array [1 2]) 2))
   (expect false (i/contains? (int-array [1 2]) 3))
   (expect false (i/contains? nil 3)))
+
+
+(deftest set-test
+  (expect (class (int-array 0)) (class (i/set [])))
+  (expect [] (vec (i/set [])))
+  (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
