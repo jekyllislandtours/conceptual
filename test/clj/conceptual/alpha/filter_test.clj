@@ -646,3 +646,9 @@
       (finally
         (remove-method f/custom-op? 'astro/full-moon?)
         (remove-method f/custom-op-reducer 'astro/full-moon?)))))
+
+
+(deftest unknown-field-as-predicate-test
+  (testing "returns empty, does not throw error"
+    (expect #{} (eval-sexp '(or madeup/field) i/+empty+))
+    (expect #{} (eval-sexp '(and madeup/field)))))
