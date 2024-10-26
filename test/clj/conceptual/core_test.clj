@@ -24,3 +24,6 @@
     (expect {:conceptual/error :conceptual/unknown-key-error
              :unknown-key :unknown/key}
             (try-f {:db/id 1 :unknown/key :hello}))))
+
+(deftest ids-of-unknown-key-returns-empty-test
+  (expect [] (vec (c/ids :a-key-i-made-up--kjadiak383))))
