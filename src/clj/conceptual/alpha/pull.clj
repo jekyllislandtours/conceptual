@@ -78,8 +78,12 @@
       c
       (recur (apply-key-opts c k+opt) more))))
 
+(defn default-relation-value
+  [m]
+  (c/value (:pull/key m) (:db/id m)))
+
 (defn reify-relations*
-  [{:keys [pull/relation-value] :as ctx} relation c]
+  [{:keys [pull/relation-value] :or {relation-value default-relation-value} :as ctx} relation c]
   (loop [c c
          [[k-or-v pattern] & more] relation]
     (if-not k-or-v
@@ -109,16 +113,34 @@
       c
       (recur (reify-relations* ctx r c) more))))
 
+
+(defn map-invert+
+  [m]
+  (persistent!
+   (reduce-kv (fn [ans k v]
+             (let [ks (ans v #{})]
+               (assoc! ans v (conj ks k))))
+           (transient {})
+           m)))
+
+(defn default-finalizer [_ctx _as->k c] c)
+
 (defn pull
   "`id+` can be an `int`, `int-array` or any seq of int.
   `ctx` is a map and must include `:pull/relation-value` fn which takes in a
   map of keys `:pull/ctx`, `:pull/key`, `:db/id` and returns either a db id or a
   seq or int-array of db ids."
-  [ctx pattern id+]
+  [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} pattern id+]
   (let [{:keys [pull/ks pull/k+opts pull/relations] :as _parsed} (parse pattern)
         rm-db-id? (not (contains? ks :db/id))
+        as->k (into {} (for [[k {:keys [as]}] k+opts
+                             :when as]
+                         [as k]))
+        k->as (map-invert+ as->k)
         xform (comp (map (partial apply-all-opts k+opts))
                  (map (partial reify-relations ctx relations))
+                 (map (partial concept-finalizer ctx {:pull/as->k as->k
+                                                :pull/k->as k->as}))
                  (map (fn [c]
                         (cond-> c
                           rm-db-id? (dissoc c :db/id)))))
