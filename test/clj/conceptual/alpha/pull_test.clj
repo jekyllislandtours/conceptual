@@ -345,3 +345,63 @@
                             :sf/name
                             {[:sf/member-ids :as :sf/members :limit 2] [:sf/id :sf/name]}]}]
                          ids)))))
+
+
+
+
+
+(deftest map-invert+test
+  (expect {:sf/id #{:sf/identifier :sneaky/id}
+           :sf/team-ids #{:sf/teams}}
+          (pull/map-invert+ {:sf/identifier :sf/id
+                             :sneaky/id :sf/id
+                             :sf/teams :sf/team-ids})))
+
+(defn restricted-keys-finalizer
+  [_ctx {:keys [pull/k->as]} c]
+  (let [all-restricted (into #{:sf/id} (k->as :sf/id))]
+    (apply dissoc c all-restricted)))
+
+
+(deftest finalizer-test
+  (let [ids (->> ["uss-e"]
+                 (map ->db-id)
+                 i/set)]
+
+    (testing "one"
+      (expect [{:sf/name "USS Enterprise"
+                :sf/captain {:sf/name "Jean-Luc Picard"}}]
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/concept-finalizer restricted-keys-finalizer}
+                         [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}]
+                         ids)))
+
+    (testing "one renamed"
+      (expect [{:sf/name "USS Enterprise"
+                :sf/captain {:sf/name "Jean-Luc Picard"}}]
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/concept-finalizer restricted-keys-finalizer}
+                         [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [[:sf/id :as :sneaky/id] :sf/name]}]
+                         ids)))
+
+    (testing "many"
+      (expect [{:sf/name "USS Enterprise"
+                :sf/captain {:sf/name "Jean-Luc Picard"}
+                :sf/teams [{:sf/name "Bridge Team"
+                            :sf/members [{:sf/name "Jean-Luc Picard"}
+                                         {:sf/name "William T. Riker"}]}
+                           {:sf/name "Security Team"
+                            :sf/members [{:sf/name "Tasha Yar"}
+                                         {:sf/name "Worf"}]}
+                           {:sf/name "Engineering Team"
+                            :sf/members [{:sf/name "Geordi La Forge"}]}]}]
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/concept-finalizer restricted-keys-finalizer}
+                         [:sf/id
+                          :sf/name
+                          {[:sf/captain-id :as :sf/captain] [[:sf/id :as :captain/id] :sf/name]}
+                          {[:sf/team-ids :as :sf/teams :limit 3]
+                           [[:sf/id :as :team/id]
+                            :sf/name
+                            {[:sf/member-ids :as :sf/members :limit 2] [[:sf/id :as :member/id] :sf/name]}]}]
+                         ids)))))
