@@ -308,9 +308,9 @@
         (custom-reducer ctx field)
         (when (= :op/custom op-type) (custom-op-reducer ctx op))
         (cond
+          (= :op/set op-type) (+set-op->reducer-fn+ op)
           (-> field keyword c/seek :db/tag?) tag-reducer
           (= :op/comparison op-type) comparison-reducer
-          (= :op/set op-type) (+set-op->reducer-fn+ op)
           :else
           (throw (ex-info "Can't handle filter-expr" {::error ::unsupported-expression
                                                       :expr filter-expr}))))))
