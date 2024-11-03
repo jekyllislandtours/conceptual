@@ -477,13 +477,13 @@
 
     (testing "fields as predicates"
       (expect #{:hello/dude :hello/there :hello/world}
-              (eval-sexp '(or test/tag?) i/+empty+))
+              (eval-sexp '(or test/tag?)))
 
       (expect #{:hello/dude :hello/world}
-              (eval-sexp '(or test/external-id) i/+empty+))
+              (eval-sexp '(or test/external-id)))
 
       (expect #{:hello/dude :hello/world}
-              (eval-sexp '(or test/external-id test/nice?) i/+empty+)))))
+              (eval-sexp '(or test/external-id test/nice?))))))
 
 
 (deftest and-or-test
@@ -657,3 +657,22 @@
 (deftest exists-tag-test
   ;; https://github.com/jekyllislandtours/conceptual/issues/95
   (expect #{:hello/there :hello/world :hello/dude} (eval-sexp '(exists? test/tag?))))
+
+
+(defn eval-sf-sexp
+  ([sexp] (eval-sf-sexp sexp (c/ids :sf/id)))
+  ([sexp init-ids]
+   (eval-sf-sexp {} sexp init-ids))
+  ([ctx sexp init-ids]
+   (->> (f/evaluate ctx sexp init-ids)
+        (map (partial c/value :sf/id))
+        set)))
+
+(deftest top-level-tag
+  (expect #{"data"} (eval-sf-sexp 'sf/android?))
+  (expect #{"troi"} (eval-sf-sexp 'sf/betazoid?))
+  (expect #{"troi"} (eval-sf-sexp '(exists? sf/betazoid?)))
+  (expect #{"data"} (eval-sf-sexp '(exists? sf/android?)))
+  (expect #{"data" "troi"} (eval-sf-sexp '(or (exists? sf/betazoid?) (exists? sf/android?))))
+  (expect #{} (eval-sf-sexp '(and sf/betazoid? sf/android?)))
+  (expect #{"data" "troi"} (eval-sf-sexp '(or sf/betazoid? sf/android?))))

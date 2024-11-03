@@ -52,6 +52,7 @@
 
     [:sf/captain-id String]
     [:sf/id String {:db/unique? true}]
+    [:sf/human? Boolean]
     [:sf/member-ids PersistentVector]
     [:sf/name String]
     [:sf/position String]
@@ -63,7 +64,11 @@
   (s/declare-to-one-relations! [[:test/parent]])
   (s/declare-to-many-relations! [[:test/children]])
   (s/declare-tags! [[:test/tag?]
-                    [:test/nice?]]))
+                    [:test/nice?]
+                    [:sf/human?]
+                    [:sf/android?]
+                    [:sf/klingon?]
+                    [:sf/betazoid?]]))
 
 (def sf-test-data
   [;; USS Enterprise
@@ -79,48 +84,58 @@
    ;; USS Enterprise Crew
    {:sf/id "picard"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "Jean-Luc Picard"
     :sf/rank "Captain"
     :sf/starship-id "uss-e"}
    {:sf/id "riker"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "William T. Riker"
     :sf/rank "Commander"
     :sf/starship-id "uss-e"}
    {:sf/id "troi"
     :sf/type :sf.type/crew
+    :sf/human? true
+    :sf/betazoid? true
     :sf/name "Deanna Troi"
     :sf/rank "Lieutenant Commander"
     :sf/starship-id "uss-e"}
    {:sf/id "data"
     :sf/type :sf.type/crew
+    :sf/android? true
     :sf/name "Data"
     :sf/rank "Lieutenant Commander"
     :sf/starship-id "uss-e"}
    {:sf/id "yar"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "Tasha Yar"
     :sf/rank "Lieutenant"
     :sf/position "Chief Tactical Officer"
     :sf/starship-id "uss-e"}
    {:sf/id "worf"
     :sf/type :sf.type/crew
+    :sf/klingon? true
     :sf/name "Worf"
     :sf/rank "Lieutenant Junior Grade"
     :sf/starship-id "uss-e"}
    {:sf/id "la-forge"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "Geordi La Forge"
     :sf/rank "Lieutenant Junior Grade"
     :sf/starship-id "uss-e"}
    {:sf/id "bev-crusher"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "Beverly Crusher"
     :sf/position "Chief Medical Officer"
     :sf/rank "Commander"
     :sf/starship-id "uss-e"}
    {:sf/id "wes-crusher"
     :sf/type :sf.type/crew
+    :sf/human? true
     :sf/name "Wesley Crusher"
     :sf/rank "Civilian"
     :sf/starship-id "uss-e"}

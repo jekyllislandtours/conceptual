@@ -325,9 +325,9 @@
     ((lookup-reducer ctx filter-info) ctx filter-info ids)))
 
 (defmethod evaluate-sexp :sexp/field
-  [{::keys [anding?] :as _ctx} [_ field] ids]
-  (let [op (if anding? i/intersection i/union)]
-    (op ids (c/ids (keyword field)))))
+  [_ctx [_ field] ids]
+  ;; same logic as (exists? field)
+  (i/intersection ids (c/ids (keyword field))))
 
 (defn and-sexps
   [ctx sexp-info init-ids]
