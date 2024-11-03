@@ -652,3 +652,8 @@
   (testing "returns empty, does not throw error"
     (expect #{} (eval-sexp '(or madeup/field) i/+empty+))
     (expect #{} (eval-sexp '(and madeup/field)))))
+
+
+(deftest exists-tag-test
+  ;; https://github.com/jekyllislandtours/conceptual/issues/95
+  (expect #{:hello/there :hello/world :hello/dude} (eval-sexp '(exists? test/tag?))))
