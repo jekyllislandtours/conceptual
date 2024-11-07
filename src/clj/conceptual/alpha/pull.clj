@@ -32,11 +32,11 @@
                       {::error ::invalid-as-option-value
                        :pull/key k})))))
 
-(def default-key+opts-fn (juxt :pull/key :pull/key-opts))
+(def default-key+opts (juxt :pull/key :pull/key-opts))
 
 (defn vector->key+opts
-  [{:keys [pull/key+opts-fn]
-    :or {key+opts-fn default-key+opts-fn}:as ctx} [k & kv-pairs]]
+  [{:keys [pull/key+opts]
+    :or {key+opts default-key+opts}:as ctx} [k & kv-pairs]]
   (let [{:keys [limit as] :as opts} (if (even? (count kv-pairs))
                                       (apply hash-map kv-pairs)
                                       (throw (ex-info "Expected 0 or an even number of options for key"
@@ -56,8 +56,8 @@
                        :pull/unknown-opts unk-ks})))
     (validate-limit k limit)
     (validate-as k as)
-    (key+opts-fn (cond-> {:pull/ctx ctx :pull/key k :pull/key-opts opts}
-                   f-sexp (assoc :pull/filter f-sexp)))))
+    (key+opts (cond-> {:pull/ctx ctx :pull/key k :pull/key-opts opts}
+                f-sexp (assoc :pull/filter f-sexp)))))
 
 (defn parse
   [ctx pattern]
@@ -165,6 +165,11 @@
   "`id+` can be an `int`, `int-array` or any seq of int.
   `ctx` is a map and can include fns to customize behavior. All the fns
   receive a map with key `:pull/ctx`.
+
+  `:pull/key+opts`
+     - fn which takes in a map and returns a tuple of keyword and opts map [key opts]
+     - returned opts map can have keys such as `:limit`,
+     - input map has keys `:pull/ctx`, `:pull/key` and `:pull/key-opts`
 
   `:pull/relation-value`
      - fn which takes in a map and returns either a conceptual db/id or a sequence or int array of db/ids
