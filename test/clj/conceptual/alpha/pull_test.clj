@@ -11,6 +11,21 @@
 
 (use-fixtures :each test.core/with-rdb)
 
+
+(deftest variable?-test
+  (expect true (pull/variable? '$foo))
+  (expect false (pull/variable? :$foo))
+  (expect false (pull/variable? "$foo")))
+
+
+(deftest map-invert+test
+  (expect {:sf/id #{:sf/identifier :sneaky/id}
+           :sf/team-ids #{:sf/teams}}
+          (pull/map-invert+ {:sf/identifier :sf/id
+                             :sneaky/id :sf/id
+                             :sf/teams :sf/team-ids})))
+
+
 (defn ->db-id
   [id]
   (c/lookup-id :sf/id id))
@@ -75,7 +90,7 @@
 (deftest vector->key-opts-test
   (let [f (fn [v]
             (try
-              (pull/vector->key+opts {} v)
+              (pull/vector->key+opts {:pull/variable-value {'$x 'sf/human?}} v)
               (catch Exception ex
                 (ex-data ex))))]
 
@@ -83,6 +98,13 @@
     (expect [:foo/bar {}] (f [:foo/bar]))
     (expect [:foo/bar {:as :hello/world}] (f [:foo/bar :as :hello/world]))
     (expect [:foo/bar {:as :hello/world :limit 3}] (f [:foo/bar :as :hello/world :limit 3]))
+    (expect [:foo/bar
+             {:limit 3
+              :as :hello/world
+              :filter [:sexp/logical {:op/boolean 'and
+                                      :list/sexp [[:sexp/field 'sf/human?]]}]}]
+            (pull/vector->key+opts {:pull/variable-value {'$x 'sf/human?}}
+                                   [:foo/bar :as :hello/world :limit 3 :filter '$x]))
 
     ;; errors
     (expect {::pull/error ::pull/unknown-options
@@ -104,33 +126,27 @@
                 (ex-data ex))))]
 
     ;; success
-    (expect {:pull/ks #{:foo/bar}
-             :pull/k+opts []
-             :pull/relations nil}
+    (expect {:pull/key+opts [[:foo/bar {}]]
+             :pull/relations []}
             (f [:foo/bar]))
 
-    (expect {:pull/ks #{:foo/bar :foo/baz}
-             :pull/k+opts []
-             :pull/relations nil}
+    (expect {:pull/key+opts [[:foo/bar {}] [:foo/baz {}]]
+             :pull/relations []}
             (f [:foo/bar :foo/baz]))
 
-    (expect {:pull/ks #{:a :b :c}
-             :pull/k+opts [[:c {:limit 3}]]
-             :pull/relations nil}
+    (expect {:pull/key+opts [[:a {}] [:b {}] [:c {:limit 3}]]
+             :pull/relations []}
             (f [:a :b [:c :limit 3]]))
 
-    (expect {:pull/ks #{:x/a :x/b :x/c}
-             :pull/k+opts [[:x/c {:limit 3}]]
-             :pull/relations nil}
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
+             :pull/relations []}
             (f [:x/a :x/b [:x/c :limit 3]]))
 
-    (expect {:pull/ks #{:x/a :x/b :x/c}
-             :pull/k+opts [[:x/c {:limit 3}]]
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
              :pull/relations [{:x/rel [:foo/a :foo/b]}]}
             (f [:x/a :x/b [:x/c :limit 3] {:x/rel [:foo/a :foo/b]}]))
 
-    (expect {:pull/ks #{:x/a :x/b :x/c}
-             :pull/k+opts [[:x/c {:limit 3}]]
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
              :pull/relations [{[:x/rel :as :x/foos] [:foo/a :foo/b]}]}
             (f [:x/a :x/b [:x/c :limit 3] {[:x/rel :as :x/foos] [:foo/a :foo/b]}]))
 
@@ -351,14 +367,55 @@
 
 
 
+(defn depth-id-resolver
+  [{:keys [pull/depth pull/key db/id]}]
+  (when (> depth 1)
+    (throw (ex-info "depth exceeded" {:depth depth})))
+  (let [v (c/value key id)]
+    (if (coll? v)
+      (mapv ->db-id v)
+      (->db-id v))))
 
+(set! *print-namespace-maps* false)
 
-(deftest map-invert+test
-  (expect {:sf/id #{:sf/identifier :sneaky/id}
-           :sf/team-ids #{:sf/teams}}
-          (pull/map-invert+ {:sf/identifier :sf/id
-                             :sneaky/id :sf/id
-                             :sf/teams :sf/team-ids})))
+(deftest relation-depth-test
+  (let [ids (->> ["uss-e"]
+                 (map ->db-id)
+                 i/set)
+        f (fn [pattern]
+            (try
+              (pull/pull {:pull/relation-value depth-id-resolver} pattern ids)
+              (catch Exception ex
+                {:ex/message (ex-message ex)
+                 :ex/data (ex-data ex)})))]
+
+    (testing "depth NOT exceeded"
+      (expect [{:sf/id "uss-e"
+                :sf/name "USS Enterprise"
+                :sf/captain {:sf/id "picard" :sf/name "Jean-Luc Picard"}
+                :sf/teams [{:sf/id "uss-e-bridge-team"
+                            :sf/member-ids ["picard" "riker" "data" "troi" "worf"]
+                            :sf/name "Bridge Team"}
+                           {:sf/id "uss-e-security-team"
+                            :sf/member-ids ["yar" "worf"]
+                            :sf/name "Security Team"}
+                           {:sf/id "uss-e-eng-team"
+                            :sf/member-ids ["la-forge"]
+                            :sf/name "Engineering Team"}]}]
+              (f [:sf/id :sf/name
+                  {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
+                  {[:sf/team-ids :as :sf/teams :limit 3] [:sf/id :sf/name :sf/member-ids]}])))
+
+    (expect {:ex/message "depth exceeded"
+             :ex/data {:depth 2}}
+            (f [:sf/id
+                :sf/name
+                {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
+                {[:sf/team-ids :as :sf/teams :limit 3]
+                 [:sf/id
+                  :sf/name
+                  {[:sf/member-ids :as :sf/members :limit 2] [:sf/id :sf/name]}]}]))))
+
 
 (defn restricted-keys-finalizer
   [{:keys [pull/k->as pull/concept]}]
@@ -414,6 +471,7 @@
   (let [ids (->> ["uss-e"]
                  (map ->db-id)
                  i/set)]
+
     (expect [{:sf/id "uss-e"
               :sf/name "USS Enterprise"
               :sf/captain {:sf/id "picard"
@@ -470,6 +528,40 @@
                              [:sf/id :sf/name]}]}]
                          ids)))))
 
+
+(deftest relation-filter-variable-test
+  (let [ids (->> ["uss-e"]
+                 (map ->db-id)
+                 i/set)]
+
+    (expect [{:sf/id "uss-e"
+              :sf/name "USS Enterprise"
+              :sf/captain {:sf/id "picard"
+                           :sf/name "Jean-Luc Picard"}
+              :sf/teams [{:sf/id "uss-e-bridge-team"
+                          :sf/name "Bridge Team"
+                          :sf/members [{:sf/id "troi" :sf/name "Deanna Troi"} ;; troi has a lower db/id so is first here
+                                       {:sf/id "data" :sf/name "Data"}]}
+                         {:sf/id "uss-e-security-team"
+                          :sf/name "Security Team"
+                          :sf/members []}
+                         {:sf/id "uss-e-eng-team"
+                          :sf/name "Engineering Team"
+                          :sf/members []}]}]
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/variable-value {'$x '(or sf/betazoid? sf/android?)}}
+                       [:sf/id
+                        :sf/name
+                        {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
+                        {[:sf/team-ids :as :sf/teams :limit 3]
+                         [:sf/id
+                          :sf/name
+                          {[:sf/member-ids
+                            :as :sf/members
+                            :filter '$x]
+                           [:sf/id :sf/name]}]}]
+                       ids))))
+
 (deftest relation-filter-finalizer-test
   (let [ids (->> ["uss-e"]
                  (map ->db-id)
@@ -477,26 +569,26 @@
         metadata-finalizer (fn [{:keys [pull/concept pull/pre-limit-ids pull/renamed-key]}]
                              (if-not pre-limit-ids
                                concept
-                               (let [metadata-key (keyword (str (symbol renamed-key) "--metadata"))]
+                               (let [metadata-key (keyword (str (symbol renamed-key) ":metadata"))]
                                  (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)}))))]
     (expect [{:sf/id "uss-e"
               :sf/name "USS Enterprise"
               :sf/captain {:sf/id "picard"
                            :sf/name "Jean-Luc Picard"}
-              :sf/teams--metadata {:summary/estimated-count 5}
+              :sf/teams:metadata {:summary/estimated-count 5}
               :sf/teams [{:sf/id "uss-e-bridge-team"
                           :sf/name "Bridge Team"
-                          :sf/members--metadata {:summary/estimated-count 4}
+                          :sf/members:metadata {:summary/estimated-count 4}
                           :sf/members [{:sf/id "picard" :sf/name "Jean-Luc Picard"}
                                        {:sf/id "riker" :sf/name "William T. Riker"}]}
                          {:sf/id "uss-e-security-team"
                           :sf/name "Security Team"
-                          :sf/members--metadata {:summary/estimated-count 2}
+                          :sf/members:metadata {:summary/estimated-count 2}
                           :sf/members [{:sf/id "yar" :sf/name "Tasha Yar"}
                                        {:sf/id "worf" :sf/name "Worf"}]}
                          {:sf/id "uss-e-eng-team"
                           :sf/name "Engineering Team"
-                          :sf/members--metadata {:summary/estimated-count 1}
+                          :sf/members:metadata {:summary/estimated-count 1}
                           :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}]
             (pull/pull {:pull/relation-value id-resolver
                         :pull/relation-finalizer metadata-finalizer}
