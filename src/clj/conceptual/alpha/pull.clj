@@ -2,7 +2,8 @@
   (:require [conceptual.core :as c]
             [conceptual.arrays :as a]
             [conceptual.int-sets :as i]
-            [conceptual.alpha.filter :as c.filter]))
+            [conceptual.alpha.filter :as c.filter]
+            [clojure.set :as set]))
 
 ;; inspiration from https://docs.datomic.com/query/query-pull.html
 
@@ -11,6 +12,11 @@
 (def known-opts #{:limit :as :filter})
 
 (declare pull)
+
+
+(defn attr?
+  [x]
+  (or (keyword? x) (symbol? x)))
 
 (defn validate-limit
   [k limit]
@@ -31,24 +37,37 @@
 
 (defn variable?
   [x]
-  (and (symbol? x)
-       (-> x name (.charAt 0) (= \$))))
-
+  (when (or (symbol? x)
+            (keyword? x)
+            (string? x))
+    (-> x symbol str (.charAt 0) (= \$))))
 
 (defn vector->key+opts
-  [{:keys [pull/variable-value]} [k & kv-pairs]]
-  (let [{:keys [limit as] :as opts} (if (even? (count kv-pairs))
-                                      (apply hash-map kv-pairs)
-                                      (throw (ex-info "Expected 0 or an even number of options for key"
-                                                      {::error ::not-enough-input-for-options
-                                                       :pull/key k
-                                                       :pull/opts kv-pairs})))
+  [{:keys [pull/variable-value]} [k & opts|kv-pairs]]
+  (let [k (keyword k)
+        opts (cond
+               (map? (first opts|kv-pairs)) (first opts|kv-pairs)
+               (even? (count opts|kv-pairs)) (apply hash-map opts|kv-pairs)
+               :else (throw (ex-info "Expected 0 or an even number of options for key"
+                                     {::error ::not-enough-input-for-options
+                                      :pull/key k
+                                      :pull/opts opts|kv-pairs})))
+        opts (or opts {})
+        _ (when-not (map? opts)
+            (throw (ex-info "Expected map for opts"
+                            {::error ::invalid-opts-map
+                             :pull/key k
+                             :pull/opts opts})))
+        {:keys [limit as]} opts
+        _ (validate-limit k limit)
+        _ (validate-as k as)
         f-sexp|var (:filter opts)
         f-sexp (if (variable? f-sexp|var)
-                 (get variable-value f-sexp|var)
+                 (get variable-value (keyword f-sexp|var))
                  f-sexp|var)
         opts (cond-> opts
-               f-sexp (assoc :filter (c.filter/conform f-sexp)))]
+               f-sexp (assoc :filter (c.filter/conform f-sexp))
+               as (update :as keyword))]
     (when-let [unk-ks (->> (keys opts)
                            (remove known-opts)
                            set
@@ -57,35 +76,52 @@
                       {::error ::unknown-options
                        :pull/key k
                        :pull/unknown-opts unk-ks})))
-    (validate-limit k limit)
-    (validate-as k as)
     [k opts]))
 
 
 (defn parse
   [ctx pattern]
   (let [ks (java.util.ArrayList.)
-        rels (java.util.ArrayList.)]
+        rels (java.util.ArrayList.)
+        rel-rfn (fn [ans k v]
+                  (when-not (or (attr? k) (vector? k))
+                    (throw (ex-info "relation must be a keyword or a vector"
+                                    {::error ::invalid-relation
+                                     :pull/key (first v)})))
+                  (let [k (if (attr? k)
+                            [(keyword k) {}]
+                            (vector->key+opts ctx k))]
+                    (assoc ans k v)))]
     (loop [[x & more] pattern]
       (if-not x
-        {:pull/key+opts (vec ks)
-         :pull/relations (vec rels)}
+        (let [key+opts (vec ks)
+              rels (vec rels)
+              k->as (java.util.HashMap.)]
+          (doseq [[k {:keys [as]}] key+opts
+                  :when as]
+            (.put k->as k as))
+          (doseq [[k {:keys [as]}] (mapcat keys rels)
+                  :when as]
+            (.put k->as k as))
+          (let [k->as (into {} k->as)]
+            {:pull/key+opts key+opts
+             :pull/relations rels
+             :pull/k->as k->as}))
         (do
           (cond
-            (keyword? x) (.add ks (vector->key+opts ctx [x]))
+            (attr? x) (.add ks [(keyword x) {}])
             (vector? x) (.add ks (vector->key+opts ctx x))
-            (map? x) (.add rels x))
+            (map? x) (.add rels (reduce-kv rel-rfn {} x)))
           (recur more))))))
 
 (defn apply-key-opts
-  [c [k {:keys [limit as]}]]
+  [c [k {:keys [limit]}]]
   ;; NB `c` must already have key `k`
   (let [v (get c k)
         many? (coll? v)
         v' (cond->> v
              (and limit many?) (take limit))]
-    (cond-> (assoc c (or as k) v')
-      as (dissoc k))))
+    (assoc c k v')))
 
 (defn apply-relation-key-opts
   [[k {:keys [limit as] f-sexp :filter}] id+]
@@ -118,34 +154,25 @@
     :or {relation-value default-relation-value
          relation-finalizer :pull/concept} :as ctx} relation c]
   (loop [c c
-         [[k-or-v pattern] & more] relation]
-    (if-not k-or-v
+         [[k+opts pattern] & more] relation]
+    (if-not k+opts
       c
-      (let [v (cond-> k-or-v
-                (keyword? k-or-v) vector)
-            attr-vec? (and (vector? v) (keyword? (first v)))]
-        (when-not attr-vec?
-          (throw (ex-info "relation must be a keyword or a vector"
-                          {::error ::invalid-relation
-                           :pull/key (first v)})))
-        (let [[k k-opts :as k+opts] (vector->key+opts ctx v)
-              rel-opts {:pull/ctx ctx
-                        :pull/key k
-                        :pull/key-opts k-opts
-                        :pull/concept c
-                        :pull/depth (::depth ctx)
-                        :db/id (:db/id c)}
-              id+ (relation-value rel-opts)
-              ids (if (int? id+) id+ (i/set id+))
-              {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-opts k+opts ids)
-              rel-opts (cond-> rel-opts
-                         pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
-              xs (pull ctx pattern id+)
-              c (-> c
-                    (dissoc k)
-                    (assoc k' xs))
-              c (relation-finalizer (assoc rel-opts :pull/concept c :pull/renamed-key k'))]
-          (recur c more))))))
+      (let [[k opts] k+opts
+            rel-opts {:pull/ctx ctx
+                      :pull/key k
+                      :pull/key-opts opts
+                      :pull/concept c
+                      :pull/depth (::depth ctx)
+                      :db/id (:db/id c)}
+            id+ (relation-value rel-opts)
+            ids (if (int? id+) id+ (i/set id+))
+            {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-opts k+opts ids)
+            rel-opts (cond-> rel-opts
+                       pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
+            xs (pull ctx pattern id+)
+            c (assoc c k xs) ;; use original key until ready to finalize to make it easier to validate actual attrs
+            c (relation-finalizer (assoc rel-opts :pull/concept c :pull/output-key k'))]
+        (recur c more)))))
 
 (defn reify-relations
   [ctx relations c]
@@ -157,21 +184,15 @@
         (recur (reify-relations* ctx r c) more)))))
 
 
-(defn map-invert+
-  [m]
-  (persistent!
-   (reduce-kv (fn [ans k v]
-                (let [ks (ans v #{})]
-                  (assoc! ans v (conj ks k))))
-              (transient {})
-              m)))
+(defn rename-keys
+  [{:keys [pull/concept pull/k->as]}]
+  (set/rename-keys concept k->as))
 
 (def default-finalizer :pull/concept)
 
 (defn default-pattern-finalizer
-  [{:keys [pull/key+opts pull/relations]}]
-  {:pull/key+opts key+opts
-   :pull/relations relations})
+  [m]
+  (select-keys m [:pull/key+opts :pull/relations :pull/k->as]))
 
 (defn pull
   "`id+` can be an `int`, `int-array` or any seq of int.
@@ -184,7 +205,7 @@
      - opportunity to do any validation checks or transformations
 
   `:pull/variable-value`
-     - a map of symbol variables to values. variables must begin with a `$` char
+     - a map of keyword variables to values. variables must begin with a `$` char
      - only the `:filter` option on an expanded relation supports variables
 
   `:pull/relation-value`
@@ -204,26 +225,24 @@
 
   `:pull/concept-finalizer`
      - fn for apply custom business logic to a concept before it is added to output. Returns the concept.
-     - input map has keys `:pull/ctx`, `:pull/as->k`, `:pull/k->as`, and `:pull/concept`
+     - input map has keys `:pull/ctx`, `:pull/k->as`, and `:pull/concept`
      - `:pull/concept` is the current concept being built up"
   [{:keys [pull/concept-finalizer
            pull/pattern-finalizer] :or {concept-finalizer default-finalizer
                                         pattern-finalizer default-pattern-finalizer} :as ctx} pattern id+]
-  (let [{:keys [pull/key+opts pull/relations]} (-> (parse ctx pattern)
-                                                   (assoc :pull/ctx ctx)
-                                                   pattern-finalizer)
+  (let [{:keys [pull/key+opts pull/relations
+                pull/k->as]} (-> (parse ctx pattern)
+                                 (assoc :pull/ctx ctx)
+                                 pattern-finalizer)
         ks (set (map first key+opts))
         rm-db-id? (not (contains? ks :db/id))
-        as->k (into {} (for [[k {:keys [as]}] key+opts
-                             :when as]
-                         [as k]))
-        k->as (map-invert+ as->k)
+        ;; _ (prn "key+opts " key+opts)
         cb-opts {:pull/ctx ctx
-                 :pull/as->k as->k
                  :pull/k->as k->as}
         xform (comp (map (partial apply-all-opts key+opts))
                  (map (partial reify-relations ctx relations))
                  (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
+                 (map #(rename-keys (assoc cb-opts :pull/concept %)))
                  (map (fn [c]
                         (cond-> c
                           rm-db-id? (dissoc c :db/id)))))
