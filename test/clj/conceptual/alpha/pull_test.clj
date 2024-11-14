@@ -4,7 +4,6 @@
             [conceptual.core :as c]
             [conceptual.int-sets :as i]
             [conceptual.alpha.pull :as pull]
-            [conceptual.alpha.filter :as c.filter]
             [expectations.clojure.test :refer [expect]]))
 
 
@@ -14,16 +13,15 @@
 
 (deftest variable?-test
   (expect true (pull/variable? '$foo))
-  (expect false (pull/variable? :$foo))
-  (expect false (pull/variable? "$foo")))
-
-
-(deftest map-invert+test
-  (expect {:sf/id #{:sf/identifier :sneaky/id}
-           :sf/team-ids #{:sf/teams}}
-          (pull/map-invert+ {:sf/identifier :sf/id
-                             :sneaky/id :sf/id
-                             :sf/teams :sf/team-ids})))
+  (expect true (pull/variable? '$foo/bar))
+  (expect true (pull/variable? :$foo/bar))
+  (expect true (pull/variable? :$foo))
+  (expect true (pull/variable? "$foo"))
+  (expect false (pull/variable? "foo"))
+  (expect false (pull/variable? 'foo))
+  (expect false (pull/variable? :foo))
+  (expect false (pull/variable? 'foo/bar))
+  (expect false (pull/variable? :foo/bar)))
 
 
 (defn ->db-id
@@ -87,7 +85,7 @@
             (f :foo/bar {:a :b}))))
 
 
-(deftest vector->key-opts-test
+(deftest vector->key+opts-test
   (let [f (fn [v]
             (try
               (pull/vector->key+opts {:pull/variable-value {'$x 'sf/human?}} v)
@@ -96,15 +94,16 @@
 
     ;; success
     (expect [:foo/bar {}] (f [:foo/bar]))
-    (expect [:foo/bar {:as :hello/world}] (f [:foo/bar :as :hello/world]))
-    (expect [:foo/bar {:as :hello/world :limit 3}] (f [:foo/bar :as :hello/world :limit 3]))
+    (expect [:foo/bar {}] (f [:foo/bar {}]))
+    (expect [:foo/bar {:as :hello/world}] (f [:foo/bar {:as :hello/world}]))
+    (expect [:foo/bar {:as :hello/world :limit 3}] (f [:foo/bar {:as :hello/world :limit 3}]))
     (expect [:foo/bar
              {:limit 3
               :as :hello/world
               :filter [:sexp/logical {:op/boolean 'and
                                       :list/sexp [[:sexp/field 'sf/human?]]}]}]
-            (pull/vector->key+opts {:pull/variable-value {'$x 'sf/human?}}
-                                   [:foo/bar :as :hello/world :limit 3 :filter '$x]))
+            (pull/vector->key+opts {:pull/variable-value {:$x 'sf/human?}}
+                                   [:foo/bar {:as :hello/world :limit 3 :filter '$x}]))
 
     ;; errors
     (expect {::pull/error ::pull/unknown-options
@@ -127,27 +126,33 @@
 
     ;; success
     (expect {:pull/key+opts [[:foo/bar {}]]
-             :pull/relations []}
+             :pull/relations []
+             :pull/k->as {}}
             (f [:foo/bar]))
 
     (expect {:pull/key+opts [[:foo/bar {}] [:foo/baz {}]]
-             :pull/relations []}
+             :pull/relations []
+             :pull/k->as {}}
             (f [:foo/bar :foo/baz]))
 
     (expect {:pull/key+opts [[:a {}] [:b {}] [:c {:limit 3}]]
-             :pull/relations []}
+             :pull/relations []
+             :pull/k->as {}}
             (f [:a :b [:c :limit 3]]))
 
     (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
-             :pull/relations []}
+             :pull/relations []
+             :pull/k->as {}}
             (f [:x/a :x/b [:x/c :limit 3]]))
 
     (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
-             :pull/relations [{:x/rel [:foo/a :foo/b]}]}
+             :pull/relations [{[:x/rel {}] [:foo/a :foo/b]}]
+             :pull/k->as {}}
             (f [:x/a :x/b [:x/c :limit 3] {:x/rel [:foo/a :foo/b]}]))
 
     (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
-             :pull/relations [{[:x/rel :as :x/foos] [:foo/a :foo/b]}]}
+             :pull/relations [{[:x/rel {:as :x/foos}] [:foo/a :foo/b]}]
+             :pull/k->as {:x/rel :x/foos}}
             (f [:x/a :x/b [:x/c :limit 3] {[:x/rel :as :x/foos] [:foo/a :foo/b]}]))
 
     ;; error
@@ -162,8 +167,8 @@
           (pull/apply-key-opts {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
                                [:sf/member-ids {:limit 2}]))
 
-  ;; limit and as
-  (expect {:sf/members ["picard" "riker"]}
+  ;; as is not applied till the end
+  (expect {:sf/member-ids ["picard" "riker"]}
           (pull/apply-key-opts {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
                                [:sf/member-ids {:limit 2 :as :sf/members}])))
 
@@ -175,6 +180,17 @@
           (pull/pull {} [:sf/id
                          :sf/name
                          :sf/rank]
+                     (->> ["picard"]
+                          (map ->db-id)
+                          i/set))))
+
+(deftest basic-pull-with-symbols-test
+  (expect [{:sf/id "picard"
+            :sf/name "Jean-Luc Picard"
+            :sf/rank "Captain"}]
+          (pull/pull {} '[sf/id
+                          sf/name
+                          sf/rank]
                      (->> ["picard"]
                           (map ->db-id)
                           i/set))))
@@ -419,7 +435,7 @@
 
 (defn restricted-keys-finalizer
   [{:keys [pull/k->as pull/concept]}]
-  (let [all-restricted (into #{:sf/id} (k->as :sf/id))]
+  (let [all-restricted (conj #{:sf/id} (k->as :sf/id))]
     (apply dissoc concept all-restricted)))
 
 
@@ -549,7 +565,7 @@
                           :sf/name "Engineering Team"
                           :sf/members []}]}]
             (pull/pull {:pull/relation-value id-resolver
-                        :pull/variable-value {'$x '(or sf/betazoid? sf/android?)}}
+                        :pull/variable-value {:$x '(or sf/betazoid? sf/android?)}}
                        [:sf/id
                         :sf/name
                         {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
@@ -566,10 +582,10 @@
   (let [ids (->> ["uss-e"]
                  (map ->db-id)
                  i/set)
-        metadata-finalizer (fn [{:keys [pull/concept pull/pre-limit-ids pull/renamed-key]}]
+        metadata-finalizer (fn [{:keys [pull/concept pull/pre-limit-ids pull/output-key]}]
                              (if-not pre-limit-ids
                                concept
-                               (let [metadata-key (keyword (str (symbol renamed-key) ":metadata"))]
+                               (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
                                  (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)}))))]
     (expect [{:sf/id "uss-e"
               :sf/name "USS Enterprise"
