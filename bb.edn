@@ -1,7 +1,8 @@
 {:tasks
  {:requires
   ([clojure.edn :as edn]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [babashka.fs :as fs])
 
   :init
   (do
@@ -18,7 +19,9 @@
 
   compile:java
   {:doc "Compiles the java files"
-   :task (shell "clojure -T:build compile-java")}
+   :task (if (seq (fs/modified-since "target/classes" "src/java"))
+           (shell "clojure -T:build compile-java")
+           (println "Skipped java compile. `src/java` is not modified"))}
 
 
   compile:clj
@@ -41,7 +44,7 @@
 
   deploy
   {:doc "Deploy to clojars."
-   :depends [build:check build:jar]
+   :depends [clean build:check test build:jar]
    :task (shell "clojure -T:build deploy")}
 
 

@@ -80,7 +80,8 @@
 
 
 (defn parse
-  [ctx pattern]
+  [{:keys [pull/relation?]
+    :or {relation? (constantly false)} :as ctx} pattern]
   (let [ks (java.util.ArrayList.)
         rels (java.util.ArrayList.)
         rel-rfn (fn [ans k v]
@@ -91,6 +92,9 @@
                   (let [k (if (attr? k)
                             [(keyword k) {}]
                             (vector->key+opts ctx k))]
+                    (when-not (relation? {:pull/key (first k)})
+                      (throw (ex-info "not a relation" {::error ::not-a-relation
+                                                        :pull/key (first k)})))
                     (assoc ans k v)))]
     (loop [[x & more] pattern]
       (if-not x
@@ -109,10 +113,20 @@
              :pull/k->as k->as}))
         (do
           (cond
-            (attr? x) (.add ks [(keyword x) {}])
-            (vector? x) (.add ks (vector->key+opts ctx x))
+            (attr? x) (if (relation? {:pull/key x})
+                        (.add rels {[(keyword x) {}] nil})
+                        (.add ks [(keyword x) {}]))
+            (vector? x) (if (relation? {:pull/key (first x)})
+                          (.add rels {(vector->key+opts ctx x) nil})
+                          (.add ks (vector->key+opts ctx x)))
             (map? x) (.add rels (reduce-kv rel-rfn {} x)))
           (recur more))))))
+
+
+(defn default-value
+  [m]
+  (c/value (:pull/key m) (:db/id m)))
+
 
 (defn apply-key-opts
   [c [k {:keys [limit]}]]
@@ -143,33 +157,33 @@
       c
       (recur (apply-key-opts c k+opt) more))))
 
-(defn default-relation-value
-  [m]
-  (c/value (:pull/key m) (:db/id m)))
-
 
 (defn reify-relations*
-  [{:keys [pull/relation-value
-           pull/relation-finalizer]
-    :or {relation-value default-relation-value
+  [{:keys [pull/relation-value pull/relation-finalizer]
+    :or {relation-value default-value
          relation-finalizer :pull/concept} :as ctx} relation c]
   (loop [c c
          [[k+opts pattern] & more] relation]
     (if-not k+opts
       c
       (let [[k opts] k+opts
+            depth (cond-> (::depth ctx)
+                    (not pattern) dec)
             rel-opts {:pull/ctx ctx
                       :pull/key k
                       :pull/key-opts opts
                       :pull/concept c
-                      :pull/depth (::depth ctx)
+                      :pull/depth depth
+                      :pull/reified-relation? (some? pattern)
                       :db/id (:db/id c)}
             id+ (relation-value rel-opts)
             ids (if (int? id+) id+ (i/set id+))
             {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-opts k+opts ids)
             rel-opts (cond-> rel-opts
                        pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
-            xs (pull ctx pattern id+)
+            xs (if pattern
+                 (pull ctx pattern id+)
+                 id+)
             c (assoc c k xs) ;; use original key until ready to finalize to make it easier to validate actual attrs
             c (relation-finalizer (assoc rel-opts :pull/concept c :pull/output-key k'))]
         (recur c more)))))
@@ -200,13 +214,19 @@
   receive a map with key `:pull/ctx`.
 
   `:pull/pattern-finalizer`
-     - fn which takes in a map and returns a map with keys `:pull/key+opts` and `:pull/relations`
+     - fn which takes in a map and returns a map with keys `:pull/key+opts`, `:pull/relations`, and `pull/k->as`
      - input map has keys `:pull/ctx`, `:pull/key+opts` and `:pull/relations`
      - opportunity to do any validation checks or transformations
+     - items in `pull/key+opts` can be tagged with `:pull/relation?` if it is managed as a public relation.
 
   `:pull/variable-value`
      - a map of keyword variables to values. variables must begin with a `$` char
      - only the `:filter` option on an expanded relation supports variables
+
+  `:pull/relation?`
+     - predicate to determine if the specifed key is a relation
+     - useful when there is a set of non-conceptual ids that should be treated as a relation
+     - receives a map with key  `:pull/ctx` and `:pull/key`
 
   `:pull/relation-value`
      - fn which takes in a map and returns either a conceptual db/id or a sequence or int array of db/ids
@@ -231,12 +251,11 @@
            pull/pattern-finalizer] :or {concept-finalizer default-finalizer
                                         pattern-finalizer default-pattern-finalizer} :as ctx} pattern id+]
   (let [{:keys [pull/key+opts pull/relations
-                pull/k->as]} (-> (parse ctx pattern)
+                pull/k->as] :as xx} (-> (parse ctx pattern)
                                  (assoc :pull/ctx ctx)
                                  pattern-finalizer)
         ks (set (map first key+opts))
         rm-db-id? (not (contains? ks :db/id))
-        ;; _ (prn "key+opts " key+opts)
         cb-opts {:pull/ctx ctx
                  :pull/k->as k->as}
         xform (comp (map (partial apply-all-opts key+opts))
