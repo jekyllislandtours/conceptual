@@ -7,6 +7,7 @@
             [expectations.clojure.test :refer [expect]]))
 
 
+(set! *print-namespace-maps* false)
 
 (use-fixtures :each test.core/with-rdb)
 
@@ -118,9 +119,11 @@
 
 
 (deftest parse-test
-  (let [f (fn [pattern]
+  (let [relation? (fn [{:keys [pull/key]}]
+                    (#{:x/rel} key))
+        f (fn [pattern]
             (try
-              (pull/parse {} pattern)
+              (pull/parse {:pull/relation? relation?} pattern)
               (catch Exception ex
                 (ex-data ex))))]
 
@@ -160,6 +163,20 @@
              :pull/key :foo/bar
              :pull/opts [:as]}
             (f [[:foo/bar :as]]))))
+
+(deftest parse-external-relation-test
+  (let [relation? (fn [{:keys [pull/key]}]
+                    (some? (#{:external/relation} key)))
+        f (fn [pattern]
+            (try
+              (pull/parse {:pull/relation? relation?} pattern)
+              (catch Exception ex
+                (ex-data ex))))]
+
+    (expect {:pull/key+opts [[:foo/bar {}] [:foo/baz {}]]
+             :pull/relations [{[:external/relation {}] nil}]
+             :pull/k->as {}}
+            (f [:foo/bar :foo/baz :external/relation]))))
 
 (deftest apply-key-opts-test
   ;; just the limit
@@ -240,6 +257,10 @@
 
 ;; NB for the relations the data is returned in sorted :db/id order
 
+(defn sf-relation?
+  [{:keys [pull/key]}]
+  (#{:sf/captain-id :sf/starship-id :sf/member-ids :sf/team-ids} key))
+
 (deftest relations-test
   (let [ids (->> ["uss-e"]
                  (map ->db-id)
@@ -249,7 +270,8 @@
                 :sf/name "USS Enterprise"
                 :sf/captain-id {:sf/id "picard"
                                 :sf/name "Jean-Luc Picard"}}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id :sf/name {:sf/captain-id [:sf/id :sf/name]}]
                          ids)))
 
@@ -281,7 +303,8 @@
                                :sf/name "Medical Team"
                                :sf/member-ids [{:sf/id "troi" :sf/name "Deanna Troi"}
                                                {:sf/id "bev-crusher" :sf/name "Beverly Crusher"}]}]}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id
                           :sf/name
                           {:sf/captain-id [:sf/id :sf/name]}
@@ -301,7 +324,8 @@
                 :sf/name "USS Enterprise"
                 :sf/captain {:sf/id "picard"
                              :sf/name "Jean-Luc Picard"}}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}] ids)))
 
     (testing "many"
@@ -332,7 +356,8 @@
                             :sf/name "Medical Team"
                             :sf/members [{:sf/id "troi" :sf/name "Deanna Troi"}
                                          {:sf/id "bev-crusher" :sf/name "Beverly Crusher"}]}]}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id
                           :sf/name
                           {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
@@ -351,7 +376,8 @@
                 :sf/name "USS Enterprise"
                 :sf/captain {:sf/id "picard"
                              :sf/name "Jean-Luc Picard"}}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}]
                          ids)))
 
@@ -371,7 +397,8 @@
                            {:sf/id "uss-e-eng-team"
                             :sf/name "Engineering Team"
                             :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id
                           :sf/name
                           {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
@@ -392,7 +419,11 @@
       (mapv ->db-id v)
       (->db-id v))))
 
-(set! *print-namespace-maps* false)
+(defn internal->external-relation-finalizer
+  [{:keys [pull/concept pull/key pull/reified-relation?]}]
+  (cond-> concept
+    (not reified-relation?)
+    (assoc key (mapv (partial c/value :sf/id) (get concept key)))))
 
 (deftest relation-depth-test
   (let [ids (->> ["uss-e"]
@@ -400,7 +431,9 @@
                  i/set)
         f (fn [pattern]
             (try
-              (pull/pull {:pull/relation-value depth-id-resolver} pattern ids)
+              (pull/pull {:pull/relation-value depth-id-resolver
+                          :pull/relation-finalizer internal->external-relation-finalizer
+                          :pull/relation? sf-relation?} pattern ids)
               (catch Exception ex
                 {:ex/message (ex-message ex)
                  :ex/data (ex-data ex)})))]
@@ -410,7 +443,7 @@
                 :sf/name "USS Enterprise"
                 :sf/captain {:sf/id "picard" :sf/name "Jean-Luc Picard"}
                 :sf/teams [{:sf/id "uss-e-bridge-team"
-                            :sf/member-ids ["picard" "riker" "data" "troi" "worf"]
+                            :sf/member-ids ["picard" "riker" "troi" "data" "worf"]
                             :sf/name "Bridge Team"}
                            {:sf/id "uss-e-security-team"
                             :sf/member-ids ["yar" "worf"]
@@ -448,6 +481,7 @@
       (expect [{:sf/name "USS Enterprise"
                 :sf/captain {:sf/name "Jean-Luc Picard"}}]
               (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?
                           :pull/concept-finalizer restricted-keys-finalizer}
                          [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}]
                          ids)))
@@ -456,6 +490,7 @@
       (expect [{:sf/name "USS Enterprise"
                 :sf/captain {:sf/name "Jean-Luc Picard"}}]
               (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?
                           :pull/concept-finalizer restricted-keys-finalizer}
                          [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [[:sf/id :as :sneaky/id] :sf/name]}]
                          ids)))
@@ -472,6 +507,7 @@
                            {:sf/name "Engineering Team"
                             :sf/members [{:sf/name "Geordi La Forge"}]}]}]
               (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?
                           :pull/concept-finalizer restricted-keys-finalizer}
                          [:sf/id
                           :sf/name
@@ -502,7 +538,8 @@
                          {:sf/id "uss-e-eng-team"
                           :sf/name "Engineering Team"
                           :sf/members []}]}]
-            (pull/pull {:pull/relation-value id-resolver}
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation? sf-relation?}
                        [:sf/id
                         :sf/name
                         {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
@@ -530,7 +567,8 @@
                            {:sf/id "uss-e-eng-team"
                             :sf/name "Engineering Team"
                             :sf/members []}]}]
-              (pull/pull {:pull/relation-value id-resolver}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation? sf-relation?}
                          [:sf/id
                           :sf/name
                           {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
@@ -565,6 +603,7 @@
                           :sf/name "Engineering Team"
                           :sf/members []}]}]
             (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation? sf-relation?
                         :pull/variable-value {:$x '(or sf/betazoid? sf/android?)}}
                        [:sf/id
                         :sf/name
@@ -578,15 +617,18 @@
                            [:sf/id :sf/name]}]}]
                        ids))))
 
+
+(defn metadata-finalizer
+  [{:keys [pull/concept pull/pre-limit-ids pull/output-key]}]
+  (if-not pre-limit-ids
+    concept
+    (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
+      (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)}))))
+
 (deftest relation-filter-finalizer-test
   (let [ids (->> ["uss-e"]
                  (map ->db-id)
-                 i/set)
-        metadata-finalizer (fn [{:keys [pull/concept pull/pre-limit-ids pull/output-key]}]
-                             (if-not pre-limit-ids
-                               concept
-                               (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
-                                 (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)}))))]
+                 i/set)]
     (expect [{:sf/id "uss-e"
               :sf/name "USS Enterprise"
               :sf/captain {:sf/id "picard"
@@ -607,6 +649,7 @@
                           :sf/members:metadata {:summary/estimated-count 1}
                           :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}]
             (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation? sf-relation?
                         :pull/relation-finalizer metadata-finalizer}
                        [:sf/id
                         :sf/name
@@ -620,3 +663,87 @@
                             :filter '(or sf/human? sf/klingon?)]
                            [:sf/id :sf/name]}]}]
                        ids))))
+
+
+
+(def external-relation->internal-relation
+  {:sf/member-ids :sf/-member-ids
+   :sf/team-ids :sf/-team-ids
+   :sf/captain-id :sf/-captain-id})
+
+(defn relation?
+  [{:keys [pull/key]}]
+  (some? (external-relation->internal-relation key)))
+
+
+(defn pre-indexed-relation-value
+  [{:keys [pull/key db/id]}]
+  (some-> key
+          external-relation->internal-relation
+          (c/value id)))
+
+
+(defn unexpanded-finalizer
+  [{:keys [pull/concept pull/pre-limit-ids pull/output-key pull/key]}]
+  (let [id+ (get concept key)
+        ->external-id  (partial c/value :sf/id)
+        v (if (int? id+)
+            (->external-id id+)
+            (mapv ->external-id id+))
+        concept (assoc concept key v)]
+    (if-not pre-limit-ids
+      concept
+      (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
+        (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)})))))
+
+(deftest unexpanded-relation-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain "picard"
+           :sf/teams:metadata {:summary/estimated-count 5}
+           :sf/teams ["uss-e-bridge-team"
+                      "uss-e-security-team"
+                      "uss-e-eng-team"]}
+          (pull/pull {:pull/relation? relation?
+                      :pull/relation-value pre-indexed-relation-value
+                      :pull/relation-finalizer unexpanded-finalizer}
+                     [:sf/id
+                      :sf/name
+                      [:sf/captain-id :as :sf/captain]
+                      [:sf/team-ids :as :sf/teams :limit 3]]
+                     (->db-id "uss-e")))
+
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain {:sf/id "picard"
+                        :sf/name "Jean-Luc Picard"}
+           :sf/teams:metadata {:summary/estimated-count 5}
+           :sf/teams [{:sf/id "uss-e-bridge-team"
+                       :sf/name "Bridge Team"
+                       :sf/members:metadata {:summary/estimated-count 4}
+                       :sf/members [{:sf/id "picard" :sf/name "Jean-Luc Picard"}
+                                    {:sf/id "riker" :sf/name "William T. Riker"}]}
+                      {:sf/id "uss-e-security-team"
+                       :sf/name "Security Team"
+                       :sf/members:metadata {:summary/estimated-count 2}
+                       :sf/members [{:sf/id "yar" :sf/name "Tasha Yar"}
+                                    {:sf/id "worf" :sf/name "Worf"}]}
+                      {:sf/id "uss-e-eng-team"
+                       :sf/name "Engineering Team"
+                       :sf/members:metadata {:summary/estimated-count 1}
+                       :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}
+          (pull/pull {:pull/relation-value pre-indexed-relation-value
+                      :pull/relation? sf-relation?
+                      :pull/relation-finalizer metadata-finalizer}
+                     [:sf/id
+                      :sf/name
+                      {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
+                      {[:sf/team-ids :as :sf/teams :limit 3]
+                       [:sf/id
+                        :sf/name
+                        {[:sf/member-ids
+                          :as :sf/members
+                          :limit 2
+                          :filter '(or sf/human? sf/klingon?)]
+                         [:sf/id :sf/name]}]}]
+                     (->db-id "uss-e"))))

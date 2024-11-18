@@ -13,7 +13,9 @@
             :test/tag? :test/float :test/instant :test/int :test/date :test/nice?
             :sf/captain-id :sf/id :sf/member-ids :sf/name :sf/position :sf/rank
             :sf/registry :sf/starship-id :sf/team-ids :sf/type
-            :sf/android? :sf/betazoid? :sf/human? :sf/klingon?}
+            :sf/android? :sf/betazoid? :sf/human? :sf/klingon?
+            :sf/-captain-id :sf/-starship-id :sf/-team-ids :sf/-member-ids
+            :sf/starship? :sf/crew? :sf/team?}
           (debug/known-keys)))
 
 (deftest unknown-keys-test
