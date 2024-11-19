@@ -158,6 +158,22 @@
              :pull/k->as {:x/rel :x/foos}}
             (f [:x/a :x/b [:x/c :limit 3] {[:x/rel :as :x/foos] [:foo/a :foo/b]}]))
 
+
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
+             :pull/relations [{[:x/rel {:as :x/foos}] '[foo/a foo/b]}]
+             :pull/k->as {:x/rel :x/foos}}
+            (f '[x/a x/b [x/c {:limit 3}] {[x/rel :as :x/foos] [foo/a foo/b]}]))
+
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
+             :pull/relations [{[:x/rel {}] nil}]
+             :pull/k->as {}}
+            (f '[x/a x/b  x/rel [x/c {:limit 3}]]))
+
+    (expect {:pull/key+opts [[:x/a {}] [:x/b {}] [:x/c {:limit 3}]]
+             :pull/relations [{[:x/rel {:as :x/foo}] nil}]
+             :pull/k->as {:x/rel :x/foo}}
+            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}]]))
+
     ;; error
     (expect {::pull/error ::pull/not-enough-input-for-options
              :pull/key :foo/bar
