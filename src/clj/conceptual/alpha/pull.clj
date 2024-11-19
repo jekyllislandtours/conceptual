@@ -113,10 +113,10 @@
              :pull/k->as k->as}))
         (do
           (cond
-            (attr? x) (if (relation? {:pull/key x})
+            (attr? x) (if (relation? {:pull/key (keyword x)})
                         (.add rels {[(keyword x) {}] nil})
                         (.add ks [(keyword x) {}]))
-            (vector? x) (if (relation? {:pull/key (first x)})
+            (vector? x) (if (relation? {:pull/key (keyword (first x))})
                           (.add rels {(vector->key+opts ctx x) nil})
                           (.add ks (vector->key+opts ctx x)))
             (map? x) (.add rels (reduce-kv rel-rfn {} x)))
@@ -251,7 +251,7 @@
            pull/pattern-finalizer] :or {concept-finalizer default-finalizer
                                         pattern-finalizer default-pattern-finalizer} :as ctx} pattern id+]
   (let [{:keys [pull/key+opts pull/relations
-                pull/k->as] :as xx} (-> (parse ctx pattern)
+                pull/k->as]} (-> (parse ctx pattern)
                                  (assoc :pull/ctx ctx)
                                  pattern-finalizer)
         ks (set (map first key+opts))
