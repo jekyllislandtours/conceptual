@@ -42,8 +42,9 @@
             (string? x))
     (-> x symbol str (.charAt 0) (= \$))))
 
-(defn vector->key+opts
-  [{:keys [pull/variable-value]} [k & opts|kv-pairs]]
+(defn vector->key-info
+  "Returns a map"
+  [{:keys [pull/variables]} [k & opts|kv-pairs]]
   (let [k (keyword k)
         opts (cond
                (map? (first opts|kv-pairs)) (first opts|kv-pairs)
@@ -63,8 +64,10 @@
         _ (validate-as k as)
         f-sexp|var (:filter opts)
         f-sexp (if (variable? f-sexp|var)
-                 (get variable-value (keyword f-sexp|var))
+                 (get variables (keyword f-sexp|var))
                  f-sexp|var)
+
+        ;; TODO: don't conform the same filter repeatedly
         opts (cond-> opts
                f-sexp (assoc :filter (c.filter/conform f-sexp))
                as (update :as keyword))]
@@ -76,50 +79,76 @@
                       {::error ::unknown-options
                        :pull/key k
                        :pull/unknown-opts unk-ks})))
-    [k opts]))
+    (cond-> {:pull/key k}
+      (seq opts) (assoc :pull/key-opts opts))))
+
+
+(defn default-pattern-finalizer
+  [m]
+  (select-keys m [:pull/key-infos :pull/relations :pull/k->as]))
 
 
 (defn parse
-  [{:keys [pull/relation?]
-    :or {relation? (constantly false)} :as ctx} pattern]
+  "Returns a data structure for processing
+  `:pull/relation?`
+     - predicate to determine if the specifed key is a relation
+     - useful when there is a set of non-conceptual ids that should be treated as a relation
+     - receives a map with key  `:pull/ctx` and `:pull/key`
+
+  `:pull/variables`
+     - a map of keyword variables to values. variables must begin with a `$` char
+     - only the `:filter` option on an expanded relation supports variables
+
+  `:pull/pattern-finalizer`
+     - fn which takes in a map and returns a map with keys `:pull/key-infos`, `:pull/relations`, and `pull/k->as`
+     - input map has keys `:pull/ctx`, `:pull/key-infos` and `:pull/relations`
+     - opportunity to do any validation checks or transformations
+     - items in `pull/key-infos` can be tagged with `:pull/relation?` if it is managed as a public relation
+     - will be called for each nested pattern and the outermost pattern"
+  [{:keys [pull/relation?
+           pull/pattern-finalizer]
+    :or {relation? (constantly false)
+         pattern-finalizer default-pattern-finalizer} :as ctx} pattern]
   (let [ks (java.util.ArrayList.)
         rels (java.util.ArrayList.)
-        rel-rfn (fn [ans k v]
+        rel-rfn (fn [ans k sub-pattern]
                   (when-not (or (attr? k) (vector? k))
                     (throw (ex-info "relation must be a keyword or a vector"
                                     {::error ::invalid-relation
-                                     :pull/key (first v)})))
-                  (let [k (if (attr? k)
-                            [(keyword k) {}]
-                            (vector->key+opts ctx k))]
-                    (when-not (relation? {:pull/key (first k)})
-                      (throw (ex-info "not a relation" {::error ::not-a-relation
-                                                        :pull/key (first k)})))
-                    (assoc ans k v)))]
+                                     :pull/key k})))
+                  (let [key-info (if (attr? k)
+                                   {:pull/key (keyword k)}
+                                   (vector->key-info ctx k))]
+                    (when-not (relation? key-info)
+                      (throw (ex-info "not a relation" (assoc key-info ::error ::not-a-relation))))
+                    (conj ans (assoc key-info :pull/pattern (parse ctx sub-pattern)))))]
     (loop [[x & more] pattern]
       (if-not x
-        (let [key+opts (vec ks)
-              rels (vec rels)
+        (let [key-infos (vec ks)
+              rels (reduce into [] rels)
               k->as (java.util.HashMap.)]
-          (doseq [[k {:keys [as]}] key+opts
+          (doseq [{:keys [pull/key pull/key-opts]} key-infos
+                  :let [{:keys [as]} key-opts]
                   :when as]
-            (.put k->as k as))
-          (doseq [[k {:keys [as]}] (mapcat keys rels)
+            (.put k->as key as))
+          (doseq [{:keys [pull/key pull/key-opts]} rels
+                  :let [{:keys [as]} key-opts]
                   :when as]
-            (.put k->as k as))
+            (.put k->as key as))
           (let [k->as (into {} k->as)]
-            {:pull/key+opts key+opts
-             :pull/relations rels
-             :pull/k->as k->as}))
+            (pattern-finalizer
+             {:pull/key-infos key-infos
+              :pull/relations rels
+              :pull/k->as k->as})))
         (do
           (cond
             (attr? x) (if (relation? {:pull/key (keyword x)})
-                        (.add rels {[(keyword x) {}] nil})
-                        (.add ks [(keyword x) {}]))
-            (vector? x) (if (relation? {:pull/key (keyword (first x))})
-                          (.add rels {(vector->key+opts ctx x) nil})
-                          (.add ks (vector->key+opts ctx x)))
-            (map? x) (.add rels (reduce-kv rel-rfn {} x)))
+                        (.add rels [{:pull/key (keyword x)}])
+                        (.add ks {:pull/key (keyword x)}))
+            (vector? x) (if (relation? {:pull/key (keyword (first x))}) ;; case when relation is in a vector without a pattern
+                          (.add rels [(vector->key-info ctx x)])
+                          (.add ks (vector->key-info ctx x)))
+            (map? x) (.add rels (reduce-kv rel-rfn [] x)))
           (recur more))))))
 
 
@@ -127,66 +156,64 @@
   [m]
   (c/value (:pull/key m) (:db/id m)))
 
-
-(defn apply-key-opts
-  [c [k {:keys [limit]}]]
-  ;; NB `c` must already have key `k`
-  (let [v (get c k)
+(defn apply-key-info
+  [c key-info]
+  ;; NB `c` must already have key `key`
+  (let [k (:pull/key key-info)
+        {:keys [limit]} (:pull/key-opts key-info)
+        v (get c k)
         many? (coll? v)
         v' (cond->> v
              (and limit many?) (take limit))]
     (assoc c k v')))
 
-(defn apply-relation-key-opts
-  [[k {:keys [limit as] f-sexp :filter}] id+]
-  (let [many? (a/int-array? id+)
+(defn apply-all-key-infos
+  [key-infos c]
+  (loop [c c
+         [key-info & more] key-infos]
+    (if-not key-info
+      c
+      (recur (apply-key-info c key-info) more))))
+
+(defn apply-relation-key-info
+  [{:keys [pull/key pull/key-opts]} id+]
+  (let [{:keys [limit as] f-sexp :filter} key-opts
+        many? (a/int-array? id+)
         v (if (and many? f-sexp)
             (c.filter/evaluate-conformed f-sexp id+)
             id+)
+        too-many? (and limit many? (> (alength ^int/1 id+) limit))
         v' (cond->> v
-             (and limit many?) (take limit))]
-    (cond-> {:k (or as k)
+             too-many? (take limit))]
+    (cond-> {:k (or as key)
              :v v'}
-      (and limit many?) (assoc :v-pre-limit v))))
-
-(defn apply-all-opts
-  [k+opts c]
-  (loop [c c
-         [k+opt & more] k+opts]
-    (if-not k+opt
-      c
-      (recur (apply-key-opts c k+opt) more))))
-
+      too-many? (assoc :v-pre-limit v))))
 
 (defn reify-relations*
   [{:keys [pull/relation-value pull/relation-finalizer]
     :or {relation-value default-value
-         relation-finalizer :pull/concept} :as ctx} relation c]
-  (loop [c c
-         [[k+opts pattern] & more] relation]
-    (if-not k+opts
-      c
-      (let [[k opts] k+opts
-            depth (cond-> (::depth ctx)
-                    (not pattern) dec)
-            rel-opts {:pull/ctx ctx
-                      :pull/key k
-                      :pull/key-opts opts
-                      :pull/concept c
-                      :pull/depth depth
-                      :pull/reified-relation? (some? pattern)
-                      :db/id (:db/id c)}
-            id+ (relation-value rel-opts)
-            ids (if (int? id+) id+ (i/set id+))
-            {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-opts k+opts ids)
-            rel-opts (cond-> rel-opts
-                       pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
-            xs (if pattern
-                 (pull ctx pattern id+)
-                 id+)
-            c (assoc c k xs) ;; use original key until ready to finalize to make it easier to validate actual attrs
-            c (relation-finalizer (assoc rel-opts :pull/concept c :pull/output-key k'))]
-        (recur c more)))))
+         relation-finalizer :pull/concept} :as ctx}
+   {:keys [pull/key pull/key-opts pull/pattern] :as relation} c]
+  (let [depth (cond-> (::depth ctx)
+                (not pattern) dec)
+        rel-opts {:pull/ctx ctx
+                  :pull/key key
+                  :pull/key-opts key-opts
+                  :pull/concept c
+                  :pull/depth depth
+                  :pull/reified-relation? (some? pattern)
+                  :db/id (:db/id c)}
+        id+ (relation-value rel-opts)
+        ids (if (int? id+) id+ (i/set id+))
+        {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-info relation ids)
+        rel-opts (cond-> rel-opts
+                   pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
+        xs (if pattern
+             (pull ctx pattern id+)
+             id+)
+        c (assoc c key xs) ;; use original key until ready to finalize to make it easier to validate actual attrs
+        c (relation-finalizer (assoc rel-opts :pull/concept c :pull/output-key k'))]
+    c))
 
 (defn reify-relations
   [ctx relations c]
@@ -204,29 +231,10 @@
 
 (def default-finalizer :pull/concept)
 
-(defn default-pattern-finalizer
-  [m]
-  (select-keys m [:pull/key+opts :pull/relations :pull/k->as]))
-
 (defn pull
   "`id+` can be an `int`, `int-array` or any seq of int.
   `ctx` is a map and can include fns to customize behavior. All the fns
   receive a map with key `:pull/ctx`.
-
-  `:pull/pattern-finalizer`
-     - fn which takes in a map and returns a map with keys `:pull/key+opts`, `:pull/relations`, and `pull/k->as`
-     - input map has keys `:pull/ctx`, `:pull/key+opts` and `:pull/relations`
-     - opportunity to do any validation checks or transformations
-     - items in `pull/key+opts` can be tagged with `:pull/relation?` if it is managed as a public relation.
-
-  `:pull/variable-value`
-     - a map of keyword variables to values. variables must begin with a `$` char
-     - only the `:filter` option on an expanded relation supports variables
-
-  `:pull/relation?`
-     - predicate to determine if the specifed key is a relation
-     - useful when there is a set of non-conceptual ids that should be treated as a relation
-     - receives a map with key  `:pull/ctx` and `:pull/key`
 
   `:pull/relation-value`
      - fn which takes in a map and returns either a conceptual db/id or a sequence or int array of db/ids
@@ -247,18 +255,13 @@
      - fn for apply custom business logic to a concept before it is added to output. Returns the concept.
      - input map has keys `:pull/ctx`, `:pull/k->as`, and `:pull/concept`
      - `:pull/concept` is the current concept being built up"
-  [{:keys [pull/concept-finalizer
-           pull/pattern-finalizer] :or {concept-finalizer default-finalizer
-                                        pattern-finalizer default-pattern-finalizer} :as ctx} pattern id+]
-  (let [{:keys [pull/key+opts pull/relations
-                pull/k->as]} (-> (parse ctx pattern)
-                                 (assoc :pull/ctx ctx)
-                                 pattern-finalizer)
-        ks (set (map first key+opts))
+  [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+]
+  (let [{:keys [pull/key-infos pull/relations pull/k->as]} parsed-pattern
+        ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
         cb-opts {:pull/ctx ctx
                  :pull/k->as k->as}
-        xform (comp (map (partial apply-all-opts key+opts))
+        xform (comp (map (partial apply-all-key-infos key-infos))
                  (map (partial reify-relations ctx relations))
                  (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
                  (map #(rename-keys (assoc cb-opts :pull/concept %)))
