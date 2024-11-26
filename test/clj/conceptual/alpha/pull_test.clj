@@ -85,7 +85,6 @@
              :pull/key :foo/bar}
             (f :foo/bar {:a :b}))))
 
-
 (deftest vector->key-info-test
   (let [f (fn [v]
             (try
@@ -98,6 +97,7 @@
     (expect {:pull/key :foo/bar} (f [:foo/bar {}]))
     (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world}} (f [:foo/bar {:as :hello/world}]))
     (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :limit 3}} (f [:foo/bar {:as :hello/world :limit 3}]))
+    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :limit 3}} (f [:foo/bar {'as "hello/world" 'limit 3}]))
     (expect {:pull/key :foo/bar
              :pull/key-opts {:limit 3
                              :as :hello/world
@@ -110,13 +110,18 @@
     (expect {::pull/error ::pull/unknown-options
              :pull/key :foo/bar
              :pull/unknown-opts #{:meow}}
-            (f [:foo/bar :meow 23]))
+            (f [:foo/bar {:meow 23}]))
 
-    (expect {::pull/error ::pull/not-enough-input-for-options
+    (expect {::pull/error ::pull/invalid-opts-map
              :pull/key :foo/bar
-             :pull/opts [:meow]}
-            (f [:foo/bar :meow]))))
+             :pull/opts :meow}
+            (f [:foo/bar :meow]))
 
+    (expect {::pull/error ::pull/invalid-opts-map-key
+             :pull/key :foo/bar
+             :pull/opts {12 22}
+             :pull/opts-key 12}
+            (f [:foo/bar {12 22}]))))
 
 (deftest parse-test
   (let [relation? (fn [{:keys [pull/key]}]
@@ -143,14 +148,14 @@
                               {:pull/key :c :pull/key-opts {:limit 3}}]
              :pull/relations []
              :pull/k->as {}}
-            (f [:a :b [:c :limit 3]]))
+            (f [:a :b [:c {:limit 3}]]))
 
     (expect {:pull/key-infos [{:pull/key :x/a}
                               {:pull/key :x/b}
                               {:pull/key :x/c :pull/key-opts {:limit 3}}]
              :pull/relations []
              :pull/k->as {}}
-            (f [:x/a :x/b [:x/c :limit 3]]))
+            (f [:x/a :x/b [:x/c {:limit 3}]]))
 
     (expect {:pull/key-infos [{:pull/key :x/a}
                               {:pull/key :x/b}
@@ -161,7 +166,7 @@
                                               :pull/relations []
                                               :pull/k->as {}}}]
              :pull/k->as {}}
-            (f [:x/a :x/b [:x/c :limit 3] {:x/rel [:foo/a :foo/b]}]))
+            (f [:x/a :x/b [:x/c {:limit 3}] {:x/rel [:foo/a :foo/b]}]))
 
     (expect {:pull/key-infos
              [{:pull/key :x/a}
@@ -175,7 +180,7 @@
                 :pull/relations []
                 :pull/k->as {}}}]
              :pull/k->as {:x/rel :x/foos}}
-            (f [:x/a :x/b [:x/c :limit 3] {[:x/rel :as :x/foos] [:foo/a :foo/b]}]))
+            (f [:x/a :x/b [:x/c {:limit 3}] {[:x/rel {:as :x/foos}] [:foo/a :foo/b]}]))
 
     (expect {:pull/key-infos
              [{:pull/key :x/a}
@@ -194,9 +199,9 @@
             (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}]]))
 
     ;; error
-    (expect {::pull/error ::pull/not-enough-input-for-options
+    (expect {::pull/error ::pull/invalid-opts-map
              :pull/key :foo/bar
-             :pull/opts [:as]}
+             :pull/opts :as}
             (f [[:foo/bar :as]]))))
 
 (deftest parse-external-relation-test
@@ -209,7 +214,7 @@
                 (ex-data ex))))]
 
     (expect {:pull/key-infos [{:pull/key :foo/bar}
-                             {:pull/key :foo/baz}]
+                              {:pull/key :foo/baz}]
              :pull/relations [{:pull/key :external/relation}]
              :pull/k->as {}}
             (f [:foo/bar :foo/baz :external/relation]))))
@@ -261,7 +266,7 @@
                 :sf/name "USS Enterprise"
                 :sf/captain-id "picard"
                 :sf/team-ids ["uss-e-bridge-team" "uss-e-security-team"]}]
-              (pull/pull {} (pull/parse {} [:sf/id :sf/name :sf/captain-id [:sf/team-ids :limit 2]]) ids)))))
+              (pull/pull {} (pull/parse {} [:sf/id :sf/name :sf/captain-id [:sf/team-ids {:limit 2}]]) ids)))))
 
 (deftest basic-as-test
   (let [ids (->> ["uss-e"]
@@ -271,7 +276,7 @@
               :sf/name "USS Enterprise"
               :sf/captain-id "picard"}]
             (pull/pull {}
-                       (pull/parse {} [[:sf/id :as :starfleet/id] :sf/name :sf/captain-id])
+                       (pull/parse {} [[:sf/id {:as :starfleet/id}] :sf/name :sf/captain-id])
                        ids))))
 
 
@@ -412,7 +417,7 @@
                           :sf/name "Jean-Luc Picard"}}
             (pull/pull {:pull/relation-value id-resolver}
                        (pull/parse {:pull/relation? sf-relation?}
-                                   [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}])
+                                   [:sf/id :sf/name {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}])
                        (->db-id "uss-e"))))
 
   (testing "many"
@@ -447,10 +452,10 @@
                        (pull/parse {:pull/relation? sf-relation?}
                                    [:sf/id
                                     :sf/name
-                                    {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                                    {[:sf/team-ids :as :sf/teams] [:sf/id
-                                                                   :sf/name
-                                                                   {[:sf/member-ids :as :sf/members] [:sf/id :sf/name]}]}])
+                                    {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                    {[:sf/team-ids {:as :sf/teams}] [:sf/id
+                                                                     :sf/name
+                                                                     {[:sf/member-ids {:as :sf/members}] [:sf/id :sf/name]}]}])
                        (->db-id "uss-e")))))
 
 (deftest relations-as-limit-test
@@ -461,7 +466,7 @@
                           :sf/name "Jean-Luc Picard"}}
             (pull/pull {:pull/relation-value id-resolver}
                        (pull/parse {:pull/relation? sf-relation?}
-                                   [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}])
+                                   [:sf/id :sf/name {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}])
                        (->db-id "uss-e"))))
 
   (testing "many"
@@ -484,11 +489,11 @@
                        (pull/parse {:pull/relation? sf-relation?}
                                    [:sf/id
                                     :sf/name
-                                    {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                                    {[:sf/team-ids :as :sf/teams :limit 3]
+                                    {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                    {[:sf/team-ids {:as :sf/teams :limit 3}]
                                      [:sf/id
                                       :sf/name
-                                      {[:sf/member-ids :as :sf/members :limit 2] [:sf/id :sf/name]}]}])
+                                      {[:sf/member-ids {:as :sf/members :limit 2}] [:sf/id :sf/name]}]}])
                        (->db-id "uss-e")))))
 
 
@@ -533,18 +538,18 @@
                            :sf/member-ids ["la-forge"]
                            :sf/name "Engineering Team"}]}
               (f [:sf/id :sf/name
-                  {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                  {[:sf/team-ids :as :sf/teams :limit 3] [:sf/id :sf/name :sf/member-ids]}])))
+                  {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                  {[:sf/team-ids {:as :sf/teams :limit 3}] [:sf/id :sf/name :sf/member-ids]}])))
 
     (expect {:ex/message "depth exceeded"
              :ex/data {:depth 2}}
             (f [:sf/id
                 :sf/name
-                {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                {[:sf/team-ids :as :sf/teams :limit 3]
+                {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                {[:sf/team-ids {:as :sf/teams :limit 3}]
                  [:sf/id
                   :sf/name
-                  {[:sf/member-ids :as :sf/members :limit 2] [:sf/id :sf/name]}]}]))))
+                  {[:sf/member-ids {:as :sf/members :limit 2}] [:sf/id :sf/name]}]}]))))
 
 
 (defn restricted-keys-finalizer
@@ -560,7 +565,7 @@
             (pull/pull {:pull/relation-value id-resolver
                         :pull/concept-finalizer restricted-keys-finalizer}
                        (pull/parse {:pull/relation? sf-relation?}
-                                   [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}])
+                                   [:sf/id :sf/name {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}])
                        (->db-id "uss-e"))))
 
   (testing "one renamed"
@@ -569,7 +574,7 @@
             (pull/pull {:pull/relation-value id-resolver
                         :pull/concept-finalizer restricted-keys-finalizer}
                        (pull/parse {:pull/relation? sf-relation?}
-                                   [:sf/id :sf/name {[:sf/captain-id :as :sf/captain] [[:sf/id :as :sneaky/id] :sf/name]}])
+                                   [:sf/id :sf/name {[:sf/captain-id {:as :sf/captain}] [[:sf/id {:as :sneaky/id}] :sf/name]}])
                        (->db-id "uss-e"))))
 
   (testing "many"
@@ -588,11 +593,11 @@
                        (pull/parse {:pull/relation? sf-relation?}
                                    [:sf/id
                                     :sf/name
-                                    {[:sf/captain-id :as :sf/captain] [[:sf/id :as :captain/id] :sf/name]}
-                                    {[:sf/team-ids :as :sf/teams :limit 3]
-                                     [[:sf/id :as :team/id]
+                                    {[:sf/captain-id {:as :sf/captain}] [[:sf/id {:as :captain/id}] :sf/name]}
+                                    {[:sf/team-ids {:as :sf/teams :limit 3}]
+                                     [[:sf/id {:as :team/id}]
                                       :sf/name
-                                      {[:sf/member-ids :as :sf/members :limit 2] [[:sf/id :as :member/id] :sf/name]}]}])
+                                      {[:sf/member-ids {:as :sf/members :limit 2}] [[:sf/id {:as :member/id}] :sf/name]}]}])
                        (->db-id "uss-e")))))
 
 
@@ -615,13 +620,13 @@
                      (pull/parse {:pull/relation? sf-relation?}
                                  [:sf/id
                                   :sf/name
-                                  {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                                  {[:sf/team-ids :as :sf/teams :limit 3]
+                                  {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                  {[:sf/team-ids {:as :sf/teams :limit 3}]
                                    [:sf/id
                                     :sf/name
                                     {[:sf/member-ids
-                                      :as :sf/members
-                                      :filter '(or sf/betazoid? sf/android?)]
+                                      {:as :sf/members
+                                       :filter '(or sf/betazoid? sf/android?)}]
                                      [:sf/id :sf/name]}]}])
                      (->db-id "uss-e")))
 
@@ -644,14 +649,14 @@
                        (pull/parse {:pull/relation? sf-relation?}
                                    [:sf/id
                                     :sf/name
-                                    {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                                    {[:sf/team-ids :as :sf/teams :limit 3]
+                                    {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                    {[:sf/team-ids {:as :sf/teams :limit 3}]
                                      [:sf/id
                                       :sf/name
                                       {[:sf/member-ids
-                                        :as :sf/members
-                                        :limit 1
-                                        :filter '(or sf/betazoid? sf/android?)]
+                                        {:as :sf/members
+                                         :limit 1
+                                         :filter '(or sf/betazoid? sf/android?)}]
                                        [:sf/id :sf/name]}]}])
                        (->db-id "uss-e")))))
 
@@ -676,13 +681,13 @@
                                   :pull/variables {:$x '(or sf/betazoid? sf/android?)}}
                                  [:sf/id
                                   :sf/name
-                                  {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                                  {[:sf/team-ids :as :sf/teams :limit 3]
+                                  {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                  {[:sf/team-ids {:as :sf/teams :limit 3}]
                                    [:sf/id
                                     :sf/name
                                     {[:sf/member-ids
-                                      :as :sf/members
-                                      :filter '$x]
+                                      {:as :sf/members
+                                       :filter '$x}]
                                      [:sf/id :sf/name]}]}])
                      (->db-id "uss-e"))))
 
@@ -718,14 +723,14 @@
                       {:pull/relation? sf-relation?}
                       [:sf/id
                        :sf/name
-                       {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                       {[:sf/team-ids :as :sf/teams :limit 3]
+                       {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                       {[:sf/team-ids {:as :sf/teams :limit 3}]
                         [:sf/id
                          :sf/name
                          {[:sf/member-ids
-                           :as :sf/members
-                           :limit 2
-                           :filter '(or sf/human? sf/klingon?)]
+                           {:as :sf/members
+                            :limit 2
+                            :filter '(or sf/human? sf/klingon?)}]
                           [:sf/id :sf/name]}]}])
                      (->db-id "uss-e"))))
 
@@ -775,8 +780,8 @@
                       {:pull/relation? relation?}
                       [:sf/id
                        :sf/name
-                       [:sf/captain-id :as :sf/captain]
-                       [:sf/team-ids :as :sf/teams :limit 3]])
+                       [:sf/captain-id {:as :sf/captain}]
+                       [:sf/team-ids {:as :sf/teams :limit 3}]])
                      (->db-id "uss-e")))
 
   (expect {:sf/id "uss-e"
@@ -802,13 +807,13 @@
                       {:pull/relation? sf-relation?}
                       [:sf/id
                        :sf/name
-                       {[:sf/captain-id :as :sf/captain] [:sf/id :sf/name]}
-                       {[:sf/team-ids :as :sf/teams :limit 3]
+                       {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                       {[:sf/team-ids {:as :sf/teams :limit 3}]
                         [:sf/id
                          :sf/name
                          {[:sf/member-ids
-                           :as :sf/members
-                           :limit 2
-                           :filter '(or sf/human? sf/klingon?)]
+                           {:as :sf/members
+                            :limit 2
+                            :filter '(or sf/human? sf/klingon?)}]
                           [:sf/id :sf/name]}]}])
                      (->db-id "uss-e"))))
