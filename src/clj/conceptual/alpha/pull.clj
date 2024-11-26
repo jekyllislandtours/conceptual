@@ -13,6 +13,11 @@
 
 (declare pull)
 
+(defn ident-like?
+  [x]
+  (or (symbol? x)
+      (keyword? x)
+      (string? x)))
 
 (defn attr?
   [x]
@@ -37,28 +42,29 @@
 
 (defn variable?
   [x]
-  (when (or (symbol? x)
-            (keyword? x)
-            (string? x))
+  (when (ident-like? x)
     (-> x symbol str (.charAt 0) (= \$))))
 
 (defn vector->key-info
   "Returns a map"
-  [{:keys [pull/variables]} [k & opts|kv-pairs]]
+  [{:keys [pull/variables]} [k opts]]
   (let [k (keyword k)
         opts (cond
-               (map? (first opts|kv-pairs)) (first opts|kv-pairs)
-               (even? (count opts|kv-pairs)) (apply hash-map opts|kv-pairs)
-               :else (throw (ex-info "Expected 0 or an even number of options for key"
-                                     {::error ::not-enough-input-for-options
+               (map? opts) (update-keys
+                            opts
+                            (fn [opts-k]
+                              (when-not (ident-like? opts-k)
+                                (throw (ex-info "Invalid opts map key"
+                                                {::error ::invalid-opts-map-key
+                                                 :pull/key k
+                                                 :pull/opts opts
+                                                 :pull/opts-key opts-k})))
+                              (keyword opts-k)))
+               (not opts) {}
+               :else (throw (ex-info "Expected map for opts"
+                                     {::error ::invalid-opts-map
                                       :pull/key k
-                                      :pull/opts opts|kv-pairs})))
-        opts (or opts {})
-        _ (when-not (map? opts)
-            (throw (ex-info "Expected map for opts"
-                            {::error ::invalid-opts-map
-                             :pull/key k
-                             :pull/opts opts})))
+                                      :pull/opts opts})))
         {:keys [limit as]} opts
         _ (validate-limit k limit)
         _ (validate-as k as)
