@@ -191,7 +191,7 @@
   ([db ks] (cond
             (instance? int-array-class ks) ks
             (or (sequential? ks)
-                (set? ks)) (let [f (partial key->id ^DB db)]
+                (set? ks)) (let [f (partial key->id db)]
                              (int-array (map f ks))))))
 
 (defn id->key
