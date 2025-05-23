@@ -668,7 +668,7 @@
         (map (partial c/value :sf/id))
         set)))
 
-(deftest top-level-tag
+(deftest top-level-tag-test
   (expect #{"data"} (eval-sf-sexp 'sf/android?))
   (expect #{"troi"} (eval-sf-sexp 'sf/betazoid?))
   (expect #{"troi"} (eval-sf-sexp '(exists? sf/betazoid?)))
@@ -676,3 +676,12 @@
   (expect #{"data" "troi"} (eval-sf-sexp '(or (exists? sf/betazoid?) (exists? sf/android?))))
   (expect #{} (eval-sf-sexp '(and sf/betazoid? sf/android?)))
   (expect #{"data" "troi"} (eval-sf-sexp '(or sf/betazoid? sf/android?))))
+
+
+(deftest field-predicate-test
+  ;; This tests that any field defined in the schema automatically works
+  ;; as if there is an implicit `exists?` predicate
+  (expect #{"bev-crusher" "yar"} (eval-sf-sexp 'sf/position))
+  (expect #{"uss-e" "uss-d"} (eval-sf-sexp 'sf/team-ids))
+  (expect #{"uss-e" "uss-d" "bev-crusher" "yar"} (eval-sf-sexp '(or sf/position sf/team-ids)))
+  (expect #{} (eval-sf-sexp '(and sf/position sf/team-ids))))
