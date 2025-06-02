@@ -50,6 +50,7 @@
 
   cider
   {:doc "Runs the repl"
+   :depends [compile:java]
    :task (shell "clj -M:dev:test:debug:cider")}
 
   test

@@ -817,3 +817,13 @@
                             :filter '(or sf/human? sf/klingon?)}]
                           [:sf/id :sf/name]}]}])
                      (->db-id "uss-e"))))
+
+
+(deftest gh-109--unknown-field-NPE-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id {:sf/id "picard"
+                           :sf/name "Jean-Luc Picard"}}
+          (pull/pull {:pull/relation-value id-resolver}
+                     (pull/parse {:pull/relation? sf-relation?} [:sf/id :sf/name {:sf/captain-id [:sf/id :sf/name :undefined/field-kd83jj]}])
+                     (->db-id "uss-e"))))

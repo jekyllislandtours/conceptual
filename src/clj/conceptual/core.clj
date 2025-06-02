@@ -159,14 +159,19 @@
 
 
 (defn keys->ids
-  "Returns a sorted int array representing a collection of keywords."
+  "Returns a sorted int array representing a collection of keywords.
+   Eliminates duplicates and returns a sorted int array."
   ([ks] (keys->ids (db) ks))
   ([^DB db ks]
-   (let [f (partial key->id db)]
-     (->> (map f ks)
-          (into #{})
-          (sort)
-          (int-array)))))
+   (cond
+     (instance? int-array-class ks) ks
+     (or (sequential? ks)
+         (set? ks)) (let [f (partial key->id db)]
+                      (->> (map f ks)
+                           (filter identity) ;; prevents NPEs with unknown keys
+                           (into #{})
+                           (sort)
+                           (int-array))))))
 
 (defn key-ids
   "Returns the keys for an concept key."
@@ -177,22 +182,28 @@
      (when (keyword? key)
        (.getKeys ^DB db ^int (key->id db key))))))
 
-;; TODO: reconcile this with normalize-ids
-(defn ordered-ids
-  "Like keys->ids but does not eliminate duplicates or sort. This is useful
+;; TODO: reconcile this with normalize-ids, probably can remove
+(defn ^:deprecated ordered-ids
+  "Like keys->ids but does NOT eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
   ([ks] (ordered-ids (db) ks))
-  ([db ks] (let [f (partial key->id ^DB db)] (int-array (map f ks)))))
+  ([db ks]
+   (let [f (partial key->id db)]
+     (int-array (filter identity (map f ks))))))
 
 (defn normalize-ids
-  "Like keys->ids but does not eliminate duplicates or sort. This is useful
+  "Like keys->ids but does NOT eliminate duplicates or sort. This is useful
   for projections where the order of the projection matters."
   ([ks] (normalize-ids (db) ks))
-  ([db ks] (cond
-            (instance? int-array-class ks) ks
-            (or (sequential? ks)
-                (set? ks)) (let [f (partial key->id db)]
-                             (int-array (map f ks))))))
+  ([db ks]
+   (cond
+     (instance? int-array-class ks) ks
+     (or (sequential? ks)
+         (set? ks)) (let [f (partial key->id db)]
+                      (->> ks
+                           (map f)
+                           (filter identity)
+                           int-array)))))
 
 (defn id->key
   "Given and id returns the key."
@@ -203,7 +214,7 @@
   "Given a collection of ids returns a collection of keys."
   ([^ints ids] (ids->keys (db) ids))
   ([^DB db ^ints ids]
-   (let [f (partial id->key ^DB db)] (map f ids))))
+   (let [f (partial id->key db)] (map f ids))))
 
 (defn- write-error
   [db m ^Throwable t]
@@ -422,7 +433,7 @@
   ([ks ^ints ids]
    (proj (db) ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (ordered-ids db ks)]
+   (let [^ints key-ids (normalize-ids db ks)]
      (.project db key-ids ids))))
 
 (defn project
@@ -442,9 +453,9 @@
   ([ks ^ints ids]
    (project-map (db) ks ids))
   ([^DB db ks ^ints ids]
-   (let [^ints key-ids (normalize-ids db ks)]
+   (let [^ints key-ids (keys->ids db ks)]
      (for [^int id ids]
-       (->> (map #(vector %1 (value-0 ^DB db %2 id)) ^ints ks key-ids)
+       (->> (map #(vector (id->key %1) (value-0 db %1 id)) key-ids)
             (into {}))))))
 
 (defn ident

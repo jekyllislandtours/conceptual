@@ -171,7 +171,8 @@
         many? (coll? v)
         v' (cond->> v
              (and limit many?) (take limit))]
-    (assoc c k v')))
+    (cond-> c
+      (some? v') (assoc k v'))))
 
 (defn apply-all-key-infos
   [key-infos c]
@@ -265,17 +266,18 @@
   (let [{:keys [pull/key-infos pull/relations pull/k->as]} parsed-pattern
         ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
+        key-ids (c/keys->ids (conj ks :db/id))
         cb-opts {:pull/ctx ctx
                  :pull/k->as k->as}
         xform (comp (map (partial apply-all-key-infos key-infos))
-                 (map (partial reify-relations ctx relations))
-                 (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
-                 (map #(rename-keys (assoc cb-opts :pull/concept %)))
+                    (map (partial reify-relations ctx relations))
+                    (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
+                    (map #(rename-keys (assoc cb-opts :pull/concept %)))
                  (map (fn [c]
                         (cond-> c
                           rm-db-id? (dissoc c :db/id)))))
         one? (int? id+)
         ids (if one? [id+] id+)
-        cs (into [] xform (c/project-map (conj ks :db/id) ids))]
+        cs (into [] xform (c/project-map key-ids ids))]
     (cond-> cs
       one? first)))
