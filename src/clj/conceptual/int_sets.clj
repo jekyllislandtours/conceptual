@@ -96,7 +96,9 @@
 (defn index-of
   "Returns the index of a key in a sorted int array, -1 if not found."
   [key ^ints coll]
-  (IntegerSets/contains coll key))
+  (if key
+    (IntegerSets/contains coll key)
+    -1))
 
 ;;(index-of 3 a)
 
