@@ -89,7 +89,9 @@
   (expect 0 (i/index-of 1 (int-array [1 2])))
   (expect 1 (i/index-of 2 (int-array [1 2])))
   (expect -1 (i/index-of 3 (int-array [1 2])))
-  (expect -1 (i/index-of 3 nil)))
+  (expect -1 (i/index-of 3 nil))
+  (expect -1 (i/index-of nil nil))
+  (expect -1 (i/index-of nil (int-array []))))
 
 (deftest member?-test
   (expect true (i/member? 2 (int-array [1 2])))
@@ -99,7 +101,9 @@
 (deftest contains?-test
   (expect true (i/contains? (int-array [1 2]) 2))
   (expect false (i/contains? (int-array [1 2]) 3))
-  (expect false (i/contains? nil 3)))
+  (expect false (i/contains? nil 3))
+  (expect false (i/contains? nil nil))
+  (expect false (i/contains? (int-array []) nil)))
 
 
 (deftest set-test
