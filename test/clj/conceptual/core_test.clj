@@ -1,8 +1,9 @@
 (ns conceptual.core-test
-  (:require [conceptual.core :as c]
-            [clojure.test :refer [deftest use-fixtures testing]]
-            [conceptual.test.core :as test.core]
-            [expectations.clojure.test :refer [expect]]))
+  (:require
+   [conceptual.core :as c]
+   [clojure.test :refer [deftest use-fixtures testing]]
+   [conceptual.test.core :as test.core]
+   [expectations.clojure.test :refer [expect]]))
 
 (use-fixtures :each test.core/with-rdb)
 

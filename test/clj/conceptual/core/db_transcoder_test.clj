@@ -1,16 +1,16 @@
 (ns conceptual.core.db-transcoder-test
-  (:require [conceptual.core :as c]
-            [conceptual.schema :as s]
-            [conceptual.int-sets :as i]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest testing is]]
-            [taoensso.nippy :as nippy])
-  (:import [clojure.lang Keyword PersistentHashMap]
-           [java.util Date]
-           [java.time Instant]
-           [conceptual.core DBTranscoder RDB]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.schema :as s]
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest testing]]
+   [expectations.clojure.test :refer [expect]]
+   ;; required to be loaded  See: https://github.com/jekyllislandtours/conceptual/issues/114
+   [taoensso.nippy])
+  (:import
+   (clojure.lang Keyword PersistentHashMap)
+   (java.util Date)
+   (java.time Instant)))
 
 (defn declare-test-schema! []
   (s/declare-properties!
@@ -82,19 +82,19 @@
 
       ;; pickle setup
       (c/create-db!)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       ;; compact the PersistentDB into an RDB type
       (c/compact!)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       ;; type should be RDB
-      (is (instance? conceptual.core.RDB (c/db)))
+      (expect true (instance? conceptual.core.RDB (c/db)))
 
       ;; pickle round-trip
       (c/pickle! :filename pickle-path)
       (c/load-pickle! :filename pickle-path)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       (io/delete-file pickle-path))))
 
@@ -107,7 +107,7 @@
       ;; pickle setup
       (c/create-db!)
 
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       ;; declare a test schema
       (declare-test-schema!)
@@ -126,20 +126,20 @@
       (c/load-pickle! :filename pickle-path)
 
       (doseq [data +test-data+]
-        (is (= (-> data (dissoc :test/date :test/instant :test/class))
-               (-> (c/seek (:db/key data))
-                   c/->persistent-map
-                   (dissoc :db/id :test/date :test/instant :test/class))))
-        (is (= (-> data :test/instant (.toEpochMilli))
-               (-> (c/value :test/instant (:db/key data))
-                   (.toEpochMilli))))
+        (expect (-> data (dissoc :test/date :test/instant :test/class))
+                (-> (c/seek (:db/key data))
+                    c/->persistent-map
+                    (dissoc :db/id :test/date :test/instant :test/class)))
+        (expect (-> data :test/instant (.toEpochMilli))
+                (-> (c/value :test/instant (:db/key data))
+                    (.toEpochMilli)))
         ;; dates become instants... do we like?
-        (is (= (-> data :test/date (.getTime))
-               (-> (c/value :test/date (:db/key data))
-                   (.toEpochMilli))))
-        (is (= (-> data :test/class (.getName))
-               (-> (c/value :test/class (:db/key data))
-                   (.getName)))))
+        (expect (-> data :test/date (.getTime))
+                (-> (c/value :test/date (:db/key data))
+                    (.toEpochMilli)))
+        (expect (-> data :test/class (.getName))
+                (-> (c/value :test/class (:db/key data))
+                    (.getName))))
 
       ;; cleanup
       (io/delete-file pickle-path))))

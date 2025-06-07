@@ -1,24 +1,18 @@
 (ns conceptual.core.crypto-test
-  (:require [conceptual.core :as c]
-            [conceptual.schema :as s]
-            [conceptual.int-sets :as i]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest testing is]]
-            [taoensso.nippy :as nippy])
-  (:import [clojure.lang Keyword PersistentHashMap]
-           [java.io FileOutputStream FileInputStream
-            PrintWriter
-            InputStreamReader
-            BufferedReader]
-           [java.util Date]
-           [java.time Instant]
-           [javax.crypto Cipher KeyGenerator SecretKey
-            CipherInputStream
-            CipherOutputStream]
-           [java.security SecureRandom]
-           [conceptual.core DBTranscoder RDB]))
+  (:require
+   [conceptual.core :as c]
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest testing]]
+   [expectations.clojure.test :refer [expect]])
+  (:import
+   (java.io FileOutputStream FileInputStream
+    PrintWriter
+    InputStreamReader
+    BufferedReader)
+   (javax.crypto Cipher KeyGenerator
+    CipherInputStream
+    CipherOutputStream)
+   (java.security SecureRandom)))
 
 
 (defn bytes->str [bytes]
@@ -47,7 +41,7 @@
           isr (InputStreamReader. cis)
           br (BufferedReader. isr)
           line (.readLine br)]
-      (is "hello world" line)
+      (expect "hello world" line)
       (io/delete-file "cipher.txt"))))
 
 
@@ -68,14 +62,14 @@
 
       ;; pickle setup
       (c/create-db!)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       ;; compact the PersistentDB into an RDB type
       (c/compact!)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       ;; type should be RDB
-      (is (instance? conceptual.core.RDB (c/db)))
+      (expect true (instance? conceptual.core.RDB (c/db)))
 
       ;; pickle
       (c/pickle! :filename pickle-path
@@ -84,6 +78,6 @@
       ;; reset then load the pickle
       (c/reset-pickle! :filename pickle-path
                        :cipher decipher)
-      (is (= 13 (c/max-id)))
+      (expect 13 (c/max-id))
 
       (io/delete-file pickle-path))))

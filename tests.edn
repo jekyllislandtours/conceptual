@@ -1,23 +1,13 @@
 #kaocha/v1
-{;;:bindings {conceptual.test.config/*sample-flag?* false}
- :kaocha.hooks/pre-run [conceptual.test.core/kaocha-pre-hook!]
+{:kaocha.hooks/pre-run [conceptual.test.core/kaocha-pre-hook!]
  :kaocha.hooks/post-run [conceptual.test.core/kaocha-post-hook!]
- :tests    [{:id         :default
-             :test-paths ["test"]
-             :skip-meta  [:slow :generative :integration]}
-            {:id         :slow
-             :test-paths ["test"]
-             :focus-meta [:slow]}
-            {:id         :generative
-             :test-paths ["test"]
-             :focus-meta [:generative]}
-            {:id         :integration
-             :test-paths ["test"]
-             :focus-meta [:integration]}]
+ :tests    [{:id :default
+             :test-paths ["test"]}]
  :plugins  [:hooks
             :kaocha.plugin/profiling
             :kaocha.plugin/print-invocations
             :kaocha.plugin/notifier]
  :reporter kaocha.report/documentation
  :cli-options
- {:config-file "test/tests.edn", :print-config true}}
+ {:config-file "test/tests.edn"
+  :print-config true}}
