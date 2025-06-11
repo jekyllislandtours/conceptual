@@ -1,6 +1,6 @@
 (ns conceptual.key-frequency-pair-test
   (:require
-   [clojure.test :refer [deftest testing]]
+   [clojure.test :refer [deftest]]
    [expectations.clojure.test :refer [expect]])
   (:import
    (conceptual.core KeyFrequencyPair)

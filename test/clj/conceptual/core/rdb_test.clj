@@ -1,11 +1,12 @@
 (ns conceptual.core.rdb-test
-  (:require [conceptual.core :as c]
-            [conceptual.test.core :as core-test]
-            [expectations.clojure.test :refer [expect]]
-            [clojure.test :refer [deftest use-fixtures]]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.test.core :as test.core]
+   [expectations.clojure.test :refer [expect]]
+   [clojure.test :refer [deftest use-fixtures]]))
 
 
-(use-fixtures :each core-test/with-rdb)
+(use-fixtures :each test.core/with-rdb)
 
 (deftest test-data-test
   (expect (c/value :db/id :hello/world) (c/value :test/parent :hello/dude))

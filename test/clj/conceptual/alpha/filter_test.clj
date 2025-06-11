@@ -1,11 +1,12 @@
 (ns conceptual.alpha.filter-test
-  (:require [clojure.test :refer [deftest use-fixtures testing]]
-            [conceptual.test.core :as test.core]
-            [conceptual.core :as c]
-            [conceptual.int-sets :as i]
-            [clojure.spec.alpha :as s]
-            [conceptual.alpha.filter :as f]
-            [expectations.clojure.test :refer [expect]])
+  (:require
+   [clojure.test :refer [deftest use-fixtures testing]]
+   [conceptual.test.core :as test.core]
+   [conceptual.core :as c]
+   [conceptual.int-sets :as i]
+   [clojure.spec.alpha :as s]
+   [conceptual.alpha.filter :as f]
+   [expectations.clojure.test :refer [expect]])
   (:import (clojure.lang ExceptionInfo)))
 
 

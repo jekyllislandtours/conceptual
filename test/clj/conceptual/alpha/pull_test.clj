@@ -1,10 +1,11 @@
 (ns conceptual.alpha.pull-test
-  (:require [clojure.test :refer [deftest use-fixtures testing]]
-            [conceptual.test.core :as test.core]
-            [conceptual.core :as c]
-            [conceptual.int-sets :as i]
-            [conceptual.alpha.pull :as pull]
-            [expectations.clojure.test :refer [expect]]))
+  (:require
+   [clojure.test :refer [deftest use-fixtures testing]]
+   [conceptual.test.core :as test.core]
+   [conceptual.core :as c]
+   [conceptual.int-sets :as i]
+   [conceptual.alpha.pull :as pull]
+   [expectations.clojure.test :refer [expect]]))
 
 
 (set! *print-namespace-maps* false)

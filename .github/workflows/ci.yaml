@@ -1,0 +1,71 @@
+# This GitHub Actions workflow builds, tests, and deploys a Clojure project.
+# To use it, create a file named `main.yml` (or any other .yml name)
+# inside the `.github/workflows/` directory in your repository.
+
+name: Clojure CI & Deploy
+
+on:
+  push:
+
+jobs:
+  # This workflow contains a single job called "build-and-test"
+  build-and-test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Sets up a Java Development Kit (JDK) environment.
+      # Clojure runs on the JVM, so Java is a prerequisite.
+      # We are using version 17, which is a modern Long-Term Support (LTS) release.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin' # A popular open-source distribution of Java
+          java-version: '17'
+
+      - name: Install clojure tools
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          # Install just one or all simultaneously
+          # The value must indicate a particular version of the tool, or use 'latest'
+          # to always provision the latest version
+          cli: latest       # Clojure CLI based on tools.deps
+          bb:  latest
+          clj-kondo: latest
+          cljfmt: latest
+
+      - name: Cache Clojure dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.clojure
+            ~/.gitlibs
+          key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
+      - name: Compile
+        run: bb build:check
+
+      - name: Run tests
+        run: bb test
+
+      # Deploy to Clojars.
+      # This step will only run if the previous steps (including tests) succeed AND
+      # the event that triggered the workflow was a push to the `main` branch.
+      # It uses `deps-deploy` to publish the JAR file created in the previous step.
+      - name: Deploy to Clojars
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          # These secrets must be configured in your repository's settings.
+          # Go to Settings > Secrets and variables > Actions > New repository secret
+          # CLOJARS_USERNAME: Your Clojars username.
+          # CLOJARS_TOKEN: Your Clojars deploy token (recommended over a password).
+          CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+          CLOJARS_TOKEN: ${{ secrets.CLOJARS_TOKEN }}
+        run: bb deploy

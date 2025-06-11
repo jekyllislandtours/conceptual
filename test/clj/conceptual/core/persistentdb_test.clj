@@ -1,11 +1,12 @@
 (ns conceptual.core.persistentdb-test
-  (:require [conceptual.core :as c]
-            [conceptual.test.core :as core-test]
-            [expectations.clojure.test :refer [expect]]
-            [clojure.test :refer [deftest use-fixtures]]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.test.core :as test.core]
+   [expectations.clojure.test :refer [expect]]
+   [clojure.test :refer [deftest use-fixtures]]))
 
 
-(use-fixtures :each core-test/with-persistentdb)
+(use-fixtures :each test.core/with-persistentdb)
 
 ;;(c/create-db!)
 

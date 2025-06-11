@@ -1,8 +1,9 @@
 (ns conceptual.alpha.debug-test
-  (:require [clojure.test :refer [deftest use-fixtures]]
-            [conceptual.test.core :as test.core]
-            [conceptual.alpha.debug :as debug]
-            [expectations.clojure.test :refer [expect]]))
+  (:require
+   [clojure.test :refer [deftest use-fixtures]]
+   [conceptual.test.core :as test.core]
+   [conceptual.alpha.debug :as debug]
+   [expectations.clojure.test :refer [expect]]))
 
 (use-fixtures :each test.core/with-rdb)
 

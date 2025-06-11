@@ -1,7 +1,8 @@
 (ns conceptual.int-sets-test
-  (:require [conceptual.int-sets :as i]
-            [clojure.test :refer [deftest testing]]
-            [expectations.clojure.test :refer [expect]]))
+  (:require
+   [conceptual.int-sets :as i]
+   [clojure.test :refer [deftest testing]]
+   [expectations.clojure.test :refer [expect]]))
 
 
 (deftest equals?-test

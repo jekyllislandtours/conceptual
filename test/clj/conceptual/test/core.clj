@@ -1,16 +1,12 @@
 (ns conceptual.test.core
-  (:require [conceptual.core :as c]
-            [conceptual.schema :as s]
-            [conceptual.int-sets :as i]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest testing is]]
-            [taoensso.nippy :as nippy])
-  (:import [clojure.lang Keyword PersistentHashMap PersistentVector]
-           [java.util Date]
-           [java.time Instant]
-           [conceptual.core DBTranscoder RDB]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.schema :as s]
+   [conceptual.int-sets :as i])
+  (:import
+   (clojure.lang Keyword PersistentHashMap PersistentVector)
+   (java.util Date)
+   (java.time Instant)))
 
 (defn setup []
   (println "  conceptual test setup:"))
