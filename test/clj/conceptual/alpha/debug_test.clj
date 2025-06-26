@@ -16,7 +16,7 @@
             :sf/registry :sf/starship-id :sf/team-ids :sf/type
             :sf/android? :sf/betazoid? :sf/human? :sf/klingon?
             :sf/-captain-id :sf/-starship-id :sf/-team-ids :sf/-member-ids
-            :sf/starship? :sf/crew? :sf/team?}
+            :sf/starship? :sf/crew? :sf/team? :sf/kvs :sf/addresses}
           (debug/known-keys)))
 
 (deftest unknown-keys-test

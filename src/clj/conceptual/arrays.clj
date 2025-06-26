@@ -16,6 +16,10 @@
 (def ^:const LONG 2)
 (def ^:const FRESSIAN 3)
 
+(defn array?
+  [x]
+  (some-> x class .isArray))
+
 (defn int-array?
   "Returns true is the given parameter is an int array."
   [obj] (instance? int-array-class obj))
