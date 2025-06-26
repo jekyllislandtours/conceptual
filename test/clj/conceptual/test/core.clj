@@ -56,7 +56,9 @@
     [:sf/registry String]
     [:sf/starship-id String]
     [:sf/team-ids PersistentVector]
-    [:sf/type Keyword]])
+    [:sf/type Keyword]
+    [:sf/kvs PersistentHashMap]
+    [:sf/addresses PersistentVector]])
   (s/declare-to-one-relations! [[:test/parent]
                                 [:sf/-starship-id]
                                 [:sf/-captain-id]])
@@ -92,7 +94,18 @@
     :sf/human? true
     :sf/name "Jean-Luc Picard"
     :sf/rank "Captain"
-    :sf/starship-id "uss-e"}
+    :sf/starship-id "uss-e"
+    :sf/addresses [{:street "409 W Water St"
+                    :city "Santa Fe"
+                    :state "NM"
+                    :postal-code  "87501"}
+                   {:street "799 Poho Pl"
+                    :city "Paia"
+                    :state "HI"
+                    :postal-code  "96779"}]
+    :sf/kvs {:university/name "Starfleet Academy"
+             :university/degree "Engineering"
+             :favorite-foods ["pizza" "burritos" "curry"]}}
    {:sf/id "riker"
     :sf/type :sf.type/crew
     :sf/crew? true

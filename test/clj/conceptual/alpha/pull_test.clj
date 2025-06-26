@@ -136,11 +136,13 @@
     ;; success
     (expect {:pull/key-infos [{:pull/key :foo/bar}]
              :pull/relations []
+             :pull/data []
              :pull/k->as {}}
             (f [:foo/bar]))
 
     (expect {:pull/key-infos [{:pull/key :foo/bar} {:pull/key :foo/baz}]
              :pull/relations []
+             :pull/data []
              :pull/k->as {}}
             (f [:foo/bar :foo/baz]))
 
@@ -148,6 +150,7 @@
                               {:pull/key :b}
                               {:pull/key :c :pull/key-opts {:limit 3}}]
              :pull/relations []
+             :pull/data []
              :pull/k->as {}}
             (f [:a :b [:c {:limit 3}]]))
 
@@ -155,8 +158,10 @@
                               {:pull/key :x/b}
                               {:pull/key :x/c :pull/key-opts {:limit 3}}]
              :pull/relations []
+             :pull/data []
              :pull/k->as {}}
             (f [:x/a :x/b [:x/c {:limit 3}]]))
+
 
     (expect {:pull/key-infos [{:pull/key :x/a}
                               {:pull/key :x/b}
@@ -165,7 +170,9 @@
                                :pull/pattern {:pull/key-infos [{:pull/key :foo/a}
                                                                {:pull/key :foo/b}]
                                               :pull/relations []
+                                              :pull/data []
                                               :pull/k->as {}}}]
+             :pull/data []
              :pull/k->as {}}
             (f [:x/a :x/b [:x/c {:limit 3}] {:x/rel [:foo/a :foo/b]}]))
 
@@ -179,7 +186,9 @@
                :pull/pattern
                {:pull/key-infos [{:pull/key :foo/a} {:pull/key :foo/b}]
                 :pull/relations []
+                :pull/data []
                 :pull/k->as {}}}]
+             :pull/data []
              :pull/k->as {:x/rel :x/foos}}
             (f [:x/a :x/b [:x/c {:limit 3}] {[:x/rel {:as :x/foos}] [:foo/a :foo/b]}]))
 
@@ -188,6 +197,7 @@
               {:pull/key :x/b}
               {:pull/key :x/c :pull/key-opts {:limit 3}}]
              :pull/relations [{:pull/key :x/rel}]
+             :pull/data []
              :pull/k->as {}}
             (f '[x/a x/b  x/rel [x/c {:limit 3}]]))
 
@@ -196,6 +206,7 @@
               {:pull/key :x/b}
               {:pull/key :x/c :pull/key-opts {:limit 3}}]
              :pull/relations [{:pull/key :x/rel :pull/key-opts {:as :x/foo}}]
+             :pull/data []
              :pull/k->as {:x/rel :x/foo}}
             (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}]]))
 
@@ -204,6 +215,130 @@
              :pull/key :foo/bar
              :pull/opts :as}
             (f [[:foo/bar :as]]))))
+
+(deftest parse-data-test
+  (let [relation? (fn [{:keys [pull/key] :as m}]
+                    (#{:x/rel} key))
+        data? (fn [{:keys [pull/key] :as m}]
+                (#{:x/simple-map :x/list-of-maps} key))
+        f (fn [pattern]
+            (try
+              (pull/parse {:pull/relation? relation?
+                           :pull/data? data?} pattern)
+              (catch Exception ex
+                (ex-data ex))))]
+
+    (expect {:pull/key-infos [{:pull/key :foo/bar}]
+             :pull/relations []
+             :pull/data [{:pull/key :x/simple-map
+                          :pull/key-infos [{:pull/key :k1} {:pull/key :k2}]}]
+             :pull/k->as {}}
+            (f [:foo/bar {:x/simple-map [:k1 :k2]}]))
+
+    (expect {:pull/key-infos [{:pull/key :foo/bar}]
+             :pull/relations []
+             :pull/data [{:pull/key :x/simple-map
+                          :pull/key-opts {:as :the-simple-map}
+                          :pull/key-infos [{:pull/key :k1} {:pull/key :k2}]}]
+             :pull/k->as {}}
+            (f [:foo/bar {[:x/simple-map {:as :the-simple-map}] [:k1 :k2]}]))
+
+    (expect {:pull/key-infos
+             [{:pull/key :x/a}
+              {:pull/key :x/b}
+              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+             :pull/relations [{:pull/key :x/rel :pull/key-opts {:as :x/foo}}]
+             :pull/data [{:pull/key :x/list-of-maps
+                          :pull/key-infos [{:pull/key :k1}
+                                                {:pull/key :k3
+                                                 :pull/key-opts {:limit 10
+                                                                 :as :k3-alias}}
+                                                {:pull/key :k9}]}]
+             :pull/k->as {:x/rel :x/foo}}
+            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}] {x/list-of-maps [:k1 [:k3 {as k3-alias limit 10}] :k9]}]))
+
+    (expect {:pull/key-infos
+             [{:pull/key :x/a}
+              {:pull/key :x/b}
+              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+             :pull/relations [{:pull/key :x/rel :pull/key-opts {:as :x/foo}}]
+             :pull/data [{:pull/key :x/list-of-maps
+                          :pull/key-infos [{:pull/key true}
+                                                {:pull/key 42
+                                                 :pull/key-opts {:as :alias-42}}
+                                                {:pull/key "hello"}
+                                                {:pull/key :k3
+                                                 :pull/key-opts {:limit 10
+                                                                 :as :k3-alias}}
+                                                {:pull/key :k9}]}]
+             :pull/k->as {:x/rel :x/foo}}
+            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}] {x/list-of-maps [true [42 {as alias-42}] "hello" [:k3 {as k3-alias limit 10}] :k9]}]))
+
+    (testing "vector is ok with various data types that are not collections"
+      (expect {:pull/key-infos [{:pull/key :foo/bar}]
+               :pull/relations []
+               :pull/data [{:pull/key :x/simple-map
+                            :pull/key-infos
+                            [{:pull/key :k1}
+                             {:pull/key true}
+                             {:pull/key 1}
+                             {:pull/key "hi"}]}]
+               :pull/k->as {}}
+              (f [:foo/bar {:x/simple-map [:k1 true 1 "hi"]}])))
+
+    (testing "[1] is ok as selection defaults to [1 {}]"
+      (expect {:pull/key-infos [{:pull/key :foo/bar}]
+               :pull/relations []
+               :pull/data [{:pull/key :x/simple-map
+                            :pull/key-infos
+                            [{:pull/key :k1}
+                             {:pull/key true}
+                             {:pull/key 1}
+                             {:pull/key "hi"}]}]
+               :pull/k->as {}}
+              (f [:foo/bar {:x/simple-map [:k1 true 1 "hi"]}]))
+      (f [:foo/bar {:x/simple-map [:k1 true [1] "hi"]}]))
+
+    (testing "set is ok"
+      (expect {:pull/key-infos [{:pull/key :foo/bar}]
+               :pull/relations []
+               :pull/data [{:pull/key :x/simple-map
+                            :pull/key-infos
+                            [{:pull/key :k1}
+                             {:pull/key :k2}]}]
+               :pull/k->as {}}
+              (f [:foo/bar {:x/simple-map #{:k1 :k2}}])))))
+
+
+(deftest parse-error-when-data-not-list-like-test
+  (let [relation? (fn [{:keys [pull/key] :as m}]
+                    (#{:x/rel} key))
+        data? (fn [{:keys [pull/key] :as m}]
+                (#{:x/simple-map :x/list-of-maps} key))
+        f (fn [pattern]
+            (try
+              (pull/parse {:pull/relation? relation?
+                           :pull/data? data?} pattern)
+              (catch Exception ex
+                (ex-data ex))))]
+
+    (testing "map results in error"
+      (expect {:pull/key :x/simple-map
+               ::pull/error ::pull/data-selection-keys-not-a-list}
+              (f [:foo/bar {:x/simple-map {:k1 :k2}}])))
+
+    (testing "int results in error"
+      (expect {:pull/key :x/simple-map
+               ::pull/error ::pull/data-selection-keys-not-a-list}
+              (f [:foo/bar {:x/simple-map 42}])))
+
+    (testing "string results in error"
+      (expect {:pull/key :x/simple-map
+               ::pull/error ::pull/data-selection-keys-not-a-list}
+              (f [:foo/bar {:x/simple-map "hello"}])))))
+
+
+
 
 (deftest parse-external-relation-test
   (let [relation? (fn [{:keys [pull/key]}]
@@ -217,20 +352,39 @@
     (expect {:pull/key-infos [{:pull/key :foo/bar}
                               {:pull/key :foo/baz}]
              :pull/relations [{:pull/key :external/relation}]
+             :pull/data []
              :pull/k->as {}}
             (f [:foo/bar :foo/baz :external/relation]))))
 
 (deftest apply-key-info-test
   ;; just the limit
-  (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
-                               {:pull/key :sf/member-ids
-                                :pull/key-opts {:limit 2}}))
+  (testing "limit"
+    (expect {:sf/member-ids ["picard" "riker"]}
+            (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:pull/key :sf/member-ids
+                                  :pull/key-opts {:limit 2}})))
 
-  ;; as is not applied till the end
-  (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
-                               {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}})))
+  (testing "as NOT applied"
+    (expect {:sf/member-ids ["picard" "riker"]}
+            (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}})))
+
+  (testing "as and limit ARE applied on same dest"
+    (expect {:sf/members ["picard" "riker"]
+             :sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+            (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}}
+                                 :rename-key? true)))
+
+  (testing "as and limit ARE applied on different dest"
+    (expect {:sf/members ["picard" "riker"]}
+            (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+                                 {}
+                                 {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}}
+                                 :rename-key? true))))
 
 
 (deftest basic-pull-test
@@ -828,3 +982,84 @@
           (pull/pull {:pull/relation-value id-resolver}
                      (pull/parse {:pull/relation? sf-relation?} [:sf/id :sf/name {:sf/captain-id [:sf/id :sf/name :undefined/field-kd83jj]}])
                      (->db-id "uss-e"))))
+
+
+
+(deftest pull-map-attrs
+  (let [data? (fn [{:keys [pull/key]}]
+                (#{:sf/kvs :sf/addresses} key))]
+
+    (testing "baseline data structures"
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+                                        ;:sf/captain-id "picard"
+               :sf/captain-id {:sf/name  "Jean-Luc Picard"
+                               :sf/addresses [{:street "409 W Water St"
+                                               :city "Santa Fe"
+                                               :state "NM"
+                                               :postal-code "87501"}
+                                              {:street "799 Poho Pl"
+                                               :city "Paia"
+                                               :state "HI"
+                                               :postal-code "96779"}]
+                               :sf/kvs {:university/name "Starfleet Academy"
+                                        :university/degree "Engineering"
+                                        :favorite-foods ["pizza" "burritos" "curry"]}}}
+              (pull/pull {:pull/relation-value id-resolver}
+                         (pull/parse
+                          {:pull/relation? sf-relation?}
+                          [:sf/id
+                           :sf/name
+                           {:sf/captain-id [:sf/name :sf/addresses :sf/kvs]}])
+                         (->db-id "uss-e"))))
+
+
+    (testing "data selections for 1 map and seq of maps"
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+               :sf/captain-id {:sf/name  "Jean-Luc Picard"
+                               :sf/addresses [{:city "Santa Fe"
+                                               :state "NM"}
+                                              {:city "Paia"
+                                               :state "HI"}]
+                               :sf/kvs {:university/name "Starfleet Academy"
+                                        :favorite-foods ["pizza" "burritos" "curry"]}}}
+              (pull/pull {:pull/relation-value id-resolver}
+                         (pull/parse
+                          {:pull/relation? sf-relation?
+                           :pull/data? data?}
+                          [:sf/id
+                           :sf/name
+                           {:sf/captain-id [:sf/name
+                                            {:sf/addresses [:city :state]}
+                                            {:sf/kvs [:university/name :favorite-foods]}]}])
+                         (->db-id "uss-e"))))))
+
+(deftest pull-map-attrs-opts
+  (let [data? (fn [{:keys [pull/key]}]
+                (#{:sf/kvs :sf/addresses} key))]
+    (testing "data selections for 1 map and seq of maps"
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+               :sf/captain-id {:sf/name  "Jean-Luc Picard"
+                               :addrs [{:ville "Santa Fe"
+                                        :department "NM"}]
+                               :sf/kvs {:uni "Starfleet Academy"
+                                        :favs ["pizza" "burritos"]}}}
+              (pull/pull {:pull/relation-value id-resolver}
+                         (pull/parse
+                          {:pull/relation? sf-relation?
+                           :pull/data? data?}
+                          [:sf/id
+                           :sf/name
+                           {:sf/captain-id
+                            [:sf/name
+                             {[:sf/addresses {:as :addrs :limit 1}]
+                              [[:city {:as :ville}] [:state {:as :department}]]}
+                             {:sf/kvs [[:university/name {:as :uni}]
+                                       [:favorite-foods {:as :favs :limit 2}]]}]}])
+                         (->db-id "uss-e"))))))
+
+
+
+;; TODO metadata for data specs
