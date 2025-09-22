@@ -1,6 +1,6 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj set])
-  (:import [conceptual.util IntegerSets]))
+  (:refer-clojure :exclude [contains? conj disj set keep mapcat])
+  (:import (conceptual.util IntegerSets IntArrayList)))
 
 
 (set! *warn-on-reflection* true)
@@ -181,12 +181,57 @@
   (IntegerSets/decode s))
 
 (defn set
-  "If `coll` is an int array, returns it as is. Otherwise,
-  removes nil elements, sorts and returns an int array."
-  [coll]
-  (if (= (class coll) (class +empty+))
-    coll
-    (->> coll
-         (filter identity)
-         sort
-         int-array)))
+  [xs]
+  (if (= int/1 (class xs))
+    xs
+    (IntArrayList/sortedIntSet xs)))
+
+(defn- keep-int-set
+  [f ^int/1 xs]
+  (let [ans (IntArrayList/new)
+        n (alength xs)]
+    (loop [i 0]
+      (when (< i n)
+        (.add ans ^Number (f (aget xs i)))
+        (recur (unchecked-inc i))))
+    (.toSortedIntSet ans)))
+
+(defn keep
+  "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
+  either `nil` or an integer. `nil` return values are ignored
+  and won't be in the output int set."
+  [f xs]
+  (if (= int/1 (class xs))
+    (keep-int-set f xs)
+    (let [ans (IntArrayList/new)]
+      (reduce (fn [^IntArrayList l id]
+                (.add l ^Number (f id))
+                l)
+              ans
+              xs)
+      (.toSortedIntSet ans))))
+
+
+(defn- mapcat-int-set
+  [f ^int/1 xs]
+  (let [ans (IntArrayList/new)
+        n (alength xs)]
+    (loop [i 0]
+      (when (< i n)
+        (.addAll ans ^int/1 (f (aget xs i)))
+        (recur (unchecked-inc i))))
+    (.toSortedIntSet ans)))
+
+(defn mapcat
+  "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
+  either `nil` or an integer array."
+  [f xs]
+  (if (= int/1 (class xs))
+    (mapcat-int-set f xs)
+    (let [ans (IntArrayList/new)]
+      (reduce (fn [^IntArrayList l id]
+                (.addAll l ^int/1 (f id))
+                l)
+              ans
+              xs)
+      (.toSortedIntSet ans))))
