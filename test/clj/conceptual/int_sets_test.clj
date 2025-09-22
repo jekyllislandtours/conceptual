@@ -112,3 +112,29 @@
   (expect (class (int-array 0)) (class (i/set nil)))
   (expect [] (vec (i/set [])))
   (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
+
+
+(deftest keep-test
+  (let [f {0 0
+           1 10
+           2 20
+           3 30
+           4 nil
+           5 50}]
+    (expect [0 10 20 30 50]
+            (vec (i/keep f (int-array (keys f)))))
+    (expect [0 10 20 30 50]
+            (vec (i/keep f (keys f))))))
+
+
+(deftest mapcat-test
+  (let [f {0 (int-array [0])
+           1 (int-array [10 11])
+           2 (int-array [20 11])
+           3 (int-array [30 33])
+           4 nil
+           5 (int-array [50 33 51 53])}]
+    (expect [0 10 11 20 30 33 50 51 53]
+            (vec (i/mapcat f (int-array (keys f)))))
+    (expect [0 10 11 20 30 33 50 51 53]
+            (vec (i/mapcat f (keys f))))))
