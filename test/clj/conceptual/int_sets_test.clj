@@ -111,6 +111,7 @@
   (expect (class (int-array 0)) (class (i/set [])))
   (expect (class (int-array 0)) (class (i/set nil)))
   (expect [] (vec (i/set [])))
+  (expect [1 2 3 9 27] (vec (i/set [3 9 1 27 2 3])))
   (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
 
 
@@ -126,7 +127,6 @@
     (expect [0 10 20 30 50]
             (vec (i/keep f (keys f))))))
 
-
 (deftest mapcat-test
   (let [f {0 (int-array [0])
            1 (int-array [10 11])
@@ -138,3 +138,39 @@
             (vec (i/mapcat f (int-array (keys f)))))
     (expect [0 10 11 20 30 33 50 51 53]
             (vec (i/mapcat f (keys f))))))
+
+(deftest sort-test
+  (let [sorted (int-array [1 2 3])]
+    ;; same array reference is returned
+    (expect true (= sorted (i/sort sorted)))
+    (expect [1 2 3] (vec sorted)))
+
+  (let [unsorted (int-array [1 5 3 2 2])]
+    (expect true (= unsorted (i/sort unsorted)))
+    (expect [1 2 2 3 5] (vec unsorted))))
+
+
+(deftest dedupe-test
+  (let [input (int-array [])
+        output (i/dedupe input)]
+    ;; same array reference is returned
+    (expect true (= output input))
+    (expect [] (vec output)))
+
+  (let [input (int-array [1])
+        output (i/dedupe input)]
+    ;; same array reference is returned
+    (expect true (= output input))
+    (expect [1] (vec output)))
+
+  (let [input (int-array [1 2 3])
+        output (i/dedupe input)]
+    ;; same array reference is returned
+    (expect true (= output input))
+    (expect [1 2 3] (vec output)))
+
+  (let [input (int-array [1 2 2 3 5])
+        output (i/dedupe input)]
+    ;; different array reference is returned
+    (expect false (= output input))
+    (expect [1 2 3 5] (vec output))))

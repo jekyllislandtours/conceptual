@@ -1,6 +1,7 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj set keep mapcat])
-  (:import (conceptual.util IntegerSets IntArrayList)))
+  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort])
+  (:import (conceptual.util IntegerSets IntArrayList)
+           (java.util Arrays)))
 
 
 (set! *warn-on-reflection* true)
@@ -186,14 +187,26 @@
     xs
     (IntArrayList/sortedIntSet xs)))
 
+
+(defn sort
+  "[ALPHA] Sorts an int array in place and returns the sorted array. NB. The input `xs` is
+  modified in place and returned. This is not persistent and is meant to be a
+  performance optimization."
+  [^int/1 xs]
+  (Arrays/sort xs) ;; this sorts in place
+  xs)
+
+(defn dedupe
+  "[ALPHA] Dedupes a sorted int array. Returns the same array if there were no dupes which is
+  not persistent and is meant to be a performance optimization."
+  [xs]
+  (IntArrayList/dedupe xs))
+
 (defn- keep-int-set
   [f ^int/1 xs]
-  (let [ans (IntArrayList/new)
-        n (alength xs)]
-    (loop [i 0]
-      (when (< i n)
-        (.add ans ^Number (f (aget xs i)))
-        (recur (unchecked-inc i))))
+  (let [ans (IntArrayList/new)]
+    (dotimes [i (alength xs)]
+      (.add ans ^Number (f (aget xs i))))
     (.toSortedIntSet ans)))
 
 (defn keep
@@ -203,6 +216,7 @@
   [f xs]
   (if (= int/1 (class xs))
     (keep-int-set f xs)
+    ;; we're not doing count since it might be a lazy seq
     (let [ans (IntArrayList/new)]
       (reduce (fn [^IntArrayList l id]
                 (.add l ^Number (f id))
@@ -214,12 +228,9 @@
 
 (defn- mapcat-int-set
   [f ^int/1 xs]
-  (let [ans (IntArrayList/new)
-        n (alength xs)]
-    (loop [i 0]
-      (when (< i n)
-        (.addAll ans ^int/1 (f (aget xs i)))
-        (recur (unchecked-inc i))))
+  (let [ans (IntArrayList/new)]
+    (dotimes [i (alength xs)]
+      (.addAll ans ^int/1 (f (aget xs i))))
     (.toSortedIntSet ans)))
 
 (defn mapcat
@@ -228,6 +239,7 @@
   [f xs]
   (if (= int/1 (class xs))
     (mapcat-int-set f xs)
+    ;; we're not doing count since it might be a lazy seq
     (let [ans (IntArrayList/new)]
       (reduce (fn [^IntArrayList l id]
                 (.addAll l ^int/1 (f id))
