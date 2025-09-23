@@ -297,7 +297,7 @@ public class IntArrayList implements Counted, Seqable, Indexed {
         return Arrays.copyOf(data, size);
     }
 
-    private static int dedupe(int[] xs) {
+    private static int dedupeInternal(int[] xs) {
         // degenerate edge cases
         if (xs.length == 0 || xs.length == 1) {
             return xs.length;
@@ -322,12 +322,20 @@ public class IntArrayList implements Counted, Seqable, Indexed {
         return j + 1;
     }
 
+    public static int[] dedupe(int[] xs) {
+        int uniqueCount = dedupeInternal(xs);
+        int[] ans = xs;
+        if (xs.length != uniqueCount) {
+            ans = Arrays.copyOf(xs, uniqueCount);
+        }
+        return ans;
+    }
+
 
     public int[] toSortedIntSet() {
         int[] xs = toIntArray();
         Arrays.sort(xs);
-        int idx = dedupe(xs);
-        return Arrays.copyOf(xs, idx);
+        return dedupe(xs);
     }
 
 
