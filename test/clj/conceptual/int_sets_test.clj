@@ -2,7 +2,8 @@
   (:require
    [conceptual.int-sets :as i]
    [clojure.test :refer [deftest testing]]
-   [expectations.clojure.test :refer [expect]]))
+   [expectations.clojure.test :refer [expect]])
+  (:import (conceptual.util IntegerSets)))
 
 
 (deftest equals?-test
@@ -52,6 +53,91 @@
 
   (testing "expected incorrect result because of unsorted set"
     (expect [] (vec (i/intersection (int-array [2 3 5]) (int-array [6 7 8 9 3]))))))
+
+
+(deftest fast-intersection-test
+  (expect [] (vec (i/fast-intersection nil)))
+  (expect [] (vec (i/fast-intersection nil nil)))
+  (expect [] (vec (i/fast-intersection nil (i/set [5]))))
+  (expect [] (vec (i/fast-intersection (i/set []) (i/set [5]))))
+  (expect [] (vec (i/fast-intersection (i/set [1 3 9]) (i/set [5]))))
+  (expect [] (vec (i/fast-intersection (i/set [5]) (i/set [1 3 9]))))
+
+  (expect [9] (vec (i/fast-intersection (i/set [1 3 9]) (i/set [5 9]))))
+  (expect [9] (vec (i/fast-intersection (i/set [1 9]) (i/set [9]))))
+  (expect [9] (vec (i/fast-intersection (i/set [9]) (i/set [9]))))
+
+  (expect [9] (vec (i/fast-intersection (i/set [5 9]) (i/set [1 3 9]))))
+  (expect [9] (vec (i/fast-intersection (i/set [9]) (i/set [1 9]))))
+
+  (expect [9] (vec (i/fast-intersection (i/set [2 5 9]) (i/set [1 3 9]) (i/set [9]))))
+  (expect [] (vec (i/fast-intersection (i/set [2 5 9]) (i/set [1 3 9]) (i/set [99]))))
+
+
+  (expect [1] (vec (i/fast-intersection (i/set [1]) (i/set [1]))))
+  (expect [1 2] (vec (i/fast-intersection (i/set [1 2]) (i/set [1 2]))))
+  (expect [1 2 3] (vec (i/fast-intersection (i/set [1 2 3]) (i/set [1 2 3]))))
+  (expect [1 2 3 4] (vec (i/fast-intersection (i/set [1 2 3 4]) (i/set [1 2 3 4]))))
+  (expect [1 2 3 4 5] (vec (i/fast-intersection (i/set [1 2 3 4 5]) (i/set [1 2 3 4 5]))))
+
+  (expect [3 5] (vec (i/fast-intersection (i/set [2 3 5]) (i/set [3 4 5]))))
+  (expect [] (vec (i/fast-intersection (i/set [2 3 5]) (i/set [6 7 8 9]))))
+
+
+  (expect [] (vec (IntegerSets/fastIntersection (into-array int/1 [nil nil nil]))))
+  (expect [] (vec (IntegerSets/fastIntersection nil)))
+  (expect [] (vec (IntegerSets/fastIntersection (into-array int/1 [(int-array [2])
+                                                                    nil
+                                                                    (int-array [2 3 5])]))))
+
+  ;; technically not valid since we expect contents to be greater than 1
+  (expect [0] (vec (i/fast-intersection (i/set [0]) (i/set [0]))))
+
+  ;; expected incorrect result because of unsorted set
+  (expect [] (vec (i/fast-intersection (int-array [2 3 5]) (int-array [6 7 8 9 3])))))
+
+
+(defn fast-difference
+  [& xs]
+  (->> xs
+       (map int-array)
+       into-array
+       IntegerSets/fastDifference
+       vec))
+
+(deftest fast-difference-test
+  (expect [] (vec (i/fast-difference nil)))
+  (expect [] (vec (i/fast-difference nil nil)))
+  (expect [1] (vec (i/fast-difference (i/set [1]))))
+  (expect [1] (vec (i/fast-difference (i/set [1]) nil)))
+  (expect [] (vec (i/fast-difference nil (i/set [1]))))
+  (expect [1] (vec (i/fast-difference (i/set [1]) (i/set []))))
+  (expect [1 2] (vec (i/fast-difference (i/set [1 2]))))
+  (expect [] (vec (i/fast-difference (i/set [1]) (i/set [1]))))
+  (expect [] (vec (i/fast-difference (i/set [1]) (i/set [1]) (i/set [1]))))
+  (expect [] (vec (i/fast-difference (i/set [1 2]) (i/set [1 2]) (i/set [1 2]))))
+  (expect [2 3] (vec (i/fast-difference (i/set [1 2 3]) (i/set [1]) (i/set [1]))))
+  (expect [3] (vec (i/fast-difference (i/set [1 2 3]) (i/set [1]) (i/set [2]))))
+  (expect [] (vec (i/fast-difference (i/set [1 2 3]) (i/set [1]) (i/set [2]) (i/set [3]))))
+  (expect [] (vec (i/fast-difference (i/set [1 2 3]) (i/set []) (i/set [1 2]) (i/set [3]))))
+  (expect [] (vec (i/fast-difference (i/set [1 2 3]) (i/set []) (i/set [1]) (i/set [2 3]))))
+  (expect [] (vec (i/fast-difference (i/set [1 2 3]) (i/set [1 2]) (i/set [3]) (i/set [2 3]))))
+  (expect [2] (vec (i/fast-difference (i/set [1 2 3]) (i/set [1 3]) (i/set [3]) (i/set [3]))))
+
+  (expect [2] (vec (i/difference (i/set [2 3 5]) (i/set [3 4 5]))))
+  (expect [2 3 5] (vec (i/difference (i/set [2 3 5]) (i/set [6 7 8 9]))))
+
+  (expect [] (vec (IntegerSets/fastDifference nil)))
+  (expect [] (vec (IntegerSets/fastDifference (into-array int/1 [nil nil]))))
+
+  (testing "expected incorrect result because of unsorted set"
+    (expect [2 3 5] (vec (i/difference (int-array [2 3 5]) (int-array [6 7 8 9 3])))))
+
+  (testing "issue 83"
+    ;; Bug https://github.com/jekyllislandtours/conceptual/issues/83
+    (let [ans (apply i/fast-difference [nil])]
+      (expect some? ans)
+      (expect empty? ans))))
 
 (deftest difference-test
   (expect some? (i/difference (int-array []) (int-array [])))
@@ -174,3 +260,53 @@
     ;; different array reference is returned
     (expect false (= output input))
     (expect [1 2 3 5] (vec output))))
+
+
+
+(deftest concat-test
+  (expect [] (vec (i/concat)))
+  (expect [] (vec (i/concat nil)))
+  (expect [] (vec (i/concat [])))
+  (expect [] (vec (i/concat (i/set nil) (i/set))))
+  (expect [1 2 3] (vec (i/concat (i/set [1 2]) (i/set [2 3]))))
+  (expect [1 2] (vec (i/concat (i/set [1 2]) (i/set [1]))))
+
+
+  ;; 1 arity
+  (expect [1 2] (vec (i/concat (i/set [1 2]))))
+
+  ;; 2 arity
+  (expect [1 2] (vec (i/concat (i/set [1 2])
+                               (i/set [1]))))
+
+  ;; 3 arity
+  (expect [1 2 3] (vec (i/concat (i/set [1 2])
+                                 (i/set [1])
+                                 (i/set [3]))))
+  ;; 4 arity
+  (expect [1 2 3 4] (vec (i/concat (i/set [1 2])
+                                   (i/set [1])
+                                   (i/set [3])
+                                   (i/set [2 4]))))
+
+  ;; 5 arity
+  (expect [1 2 3 4 5] (vec (i/concat (i/set [1 2])
+                                   (i/set [1])
+                                   (i/set [3])
+                                   (i/set [2 4])
+                                   (i/set [5]))))
+
+
+  ;; rest args
+  (expect [1 2 3 4 5 6 7] (vec (i/concat (i/set [1 2])
+                                         (i/set [1])
+                                         (i/set [3])
+                                         (i/set [2 4])
+                                         (i/set [5])
+                                         (i/set [6 7]))))
+
+
+  (expect [1 2 3 4 5 6 7] (->> [[1] [2] [3] [4] [5] [6] [7]]
+                               (map i/set)
+                               (apply i/concat)
+                               vec)))

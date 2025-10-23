@@ -1,5 +1,5 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort])
+  (:refer-clojure :exclude [contains? concat conj disj dedupe keep mapcat set sort])
   (:import (conceptual.util IntegerSets IntArrayList)
            (java.util Arrays)))
 
@@ -182,10 +182,11 @@
   (IntegerSets/decode s))
 
 (defn set
-  [xs]
-  (if (= int/1 (class xs))
-    xs
-    (IntArrayList/sortedIntSet xs)))
+  ([] +empty+)
+  ([xs]
+   (if (= int/1 (class xs))
+     xs
+     (IntArrayList/sortedIntSet xs))))
 
 
 (defn sort
@@ -209,7 +210,7 @@
       (.add ans ^Number (f (aget xs i))))
     (.toSortedIntSet ans)))
 
-(defn keep
+(defn ^:alpha keep
   "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
   either `nil` or an integer. `nil` return values are ignored
   and won't be in the output int set."
@@ -233,7 +234,7 @@
       (.addAll ans ^int/1 (f (aget xs i))))
     (.toSortedIntSet ans)))
 
-(defn mapcat
+(defn ^:alpha mapcat
   "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
   either `nil` or an integer array."
   [f xs]
@@ -247,3 +248,102 @@
               ans
               xs)
       (.toSortedIntSet ans))))
+
+(defn ^:alpha concat
+  "[ALPHA] Experiment to see if this is faster than `union`. Inputs are int arrays."
+  ([] +empty+)
+  ([a]
+   (let [x (or a +empty+)]
+     (if (= int/1 (class x))
+       x
+       (set x))))
+  ([a b]
+   (let [^ints a (or a +empty+)
+         ^ints b (or b +empty+)
+         capacity (+ (count a) (count b))
+         l (IntArrayList/new capacity)]
+     (.addArray l a)
+     (.addArray l b)
+     (.toSortedIntSet l)))
+  ([a b c]
+   (let [^ints a (or a +empty+)
+         ^ints b (or b +empty+)
+         ^ints c (or c +empty+)
+         capacity (+ (alength a) (alength b) (alength c))
+         l (IntArrayList/new capacity)]
+     (.addArray l a)
+     (.addArray l b)
+     (.addArray l c)
+     (.toSortedIntSet l)))
+  ([a b c d]
+   (let [^ints a (or a +empty+)
+         ^ints b (or b +empty+)
+         ^ints c (or c +empty+)
+         ^ints d (or d +empty+)
+         capacity (+ (alength a) (alength b) (alength c) (alength d))
+         l (IntArrayList/new capacity)]
+     (.addArray l a)
+     (.addArray l b)
+     (.addArray l c)
+     (.addArray l d)
+     (.toSortedIntSet l)))
+  ([a b c d e & more]
+   (let [^ints a (or a +empty+)
+         ^ints b (or b +empty+)
+         ^ints c (or c +empty+)
+         ^ints d (or d +empty+)
+         ^ints e (or e +empty+)
+         capacity (+ (alength a) (alength b) (alength c) (alength d) (alength e))
+         l (IntArrayList/new capacity)]
+     (.addArray l a)
+     (.addArray l b)
+     (.addArray l c)
+     (.addArray l d)
+     (.addArray l e)
+     (doseq [x more]
+       (.addArray l x))
+     (.toSortedIntSet l))))
+
+
+(defn ^:alpha fast-intersection
+  ([] +empty+)
+  ([a] a)
+  ([a b]
+   (IntegerSets/fastIntersection (into-array int/1 [a b])))
+  ([a b c]
+   (IntegerSets/fastIntersection (into-array int/1 [a b c])))
+  ([a b c d]
+   (IntegerSets/fastIntersection (into-array int/1 [a b c d])))
+  ([a b c d e]
+   (IntegerSets/fastIntersection (into-array int/1 [a b c d e])))
+  ([a b c d e & more]
+   (->> more
+        (cons e)
+        (cons d)
+        (cons c)
+        (cons b)
+        (cons a)
+        (into-array int/1)
+        IntegerSets/fastIntersection)))
+
+
+(defn ^:alpha fast-difference
+  ([] +empty+)
+  ([a] (or a +empty+))
+  ([a b]
+   (IntegerSets/fastDifference (into-array int/1 [a b])))
+  ([a b c]
+   (IntegerSets/fastDifference (into-array int/1 [a b c])))
+  ([a b c d]
+   (IntegerSets/fastDifference (into-array int/1 [a b c d])))
+  ([a b c d e]
+   (IntegerSets/fastDifference (into-array int/1 [a b c d e])))
+  ([a b c d e & more]
+   (->> more
+        (cons e)
+        (cons d)
+        (cons c)
+        (cons b)
+        (cons a)
+        (into-array int/1)
+        IntegerSets/fastDifference)))

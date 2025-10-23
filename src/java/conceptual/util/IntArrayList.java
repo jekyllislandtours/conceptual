@@ -1,7 +1,5 @@
 package conceptual.util;
 
-import java.util.Arrays;
-
 import clojure.lang.ISeq;
 import clojure.lang.Cons;
 import clojure.lang.PersistentList;
@@ -112,6 +110,11 @@ public class IntArrayList implements Counted, Seqable, Indexed {
         ensureCapacity(size + numToAdd);
         System.arraycopy(elements, 0, data, size, numToAdd);
         size += numToAdd;
+    }
+
+
+    public void addArray(final int[] elements) {
+        addAll(elements);
     }
 
     public void add(final IntArrayList l) {
@@ -434,6 +437,7 @@ public class IntArrayList implements Counted, Seqable, Indexed {
             return Util.equiv(this, o);
         }
 
+        @Override
         public ISeq seq() {
             if (list.size == 0) {
                 return PersistentList.EMPTY;

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.List;
@@ -21,6 +22,10 @@ import java.util.Random;
 public final class IntegerSets {
 
     public static int[] EMPTY = new int[0];
+
+    static Comparator<int[]> NULLS_FIRST_ARRAY_LENGTH_COMPARATOR =
+        // Then, for non-null arrays, compare by length
+        Comparator.nullsFirst((arr1, arr2) -> Integer.compare(arr1.length, arr2.length));
 
     private IntegerSets() {}
 
@@ -66,6 +71,55 @@ public final class IntegerSets {
 
     public final static int[] intersection(final int[][] sets) {
         return getIntersection(sets);
+    }
+
+
+    public final static int[] fastIntersection(final int[][] sets) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+
+        // sort sets by length so that smallest or null arrays are first
+        Arrays.sort(sets, NULLS_FIRST_ARRAY_LENGTH_COMPARATOR);
+
+        if (null == sets[0] || 0 == sets[0].length) { return EMPTY; }
+
+        int[] result = Arrays.copyOf(sets[0], sets[0].length);
+
+        int writeIdx = 0;
+
+        int rLength = result.length;
+
+        for (int i = 1; i < sets.length; i++) {
+            final int[] elements = sets[i];
+            if (elements == null || elements.length == 0) { return EMPTY; }
+
+            int r = 0;
+            int e = 0;
+            writeIdx = 0;
+
+            while (r < rLength && e < elements.length) {
+                final int valR = result[r];
+                final int valE = elements[e];
+
+                if (valR < valE) {
+                    // Move r forward
+                    r++;
+                } else if (valR > valE) {
+                    // Move e forward
+                    e++;
+                } else {
+                    // Intersection found (valR == valE)
+                    result[writeIdx] = valR;
+                    writeIdx++;
+                    r++;
+                    e++;
+                }
+            }
+
+            rLength = writeIdx;
+        }
+
+        if (0 == writeIdx) { return EMPTY; }
+        return Arrays.copyOf(result, writeIdx);
     }
 
     /**
@@ -337,6 +391,110 @@ public final class IntegerSets {
         }
         return difference;
     }
+
+
+    public final static int[] fastDifference(final int[][] sets) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+        if (null == sets[0] || 0 == sets[0].length) { return EMPTY; }
+
+        int[] result = Arrays.copyOf(sets[0], sets[0].length);
+
+        for (int i = 1; i < sets.length; i++) {
+            final int[] elements = sets[i];
+            if (elements == null || elements.length == 0) { continue; }
+
+            int r = 0;
+            int e = 0;
+
+            // elements is not empty at this point
+
+            while (r < result.length && e < elements.length) {
+                final int valR = result[r];
+                final int valE = elements[e];
+
+                if (-1 == valR) {
+                    // we already handled whatever was here move along
+                    r++;
+                } else if (valR < valE) {
+                    // valR is less than valE which means valR can't be in elements and is part of the diff
+                    // result[r] = valR;
+                    r++;
+                } else if (valR > valE) {
+                    // valE is less than valR so its not yet in results
+                    e++;
+                } else {
+                    // valR and valE are equal so move both forward
+                    result[r] = -1;
+                    r++;
+                    e++;
+                }
+            }
+        }
+
+        // collect the results by ignoring the -1s
+        int j = 0;
+        for (int i = 0; i < result.length; i++) {
+            int v = result[i];
+            if (-1 != v) {
+                result[j] = v;
+                j++;
+            }
+        }
+
+        return Arrays.copyOf(result, j);
+    }
+
+    public final static int[] fastDifferenceOrig(final int[][] sets) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+        if (null == sets[0] || 0 == sets[0].length) { return EMPTY; }
+
+        int[] result = Arrays.copyOf(sets[0], sets[0].length);
+
+        for (int i = 1; i < sets.length; i++) {
+            final int[] elements = sets[i];
+            if (elements == null || elements.length == 0) { continue; }
+
+            int r = 0;
+            int e = 0;
+
+            // elements is not empty at this point
+
+            while (r < result.length && e < elements.length) {
+                final int valR = result[r];
+                final int valE = elements[e];
+
+                if (-1 == valR) {
+                    // we already handled whatever was here move along
+                    r++;
+                } else if (valR < valE) {
+                    // valR is less than valE which means valR can't be in elements and is part of the diff
+                    // result[r] = valR;
+                    r++;
+                } else if (valR > valE) {
+                    // valE is less than valR so its not yet in results
+                    e++;
+                } else {
+                    // valR and valE are equal so move both forward
+                    result[r] = -1;
+                    r++;
+                    e++;
+                }
+            }
+        }
+
+        int[] ans = new int[result.length];
+        int j = 0;
+        for (int i = 0; i < result.length; i++) {
+            int v = result[i];
+            if (-1 != v) {
+                ans[j] = v;
+                j++;
+            }
+        }
+
+        return Arrays.copyOf(ans, j);
+    }
+
 
     /**
      * Returns the index of a key in a sorted int set, -1 if not found
