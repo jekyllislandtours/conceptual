@@ -6,6 +6,11 @@
 
   :init
   (do
+    (defn sys-exit
+      [code msg]
+      (println msg)
+      (System/exit code))
+
     (defn cli-args-map
       []
       (->> *command-line-args*
@@ -60,13 +65,15 @@
 
   test:ff
   {:doc "Runs clojure tests stopping on first failure."
+   :depends [compile:java]
    :task (shell "clojure -M:dev:test default --fail-fast")}
 
   test:focus
   {:doc "Runs a specific clojure tests referenced by namespace or fully qualified var."
+   :depends [compile:java]
    :task (let [named-test (first *command-line-args*)]
            (when-not named-test
-             (lib/sys-exit 1 "no namespace or fully qualified var specified"))
+             (sys-exit 1 "no namespace or fully qualified var specified"))
            (shell (str "clojure -M:dev:test --focus " named-test)))}
 
 

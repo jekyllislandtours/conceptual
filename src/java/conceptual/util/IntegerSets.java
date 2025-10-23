@@ -9,11 +9,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Random;
+import conceptual.util.IntArrayList;
 
 /**
  * IntegerSets assumes all incoming sets have no repeats and are sorted from least to
@@ -22,7 +24,159 @@ public final class IntegerSets {
 
     public static int[] EMPTY = new int[0];
 
+    static Comparator<int[]> NULLS_FIRST_ARRAY_LENGTH_COMPARATOR =
+        // Then, for non-null arrays, compare by length
+        Comparator.nullsFirst((arr1, arr2) -> Integer.compare(arr1.length, arr2.length));
+
     private IntegerSets() {}
+
+
+
+    public final static int[] fastIntersection(final int[][] sets) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+
+        // sort sets by length so that smallest or null arrays are first
+        Arrays.sort(sets, NULLS_FIRST_ARRAY_LENGTH_COMPARATOR);
+
+        if (null == sets[0] || 0 == sets[0].length) { return EMPTY; }
+
+        int[] result = Arrays.copyOf(sets[0], sets[0].length);
+
+        int writeIdx = 0;
+
+        int rLength = result.length;
+
+        for (int i = 1; i < sets.length; i++) {
+            final int[] elements = sets[i];
+            if (elements == null || elements.length == 0) { return EMPTY; }
+
+            int r = 0;
+            int e = 0;
+            writeIdx = 0;
+
+            while (r < rLength && e < elements.length) {
+                final int valR = result[r];
+                final int valE = elements[e];
+
+                if (valR < valE) {
+                    // Move r forward
+                    r++;
+                } else if (valR > valE) {
+                    // Move e forward
+                    e++;
+                } else {
+                    // Intersection found (valR == valE)
+                    result[writeIdx] = valR;
+                    writeIdx++;
+                    r++;
+                    e++;
+                }
+            }
+
+            rLength = writeIdx;
+        }
+
+        if (0 == writeIdx) { return EMPTY; }
+        return Arrays.copyOf(result, writeIdx);
+    }
+
+
+    public final static int[] fastDifference(final int[][] sets) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+        if (null == sets[0] || 0 == sets[0].length) { return EMPTY; }
+
+        int[] result = Arrays.copyOf(sets[0], sets[0].length);
+
+        for (int i = 1; i < sets.length; i++) {
+            final int[] elements = sets[i];
+            if (elements == null || elements.length == 0) { continue; }
+
+            int r = 0;
+            int e = 0;
+
+            // elements is not empty at this point
+
+            while (r < result.length && e < elements.length) {
+                final int valR = result[r];
+                final int valE = elements[e];
+
+                if (-1 == valR) {
+                    // we already handled whatever was here move along
+                    r++;
+                } else if (valR < valE) {
+                    // valR is less than valE which means valR can't be in elements and is part of the diff
+                    // result[r] = valR;
+                    r++;
+                } else if (valR > valE) {
+                    // valE is less than valR so its not yet in results
+                    e++;
+                } else {
+                    // valR and valE are equal so move both forward
+                    result[r] = -1;
+                    r++;
+                    e++;
+                }
+            }
+        }
+
+        // collect the results by ignoring the -1s
+        int j = 0;
+        for (int i = 0; i < result.length; i++) {
+            int v = result[i];
+            if (-1 != v) {
+                result[j] = v;
+                j++;
+            }
+        }
+
+        return Arrays.copyOf(result, j);
+    }
+
+
+    public static int[] concat(final int[] a, final int[] b) {
+        return concat(a, b, null, null, null, null, null, null);
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c) {
+        return concat(a, b, c, null, null, null, null, null);
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d) {
+        return concat(a, b, c, d, null, null, null, null);
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d,
+                               final int[] e) {
+        return concat(a, b, c, d, e, null, null, null);
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d,
+                               final int[] e, final int[] f) {
+        return concat(a, b, c, d, e, f, null, null);
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d,
+                               final int[] e, final int[] f, final int[] g) {
+        return concat(a, b, c, d, e, f, g, null);
+    }
+
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d,
+                               final int[] e, final int[] f, final int[] g, final int[] h) {
+        final int n = IntArrayList.sumSizes(a, b, c, d, e, f, g, h);
+        IntArrayList ial = new IntArrayList(n);
+        ial.addArrays(ial, a, b, c, d, e, f, g, h);
+        return ial.toSortedIntSet();
+    }
+
+    public static int[] concat(final int[] a, final int[] b, final int[] c, final int[] d,
+                               final int[] e, final int[] f, final int[] g, final int[] h, final int[]... more) {
+        final int n = IntArrayList.sumSizes(a, b, c, d, e, f, g, h);
+        IntArrayList ial = new IntArrayList(n);
+        ial.addArrays(a, b, c, d, e, f, g, h, more);
+        return ial.toSortedIntSet();
+    }
+
 
     /**
      * <p>getIntersectionAndUnionCount</p>
@@ -67,6 +221,8 @@ public final class IntegerSets {
     public final static int[] intersection(final int[][] sets) {
         return getIntersection(sets);
     }
+
+
 
     /**
      * <p>getIntersection</p>
@@ -337,6 +493,7 @@ public final class IntegerSets {
         }
         return difference;
     }
+
 
     /**
      * Returns the index of a key in a sorted int set, -1 if not found
@@ -702,89 +859,6 @@ public final class IntegerSets {
         }
         builder.append("}");
         System.out.println(builder.toString());
-    }
-
-    /**
-     * <p>main</p>
-     *
-     * @param args an array of {@link java.lang.String} objects.
-     */
-    public static void main(String[] args) {
-        int size = 10000;
-        int maxIter = 100000;
-        double p = 0.5;
-
-        int[] a = new int[size];
-        int[] b = new int[size];
-
-        Random random = new Random();
-        int aCount = 0;
-        int bCount = 0;
-        for (int i=0; i < size; i++) {
-            if (random.nextDouble() > (1.0d - p)) {
-                a[aCount] = i;
-                aCount++;
-            }
-            if (random.nextDouble() > (1.0d - p)) {
-                b[bCount] = i;
-                bCount++;
-            }
-        }
-        int[] tempA = new int[aCount];
-        System.arraycopy(a, 0, tempA, 0, aCount);
-        a = tempA;
-        int[] tempB = new int[bCount];
-        System.arraycopy(b, 0, tempB, 0, bCount);
-        b = tempB;
-
-        printArray("a (" + a.length + ")", a);
-        printArray("b (" + b.length + ")", b);
-
-        long startTime = 0;
-        long endTime = 0;
-        long difference = 0;
-
-        int[] set = null;
-
-        set = getIntersection(a, b);
-        printArray("getIntersection (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getIntersection(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getUnion(a, b);
-        printArray("getUnion (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getUnion(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getDifference(a, b);
-        printArray("getDifference (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getDifference(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getIntersectionAndUnionCount(a, b);
-        printArray("getIntersectionAndUnionCount (" + set[0] + ", " + set[1] + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getIntersectionAndUnionCount(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
     }
 
     public static final void encode(final int[] array, final OutputStream os) throws IOException {
