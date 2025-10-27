@@ -29,11 +29,13 @@
 
            :cider
            {:extra-deps {cider/cider-nrepl {:mvn/version "0.50.2"}}
+            :jvm-opts ["--add-modules=jdk.incubator.vector"]
             :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
 
            :test
            {:main-opts   ["-m" "kaocha.runner" "--config-file" "tests.edn"]
             :extra-paths ["test/clj" "test/resources"]
+            :jvm-opts ["--add-modules=jdk.incubator.vector"]
             :extra-deps
             {lambdaisland/kaocha                     {:mvn/version "1.91.1392"}
              org.clojure/test.check                  {:mvn/version "1.1.1"}

@@ -1,21 +1,13 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? concat conj disj dedupe keep mapcat set sort])
-  (:import (conceptual.util IntegerSets IntArrayList)
-           (java.util Arrays)))
-
+  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort])
+  (:import
+   (conceptual.util IntegerSets IntArrayList)
+   (java.util Arrays)
+   (jdk.incubator.vector IntVector VectorSpecies VectorOperators)))
 
 (set! *warn-on-reflection* true)
 
 (def +empty+ IntegerSets/EMPTY)
-
-
-;;(def a (int-array [1 2 3 4 5 6 7]))
-;;(seq a)
-;;(def b (int-array [3 4 5 6 7 8 9]))
-;;(seq b)
-;;(def c (int-array [0 1 2]))
-;;(def d (int-array [5 8 10 15]))
-;;(def test-set (let [size 10] (seq (mapv (fn [n] (int-array (range n (+ n size)))) (range 0 size)))))
 
 (defn- chunked-reduce
   "Acts similarly to reduce except f is passed chunk-size number of
@@ -248,119 +240,3 @@
               ans
               xs)
       (.toSortedIntSet ans))))
-
-(defn ^:alpha concat
-  "[ALPHA] Experiment to see if this is faster than `union`. Inputs are int arrays."
-  ([] +empty+)
-  ([a]
-   (let [x (or a +empty+)]
-     (if (= int/1 (class x))
-       x
-       (set x))))
-  ([a b]
-   (IntegerSets/concat a b))
-  ([a b c]
-   (IntegerSets/concat a b c))
-  ([a b c d]
-   (IntegerSets/concat a b c d))
-  ([a b c d e]
-   (IntegerSets/concat a b c d e))
-  ([a b c d e f]
-   (IntegerSets/concat a b c d e f))
-  ([a b c d e f g]
-   (IntegerSets/concat a b c d e f g))
-  ([a b c d e f g h]
-   (IntegerSets/concat a b c d e f g h))
-  ([a b c d e f g h & more]
-   (IntegerSets/concat a b c d e f g h (into-array int/1 more))))
-
-(defn ^:alpha fast-union
-  ([] +empty+)
-  ([a] (or a +empty+))
-  ([a b]
-   (mapcat [a b]))
-  ([a b c]
-   (mapcat [a b c]))
-  ([a b c d]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d])))
-  ([a b c d e]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e])))
-  ([a b c d e f]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
-   (->> more
-        (cons h)
-        (cons g)
-        (cons f)
-        (cons e)
-        (cons d)
-        (cons c)
-        (cons b)
-        (cons a)
-        (into-array int/1)
-        IntegerSets/fastIntersection)))
-
-(defn ^:alpha fast-intersection
-  ([] +empty+)
-  ([a] a)
-  ([a b]
-   (IntegerSets/fastIntersection (into-array int/1 [a b])))
-  ([a b c]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c])))
-  ([a b c d]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d])))
-  ([a b c d e]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e])))
-  ([a b c d e f]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
-   (IntegerSets/fastIntersection (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
-   (->> more
-        (cons h)
-        (cons g)
-        (cons f)
-        (cons e)
-        (cons d)
-        (cons c)
-        (cons b)
-        (cons a)
-        (into-array int/1)
-        IntegerSets/fastIntersection)))
-
-
-(defn ^:alpha fast-difference
-  ([] +empty+)
-  ([a] (or a +empty+))
-  ([a b]
-   (IntegerSets/fastDifference (into-array int/1 [a b])))
-  ([a b c]
-   (IntegerSets/fastDifference (into-array int/1 [a b c])))
-  ([a b c d]
-   (IntegerSets/fastDifference (into-array int/1 [a b c d])))
-  ([a b c d e]
-   (IntegerSets/fastDifference (into-array int/1 [a b c d e])))
-  ([a b c d e f]
-   (IntegerSets/fastDifference (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
-   (IntegerSets/fastDifference (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
-   (IntegerSets/fastDifference (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
-   (->> more
-        (cons h)
-        (cons g)
-        (cons f)
-        (cons e)
-        (cons d)
-        (cons c)
-        (cons b)
-        (cons a)
-        (into-array int/1)
-        IntegerSets/fastDifference)))

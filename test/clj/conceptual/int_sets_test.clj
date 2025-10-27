@@ -3,7 +3,9 @@
    [conceptual.int-sets :as i]
    [clojure.test :refer [deftest testing]]
    [expectations.clojure.test :refer [expect]])
-  (:import (conceptual.util IntegerSets)))
+  (:import
+   (conceptual.util IntegerSets)
+   (jdk.incubator.vector IntVector VectorSpecies)))
 
 
 (deftest equals?-test
@@ -333,3 +335,94 @@
                (map i/set)
                (apply i/concat)
                vec)))
+
+
+
+(deftest vector-intersection-test
+  (expect [] (vec (i/vector-intersection nil)))
+  (expect [] (vec (i/vector-intersection nil nil)))
+  (expect [] (vec (i/vector-intersection nil (i/set [5]))))
+  (expect [] (vec (i/vector-intersection (i/set []) (i/set [5]))))
+  (expect [] (vec (i/vector-intersection (i/set [1 3 9]) (i/set [5]))))
+  (expect [] (vec (i/vector-intersection (i/set [5]) (i/set [1 3 9]))))
+
+  (expect [9] (vec (i/vector-intersection (i/set [1 3 9]) (i/set [5 9]))))
+  (expect [9] (vec (i/vector-intersection (i/set [1 9]) (i/set [9]))))
+  (expect [9] (vec (i/vector-intersection (i/set [9]) (i/set [9]))))
+
+  (expect [9] (vec (i/vector-intersection (i/set [5 9]) (i/set [1 3 9]))))
+  (expect [9] (vec (i/vector-intersection (i/set [9]) (i/set [1 9]))))
+
+  (expect [9] (vec (i/vector-intersection (i/set [2 5 9]) (i/set [1 3 9]) (i/set [9]))))
+  (expect [] (vec (i/vector-intersection (i/set [2 5 9]) (i/set [1 3 9]) (i/set [99]))))
+
+
+  (expect [1] (vec (i/vector-intersection (i/set [1]) (i/set [1]))))
+  (expect [1 2] (vec (i/vector-intersection (i/set [1 2]) (i/set [1 2]))))
+  (expect [1 2 3] (vec (i/vector-intersection (i/set [1 2 3]) (i/set [1 2 3]))))
+  (expect [1 2 3 4] (vec (i/vector-intersection (i/set [1 2 3 4]) (i/set [1 2 3 4]))))
+  (expect [1 2 3 4 5] (vec (i/vector-intersection (i/set [1 2 3 4 5]) (i/set [1 2 3 4 5]))))
+
+  (expect [3 5] (vec (i/vector-intersection (i/set [2 3 5]) (i/set [3 4 5]))))
+  (expect [] (vec (i/vector-intersection (i/set [2 3 5]) (i/set [6 7 8 9]))))
+
+
+  (expect [] (vec (IntegerSets/vectorIntersection (into-array int/1 [nil nil nil]))))
+  (expect [] (vec (IntegerSets/vectorIntersection nil)))
+  (expect [] (vec (IntegerSets/vectorIntersection (into-array int/1 [(int-array [2])
+                                                                    nil
+                                                                    (int-array [2 3 5])]))))
+
+  ;; technically not valid since we expect contents to be greater than 1
+  (expect [0] (vec (i/vector-intersection (i/set [0]) (i/set [0]))))
+
+  (expect (range 1 15)
+          (vec (i/vector-intersection (i/set (range 1 15))
+                                      (i/set (range 1 15)))))
+
+  (expect (range 1 16)
+          (vec (i/vector-intersection (i/set (range 1 16))
+                                      (i/set (range 1 16)))))
+
+  (expect (range 1 17)
+          (vec (i/vector-intersection (i/set (range 1 17))
+                                      (i/set (range 1 17)))))
+
+
+  (expect []
+          (vec (i/vector-intersection (i/set (range 90 200))
+                                      (i/set (range 1 90)))))
+
+  (expect [90]
+          (vec (i/vector-intersection (i/set (range 90 200))
+                                      (i/set (range 1 91)))))
+
+  (expect (range 90 110)
+          (vec (i/vector-intersection (i/set (range 90 200))
+                                      (i/set (range 1 110))))))
+
+
+(deftest vector-intersect-edge-cases-test
+  (let [vec-length (.length IntVector/SPECIES_PREFERRED)
+        all-lengths (range 1 (+ 2 (* 3 vec-length)))]
+    ;; 0 to (+ 1 (* 3 vec-length))
+    ;; equal length
+    (doseq [lengths-1 all-lengths]
+      (doseq [lengths-2 all-lengths]
+        (let [a (i/set (range 1 lengths-1))
+              b (i/set (range 1 lengths-2))
+              expected (vec (i/intersection a b))
+              actual (vec (i/vector-intersection
+                           (i/set (range 1 lengths-1))
+                           (i/set (range 1 lengths-2))))]
+          ;; (prn {:a (vec a) :b (vec b) :expected expected :actual actual})
+          (expect expected actual))))))
+
+
+(deftest vector-intersect-1-test
+  (let [a (i/set [384 386 388 390 392])
+        b (i/set [384 385 389 391 392 395 396 398 399 400 402 403 406 407 408
+                  409 410 411 418 419 420 421 422 423 424 428])
+        expected [384 392]]
+    (expect expected (vec (i/vector-intersection2 a b)))
+    ))

@@ -27,7 +27,7 @@
   (b/javac {:src-dirs java-src-dirs
             :class-dir class-dir
             :basis @basis
-            :javac-opts ["--release" "11"
+            :javac-opts ["--add-modules=jdk.incubator.vector"
                          "-Xlint:deprecation" "-Xlint:unchecked"
                          "-proc:none"]}))
 
