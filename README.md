@@ -27,6 +27,11 @@ Conceptual is a fast JVM based in-memory concept database that can be used as a 
   * can support many different backing stores
   * default implementation represented as co-indexed arrays
 
+### NB
+* Java 17 is required to use the Vector API (JEP 338 and others).
+* The `conceptual.alpha` namespace/package is subject to change.
+* Functions designated as alpha are also subject to change.
+
 ### Usage
 
 Add to :deps in your deps.edn:

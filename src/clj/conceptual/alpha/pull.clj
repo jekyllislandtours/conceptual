@@ -1,7 +1,7 @@
 (ns conceptual.alpha.pull
   (:require [conceptual.core :as c]
             [conceptual.arrays :as a]
-            [conceptual.int-sets :as i]
+            [conceptual.alpha.int-sets :as i]
             [conceptual.alpha.filter :as c.filter]
             [clojure.set :as set]))
 
