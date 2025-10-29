@@ -27,7 +27,8 @@
   (b/javac {:src-dirs java-src-dirs
             :class-dir class-dir
             :basis @basis
-            :javac-opts ["--release" "11"
+            :javac-opts ["--release=17"
+                         "--add-modules=jdk.incubator.vector"
                          "-Xlint:deprecation" "-Xlint:unchecked"
                          "-proc:none"]}))
 
@@ -36,7 +37,8 @@
   (println "Compiling clj...")
   (b/compile-clj {:src-dirs clj-src-dirs
                   :class-dir class-dir
-                  :basis @basis}))
+                  :basis @basis
+                  :java-opts ["--add-modules=jdk.incubator.vector"]}))
 
 
 (defn- pom-template [version]

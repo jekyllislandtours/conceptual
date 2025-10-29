@@ -8,36 +8,41 @@
 
  :paths ["src/clj" "target/classes"]
 
- :aliases {:build
-           {:ns-default build
-            :deps
-            {io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}
-             slipset/deps-deploy {:mvn/version "0.2.2"}}}
+ :aliases
+ {:build
+  {:ns-default build
+   :deps
+   {io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}
+    slipset/deps-deploy {:mvn/version "0.2.2"}}}
 
-           ;; the walkthrough requires some memory
-           :walkthrough {:jvm-opts ["-Xmx25g"]}
 
-           :dev {}
+  ;; the walkthrough requires some memory
+  :walkthrough {:jvm-opts ["-Xmx25g"]}
 
-           :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1250"}}
-                      :main-opts  ["-m" "antq.core"]}
+  :shared
+  {:jvm-opts ["--add-modules=jdk.incubator.vector"]}
 
-           :debug
-           {:extra-deps {djblue/portal                         {:mvn/version "0.58.2"}
-                         com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.7.5"}
-                         com.github.jpmonettas/flow-storm-inst {:mvn/version "3.7.5"}}}
+  :dev {}
 
-           :cider
-           {:extra-deps {cider/cider-nrepl {:mvn/version "0.50.2"}}
-            :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
+  :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1250"}}
+             :main-opts  ["-m" "antq.core"]}
 
-           :test
-           {:main-opts   ["-m" "kaocha.runner" "--config-file" "tests.edn"]
-            :extra-paths ["test/clj" "test/resources"]
-            :extra-deps
-            {lambdaisland/kaocha                     {:mvn/version "1.91.1392"}
-             org.clojure/test.check                  {:mvn/version "1.1.1"}
-             com.github.seancorfield/expectations    {:mvn/version "2.1.201"}}}}
+  :debug
+  {:extra-deps {djblue/portal                         {:mvn/version "0.58.2"}
+                com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.7.5"}
+                com.github.jpmonettas/flow-storm-inst {:mvn/version "3.7.5"}}}
+
+  :cider
+  {:extra-deps {cider/cider-nrepl {:mvn/version "0.50.2"}}
+   :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
+
+  :test
+  {:main-opts   ["-m" "kaocha.runner" "--config-file" "tests.edn"]
+   :extra-paths ["test/clj" "test/resources"]
+   :extra-deps
+   {lambdaisland/kaocha                     {:mvn/version "1.91.1392"}
+    org.clojure/test.check                  {:mvn/version "1.1.1"}
+    com.github.seancorfield/expectations    {:mvn/version "2.1.201"}}}}
 
  :deps/prep-lib {:ensure "target/classes"
                  :alias :build

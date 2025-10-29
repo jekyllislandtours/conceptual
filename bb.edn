@@ -6,6 +6,11 @@
 
   :init
   (do
+    (defn sys-exit
+      [code msg]
+      (println msg)
+      (System/exit code))
+
     (defn cli-args-map
       []
       (->> *command-line-args*
@@ -51,23 +56,25 @@
   cider
   {:doc "Runs the repl"
    :depends [compile:java]
-   :task (shell "clj -M:dev:test:debug:cider")}
+   :task (shell "clj -M:dev:test:debug:shared:cider")}
 
   test
   {:doc "Runs clojure tests"
    :depends [compile:java]
-   :task (shell "clojure -M:dev:test default")}
+   :task (shell "clojure -M:dev:shared:test default")}
 
   test:ff
   {:doc "Runs clojure tests stopping on first failure."
-   :task (shell "clojure -M:dev:test default --fail-fast")}
+   :depends [compile:java]
+   :task (shell "clojure -M:dev:shared:test default --fail-fast")}
 
   test:focus
   {:doc "Runs a specific clojure tests referenced by namespace or fully qualified var."
+   :depends [compile:java]
    :task (let [named-test (first *command-line-args*)]
            (when-not named-test
-             (lib/sys-exit 1 "no namespace or fully qualified var specified"))
-           (shell (str "clojure -M:dev:test --focus " named-test)))}
+             (sys-exit 1 "no namespace or fully qualified var specified"))
+           (shell (str "clojure -M:dev:shared:test --focus " named-test)))}
 
 
   outdated

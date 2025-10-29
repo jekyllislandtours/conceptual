@@ -2,7 +2,7 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.set :as set]
             [conceptual.core :as c]
-            [conceptual.int-sets :as i]))
+            [conceptual.alpha.int-sets :as i]))
 
 ;; prevent slow index scans by default
 (def ^:dynamic *enable-index-scan* false)
