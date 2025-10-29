@@ -1,38 +1,29 @@
-# This GitHub Actions workflow builds, tests, and deploys a Clojure project.
-# To use it, create a file named `main.yml` (or any other .yml name)
-# inside the `.github/workflows/` directory in your repository.
+# This file must be at `.github/workflows/ci.yaml` in the repository.
 
-name: Clojure CI & Deploy
+name: Conceptual CI & Deploy
 
 on:
   push:
 
 jobs:
-  # This workflow contains a single job called "build-and-test"
   build-and-test:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
     steps:
-      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # Checks out your repository under $GITHUB_WORKSPACE
       - name: Checkout code
         uses: actions/checkout@v5
 
       # Sets up a Java Development Kit (JDK) environment.
-      # Clojure runs on the JVM, so Java is a prerequisite.
-      # We are using version 21, which is a modern Long-Term Support (LTS) release.
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin' # A popular open-source distribution of Java
-          java-version: '21'
+          distribution: 'temurin'
+          java-version: '21' # Long-Term Support (LTS) release
 
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@13.4
         with:
-          # Install just one or all simultaneously
           # The value must indicate a particular version of the tool, or use 'latest'
-          # to always provision the latest version
           cli: latest       # Clojure CLI based on tools.deps
           bb:  latest
           clj-kondo: latest
@@ -55,12 +46,9 @@ jobs:
       - name: Run tests
         run: bb test
 
-      # Deploy to Clojars.
-      # This step will only run if the previous steps (including tests) succeed AND
-      # the event that triggered the workflow was a push to the `main` branch.
-      # It uses `deps-deploy` to publish the JAR file created in the previous step.
+      # Deploy to Clojars only when a new tag is pushed
       - name: Deploy to Clojars
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           # These secrets must be configured in your repository's settings.
           # Go to Settings > Secrets and variables > Actions > New repository secret
