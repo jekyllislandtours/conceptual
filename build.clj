@@ -37,7 +37,8 @@
   (println "Compiling clj...")
   (b/compile-clj {:src-dirs clj-src-dirs
                   :class-dir class-dir
-                  :basis @basis}))
+                  :basis @basis
+                  :java-opts ["--add-modules=jdk.incubator.vector"]}))
 
 
 (defn- pom-template [version]
