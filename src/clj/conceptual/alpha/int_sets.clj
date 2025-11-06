@@ -1,5 +1,5 @@
 (ns conceptual.alpha.int-sets
-  (:refer-clojure :exclude [contains? concat conj disj keep mapcat set =])
+  (:refer-clojure :exclude [= contains? concat conj disj keep mapcat set take])
   (:import
    (conceptual.alpha IntegerSetsAlpha)
    (conceptual.util IntArrayList)
@@ -214,3 +214,22 @@
   "Is `a` a superset of `b`?"
   [a b]
   (= (intersection a b) b))
+
+
+(defn take
+  "[ALPHA] Returns an int set with at most `n` unique ints from `xs`
+  as they are encountered."
+  [n xs]
+  (loop [ans (java.util.HashSet/newHashSet n)
+         [x & more] xs]
+    (cond
+      (or (clojure.core/= n (.size ans))
+          (and (nil? x) (nil? more)))
+      (sort! (int-array (seq ans)))
+
+      (nil? x)
+      (recur ans more)
+
+      :else
+      (do (.add ans x)
+          (recur ans more)))))

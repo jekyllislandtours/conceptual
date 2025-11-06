@@ -288,3 +288,13 @@
     (let [ans (apply i/difference [nil])]
       (expect some? ans)
       (expect empty? ans))))
+
+
+(deftest take-test
+  (expect [1 2 3] (vec (i/take 3 [1 2 3])))
+  (expect [1 2 3] (vec (i/take 3 [1 2 3 3])))
+  (expect [1 2 3] (vec (i/take 3 [1 2 3 nil])))
+  (expect [1 2 3] (vec (i/take 3 [1 nil 2 nil nil 3 nil])))
+  (expect [1 2 3] (vec (i/take 3 [3 2 3 1 4])))
+  (expect [1 2 3 4] (vec (i/take 4 [3 2 3 1 4])))
+  (expect [2 3 9] (vec (i/take 3 [9 3 2 3 1 4]))))

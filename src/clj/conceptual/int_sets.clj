@@ -1,5 +1,5 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort])
+  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort take])
   (:import (conceptual.util IntegerSets IntArrayList)
            (java.util Arrays)))
 
@@ -25,7 +25,7 @@
   [f val coll chunk-size]
   (loop [current-coll coll
          acc val]
-    (let [result (apply f acc (take chunk-size current-coll))
+    (let [result (apply f acc (clojure.core/take chunk-size current-coll))
           rest (drop chunk-size current-coll)]
       (if (seq current-coll)
         (recur rest
@@ -247,3 +247,22 @@
               ans
               xs)
       (.toSortedIntSet ans))))
+
+
+(defn take
+  "[ALPHA] Returns an int set with at most `n` unique ints from `xs`
+  as they are encountered."
+  [n xs]
+  (loop [ans (java.util.HashSet/newHashSet n)
+         [x & more] xs]
+    (cond
+      (or (= n (.size ans))
+          (and (nil? x) (nil? more)))
+      (sort (int-array (seq ans)))
+
+      (nil? x)
+      (recur ans more)
+
+      :else
+      (do (.add ans x)
+          (recur ans more)))))
