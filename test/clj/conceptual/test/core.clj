@@ -52,6 +52,7 @@
     [:sf/member-ids PersistentVector]
     [:sf/name String]
     [:sf/position String]
+    [:sf/interests int/1]
     [:sf/rank String]
     [:sf/registry String]
     [:sf/starship-id String]
@@ -92,6 +93,7 @@
     :sf/human? true
     :sf/name "Jean-Luc Picard"
     :sf/rank "Captain"
+    :sf/interests (int-array [501 502 503])
     :sf/starship-id "uss-e"}
    {:sf/id "riker"
     :sf/type :sf.type/crew
@@ -99,6 +101,7 @@
     :sf/human? true
     :sf/name "William T. Riker"
     :sf/rank "Commander"
+    :sf/interests (int-array [502])
     :sf/starship-id "uss-e"}
    {:sf/id "troi"
     :sf/type :sf.type/crew
@@ -107,6 +110,7 @@
     :sf/betazoid? true
     :sf/name "Deanna Troi"
     :sf/rank "Lieutenant Commander"
+    :sf/interests (int-array [503 505 509])
     :sf/starship-id "uss-e"}
    {:sf/id "data"
     :sf/crew? true
@@ -114,6 +118,7 @@
     :sf/android? true
     :sf/name "Data"
     :sf/rank "Lieutenant Commander"
+    :sf/interests (int-array [506 507])
     :sf/starship-id "uss-e"}
    {:sf/id "yar"
     :sf/type :sf.type/crew
@@ -122,6 +127,7 @@
     :sf/name "Tasha Yar"
     :sf/rank "Lieutenant"
     :sf/position "Chief Tactical Officer"
+    :sf/interests (int-array [507])
     :sf/starship-id "uss-e"}
    {:sf/id "worf"
     :sf/type :sf.type/crew
@@ -129,6 +135,7 @@
     :sf/klingon? true
     :sf/name "Worf"
     :sf/rank "Lieutenant Junior Grade"
+    :sf/interests (int-array [502 507])
     :sf/starship-id "uss-e"}
    {:sf/id "la-forge"
     :sf/type :sf.type/crew

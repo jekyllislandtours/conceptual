@@ -12,7 +12,7 @@
             :test/boolean :test/collection :test/character :test/parent
             :test/class :test/external-id :test/long :test/double :test/children
             :test/tag? :test/float :test/instant :test/int :test/date :test/nice?
-            :sf/captain-id :sf/id :sf/member-ids :sf/name :sf/position :sf/rank
+            :sf/captain-id :sf/id :sf/interests :sf/member-ids :sf/name :sf/position :sf/rank
             :sf/registry :sf/starship-id :sf/team-ids :sf/type
             :sf/android? :sf/betazoid? :sf/human? :sf/klingon?
             :sf/-captain-id :sf/-starship-id :sf/-team-ids :sf/-member-ids
