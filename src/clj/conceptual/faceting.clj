@@ -1,6 +1,8 @@
 (ns conceptual.faceting
-  (:require [conceptual.core :refer [*db*]])
-  (:import [conceptual.core DB]))
+  (:require
+   [conceptual.core :refer [*db*]])
+  (:import
+   (conceptual.core DB)))
 
 
 (set! *warn-on-reflection* true)

@@ -103,3 +103,109 @@ was many times slower than the chosen implementation.
         return intersection.toIntArray();
     }
 ```
+### Faceting using Bitmaps
+This approach proved much slower on real world data because you are doing far more additions.
+For example, if there are 500 facets and 1 million concepts and each concept
+has about 10 facets, now we're storing a bitmap representing 500 facets for
+each concept and have to do 500 million addition ops instead of 50 million.
+In addition, memory usage goes up significantly.
+```java
+    /**
+     * Returns an int array with values 0 or 1. 1 is where the item from all was
+     *
+     * Given all:    `[325 326 327 328 329 330 331 332 333 334]`
+     * Given chosen: `[327 333]`
+     * Returns:      `[0 0 1 0 0 0 0 0 1 0]`
+     * @param all sorted int set of all options
+     * @param chosen sorted int set which is a subset of all or equal to all
+     * @return an array of length all.length filled with 1s where chosen exists at all
+     */
+    public static int[] createBitmap(final int[] all, final int[] chosen) {
+        if (null == chosen || 0 == chosen.length) { return null; }
+        final int[] bitmap = new int[all.length];
+        int i = 0;
+        int j = 0;
+        while (i < all.length && j < chosen.length) {
+            final int av = all[i];
+            final int cv = chosen[j];
+            if (av == cv) {
+                bitmap[i] = 1;
+                i++;
+                j++;
+            } else if (av < cv) {
+                i++;
+            } else {
+                j++; // this should never hit
+            }
+        }
+
+        return bitmap;
+    }
+
+    /**
+     * result and bitmap have to be the same length. Modifies
+     * result by adding at each index the value from the same
+     * index from bitmap. Returns the modified result.
+     */
+    public static int[] sumBitmaps(final int[] result, final int[] bitmap) {
+        for (int i = 0; i < result.length; i++) {
+            result[i] += bitmap[i];
+        }
+        return result;
+    }
+
+    public static int[] sumBitmaps(final DB db, final int bitmapId, final int bitmapBins, final int[] ids) {
+        // assume it's a to-many relation
+        // that the the bitmaps are all the same length and
+        int[] result = new int[bitmapBins];
+        for (int i = 0; i < ids.length; i++) {
+            // an array containing either 0 or 1
+            final int[] bitmap = (int[]) db.getValue(ids[i], bitmapId);
+            if (null == bitmap || 0 == bitmap.length) { continue; }
+            result = sumBitmaps(result, bitmap);
+        }
+        return result;
+    }
+```
+
+### Vectorized Faceting using Bitmaps
+This was also slow and rejected for the same reason as above.
+```java
+
+    /**
+     * result and bitmap have to be the same length. Modifies
+     * result by adding at each index the value from the same
+     * index from bitmap. Returns the modified result.
+     */
+    public static int[] vSumBitmaps0(final int[] result, final int[] bitmap, final int maxI, final int vecLength) {
+        int i = 0;
+        while (i < maxI) {
+            IntVector vA = IntVector.fromArray(IntVector.SPECIES_PREFERRED, result, i);
+            IntVector vB = IntVector.fromArray(IntVector.SPECIES_PREFERRED, bitmap, i);
+            IntVector vSum = vA.add(vB);
+            vSum.intoArray(result, i);
+            i += vecLength;
+        }
+
+        for(; i < result.length; i++) {
+            result[i] += bitmap[i];
+        }
+        return result;
+    }
+
+    public static int[] vSumBitmaps(final DB db, final int bitmapId, final int bitmapBins, final int[] ids) {
+        final VectorSpecies<Integer> species = IntVector.SPECIES_PREFERRED;
+        final int vecLength = species.length();
+        final int maxI = bitmapBins - vecLength;
+        // assume it's a to-many relation
+        // that the the bitmaps are all the same length and
+        int[] result = new int[bitmapBins];
+        for (int i = 0; i < ids.length; i++) {
+            // an array containing either 0 or 1
+            final int[] bitmap = (int[]) db.getValue(ids[i], bitmapId);
+            if (null == bitmap || 0 == bitmap.length) { continue; }
+            result = vSumBitmaps0(result, bitmap, maxI, vecLength);
+        }
+        return result;
+    }
+```
