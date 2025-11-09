@@ -34,16 +34,16 @@
 
 (defn intersection
   "Returns the integer intersection of the given sorted int array sets."
-  ([] +empty+)
-  ([^ints a] (or a +empty+))
-  ([^ints a ^ints b] (IntegerSets/intersection a b))
-  ([^ints a ^ints b ^ints c] (IntegerSets/intersection a b c))
-  ([^ints a ^ints b ^ints c ^ints d] (IntegerSets/intersection a b c d))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e] (IntegerSets/intersection a b c d e))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (IntegerSets/intersection a b c d e f))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (IntegerSets/intersection a b c d e f g))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (IntegerSets/intersection a b c d e f g h))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
+  (^int/1 [] +empty+)
+  (^int/1 [^ints a] (or a +empty+))
+  (^int/1 [^ints a ^ints b] (IntegerSets/intersection a b))
+  (^int/1 [^ints a ^ints b ^ints c] (IntegerSets/intersection a b c))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d] (IntegerSets/intersection a b c d))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e] (IntegerSets/intersection a b c d e))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (IntegerSets/intersection a b c d e f))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (IntegerSets/intersection a b c d e f g))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (IntegerSets/intersection a b c d e f g h))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
    (chunked-reduce intersection (intersection a b c d e f g h) more 7)))
 
 ;;(seq (intersection a b))
@@ -51,16 +51,16 @@
 
 (defn union
   "Returns the integer union of the given sorted int array sets."
-  ([] +empty+)
-  ([^ints a] (or a +empty+))
-  ([^ints a ^ints b] (IntegerSets/union a b))
-  ([^ints a ^ints b ^ints c] (IntegerSets/union a b c))
-  ([^ints a ^ints b ^ints c ^ints d] (IntegerSets/union a b c d))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e] (IntegerSets/union a b c d e))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (IntegerSets/union a b c d e f))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (IntegerSets/union a b c d e f g))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (IntegerSets/union a b c d e f g h))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
+  (^int/1 [] +empty+)
+  (^int/1 [^ints a] (or a +empty+))
+  (^int/1 [^ints a ^ints b] (IntegerSets/union a b))
+  (^int/1 [^ints a ^ints b ^ints c] (IntegerSets/union a b c))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d] (IntegerSets/union a b c d))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e] (IntegerSets/union a b c d e))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (IntegerSets/union a b c d e f))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (IntegerSets/union a b c d e f g))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (IntegerSets/union a b c d e f g h))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
      (chunked-reduce union (union a b c d e f g h) more 7)))
 
 ;;(seq (union a b))
@@ -70,15 +70,15 @@
   "Returns the integer difference of the given sorted int arrays. Everything is
   subtracted from the first sorted int array set."
   ([] +empty+)
-  ([^ints a] (or a +empty+))
-  ([^ints a ^ints b] (IntegerSets/difference a b))
-  ([^ints a ^ints b ^ints c] (difference a (union b c)))
-  ([^ints a ^ints b ^ints c ^ints d] (difference a (union b c d)))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e] (difference a (union b c d e)))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (difference a (union b c d e f)))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (difference a (union b c d e f g)))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (difference a (union b c d e f g h)))
-  ([^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
+  (^int/1 [^ints a] (or a +empty+))
+  (^int/1 [^ints a ^ints b] (IntegerSets/difference a b))
+  (^int/1 [^ints a ^ints b ^ints c] (difference a (union b c)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d] (difference a (union b c d)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e] (difference a (union b c d e)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f] (difference a (union b c d e f)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g] (difference a (union b c d e f g)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h] (difference a (union b c d e f g h)))
+  (^int/1 [^ints a ^ints b ^ints c ^ints d ^ints e ^ints f ^ints g ^ints h & more]
    (difference a (apply union a b c d e f g h more))))
 
 (defn add-to-int-set [^ints a b]
@@ -87,11 +87,11 @@
 ;;(seq (difference (int-array (range 10 20)) (apply union test-set)))
 
 (defn conj
-  [^ints a b]
+  ^int/1 [^ints a b]
   (union a (int-array [b])))
 
 (defn disj
-  [^ints a b]
+  ^int/1 [^ints a b]
   (difference a (int-array [b])))
 
 (defn index-of
@@ -182,7 +182,7 @@
   (IntegerSets/decode s))
 
 (defn set
-  [xs]
+  ^int/1 [xs]
   (if (= int/1 (class xs))
     xs
     (IntArrayList/sortedIntSet xs)))
@@ -192,14 +192,14 @@
   "[ALPHA] Sorts an int array in place and returns the sorted array. NB. The input `xs` is
   modified in place and returned. This is not persistent and is meant to be a
   performance optimization."
-  [^int/1 xs]
+  ^int/1 [^int/1 xs]
   (Arrays/sort xs) ;; this sorts in place
   xs)
 
 (defn dedupe
   "[ALPHA] Dedupes a sorted int array. Returns the same array if there were no dupes which is
   not persistent and is meant to be a performance optimization."
-  [xs]
+  ^int/1 [xs]
   (IntArrayList/dedupe xs))
 
 (defn- keep-int-set
@@ -213,7 +213,7 @@
   "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
   either `nil` or an integer. `nil` return values are ignored
   and won't be in the output int set."
-  [f xs]
+  ^int/1 [f xs]
   (if (= int/1 (class xs))
     (keep-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
@@ -236,7 +236,7 @@
 (defn mapcat
   "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
   either `nil` or an integer array."
-  [f xs]
+  ^int/1 [f xs]
   (if (= int/1 (class xs))
     (mapcat-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
@@ -252,7 +252,7 @@
 (defn take
   "[ALPHA] Returns an int set with at most `n` unique ints from `xs`
   as they are encountered."
-  [n xs]
+  ^int/1 [n xs]
   (loop [ans (java.util.HashSet/newHashSet n)
          [x & more] xs]
     (cond

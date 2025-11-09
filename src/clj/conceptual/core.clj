@@ -420,9 +420,9 @@
 (defn ids
   "Shorthand method for {:db/ids (seek id)}. Given a the for a property/attribute
    returns the set of concepts having that property/attribute."
-  ([id]
+  (^int/1 [id]
    (ids @*db* id))
-  ([db id]
+  (^int/1 [db id]
    (or (:db/ids (seek db id)) i/+empty+)))
 
 (defn proj-0
