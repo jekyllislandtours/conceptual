@@ -13,23 +13,23 @@
   "Returns the set union of input sorted int sets. This is `nil` safe, but NOT thread safe.
   Currently works correctly even if inputs are not sorted or have duplicates but it
   is an implementation detail that should NOT be relied on."
-  ([] +empty+)
-  ([a] (or a +empty+))
-  ([a b]
+  (^int/1 [] +empty+)
+  (^int/1 [a] (or a +empty+))
+  (^int/1 [a b]
    (IntegerSetsAlpha/union (into-array int/1 [a b])))
-  ([a b c]
+  (^int/1 [a b c]
    (IntegerSetsAlpha/union (into-array int/1 [a b c])))
-  ([a b c d]
+  (^int/1 [a b c d]
    (IntegerSetsAlpha/union (into-array int/1 [a b c d])))
-  ([a b c d e]
+  (^int/1 [a b c d e]
    (IntegerSetsAlpha/union (into-array int/1 [a b c d e])))
-  ([a b c d e f]
+  (^int/1 [a b c d e f]
    (IntegerSetsAlpha/union (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
+  (^int/1 [a b c d e f g]
    (IntegerSetsAlpha/union (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
+  (^int/1 [a b c d e f g h]
    (IntegerSetsAlpha/union (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
+  (^int/1 [a b c d e f g h & more]
    (->> more
         (cons h)
         (cons g)
@@ -45,23 +45,23 @@
 
 (defn difference
   "Returns the set difference. This is `nil` safe but NOT thread safe."
-  ([] +empty+)
-  ([a] (or a +empty+))
-  ([a b]
+  (^int/1 [] +empty+)
+  (^int/1 [a] (or a +empty+))
+  (^int/1 [a b]
    (IntegerSetsAlpha/difference (into-array int/1 [a b])))
-  ([a b c]
+  (^int/1 [a b c]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c])))
-  ([a b c d]
+  (^int/1 [a b c d]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c d])))
-  ([a b c d e]
+  (^int/1 [a b c d e]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c d e])))
-  ([a b c d e f]
+  (^int/1 [a b c d e f]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
+  (^int/1 [a b c d e f g]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
+  (^int/1 [a b c d e f g h]
    (IntegerSetsAlpha/difference (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
+  (^int/1 [a b c d e f g h & more]
    (->> more
         (cons h)
         (cons g)
@@ -78,23 +78,23 @@
 
 (defn intersection
   "Returns the set intersection. This is `nil` safe but NOT thread safe."
-  ([] +empty+)
-  ([a] (or a +empty+))
-  ([a b]
+  (^int/1 [] +empty+)
+  (^int/1 [a] (or a +empty+))
+  (^int/1 [a b]
    (IntegerSetsAlpha/intersection a b))
-  ([a b c]
+  (^int/1 [a b c]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c])))
-  ([a b c d]
+  (^int/1 [a b c d]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c d])))
-  ([a b c d e]
+  (^int/1 [a b c d e]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c d e])))
-  ([a b c d e f]
+  (^int/1 [a b c d e f]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c d e f])))
-  ([a b c d e f g]
+  (^int/1 [a b c d e f g]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c d e f g])))
-  ([a b c d e f g h]
+  (^int/1 [a b c d e f g h]
    (IntegerSetsAlpha/intersection (into-array int/1 [a b c d e f g h])))
-  ([a b c d e f g h & more]
+  (^int/1 [a b c d e f g h & more]
    (->> more
         (cons h)
         (cons g)
@@ -108,8 +108,8 @@
         IntegerSetsAlpha/intersection)))
 
 (defn set
-  ([] +empty+)
-  ([xs]
+  (^int/1 [] +empty+)
+  (^int/1 [xs]
    (if (clojure.core/= int/1 (class xs))
      xs
      (IntArrayList/sortedIntSet xs))))
@@ -118,22 +118,22 @@
   "Sorts an int array in place and returns the sorted array. NB. The input `xs` is
   modified in place and returned. This is not persistent and is meant to be a
   performance optimization."
-  [^int/1 xs]
+  ^int/1 [^int/1 xs]
   (Arrays/sort xs) ;; this sorts in place
   xs)
 
 (defn dedupe!
   "Dedupes a sorted int array. Returns the same array if there were no dupes which is
   not persistent and is meant to be a performance optimization."
-  [xs]
+  ^int/1 [xs]
   (IntArrayList/dedupe xs))
 
 (defn conj
-  [i-set x]
+  ^int/1 [i-set x]
   (union i-set (int-array [x])))
 
 (defn disj
-  [i-set x]
+  ^int/1 [i-set x]
   (difference i-set (int-array [x])))
 
 (defn index-of
@@ -166,7 +166,7 @@
   "Returns an int set of applying `f` to each of `xs`. `f` must return
   either `nil` or an integer. `nil` return values are ignored
   and won't be in the output int set."
-  [f xs]
+  ^int/1 [f xs]
   (if (clojure.core/= int/1 (class xs))
     (keep-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
@@ -188,7 +188,7 @@
 (defn mapcat
   "Returns a sorted int set of applying `f` to each of `xs`. `f` must return
   either `nil` or an integer array."
-  [f xs]
+  ^int/1 [f xs]
   (if (clojure.core/= int/1 (class xs))
     (mapcat-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
@@ -219,7 +219,7 @@
 (defn take
   "[ALPHA] Returns an int set with at most `n` unique ints from `xs`
   as they are encountered."
-  [n xs]
+  ^int/1 [n xs]
   (loop [ans (java.util.HashSet/newHashSet n)
          [x & more] xs]
     (cond
