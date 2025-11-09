@@ -110,7 +110,7 @@
 (defn set
   (^int/1 [] +empty+)
   (^int/1 [xs]
-   (if (clojure.core/= int/1 (class xs))
+   (if (instance? int/1 xs)
      xs
      (IntArrayList/sortedIntSet xs))))
 
@@ -167,7 +167,7 @@
   either `nil` or an integer. `nil` return values are ignored
   and won't be in the output int set."
   ^int/1 [f xs]
-  (if (clojure.core/= int/1 (class xs))
+  (if (instance? int/1 xs)
     (keep-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
     (let [ans (IntArrayList/new)]
@@ -189,7 +189,7 @@
   "Returns a sorted int set of applying `f` to each of `xs`. `f` must return
   either `nil` or an integer array."
   ^int/1 [f xs]
-  (if (clojure.core/= int/1 (class xs))
+  (if (instance? int/1 xs)
     (mapcat-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
     (let [ans (IntArrayList/new)]

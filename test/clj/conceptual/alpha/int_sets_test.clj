@@ -85,7 +85,12 @@
   (expect (class (int-array 0)) (class (i/set nil)))
   (expect [] (vec (i/set [])))
   (expect [1 2 3 9 27] (vec (i/set [3 9 1 27 2 3])))
-  (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
+  (expect [1 3 9] (vec (i/set [9 1 nil 3])))
+  (let [x (int-array [1])]
+    ;; same array reference is returned
+    (expect true (= x (i/set x)))
+    ;; get a new int array when passing non int-array
+    (expect false (= x (i/set [1])))))
 
 
 (deftest keep-test
