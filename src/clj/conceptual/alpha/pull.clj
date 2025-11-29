@@ -194,7 +194,7 @@
              too-many? (take limit))]
     (cond-> {:k (or as key)
              :v v'}
-      too-many? (assoc :v-pre-limit v))))
+      many? (assoc :v-all v))))
 
 (defn reify-relations*
   [{:keys [pull/relation-value pull/relation-finalizer]
@@ -212,9 +212,9 @@
                   :db/id (:db/id c)}
         id+ (relation-value rel-opts)
         ids (if (int? id+) id+ (i/set id+))
-        {k' :k id+ :v pre-limit-ids :v-pre-limit} (apply-relation-key-info relation ids)
+        {k' :k id+ :v all-ids :v-all} (apply-relation-key-info relation ids)
         rel-opts (cond-> rel-opts
-                   pre-limit-ids (assoc :pull/pre-limit-ids pre-limit-ids))
+                   all-ids (assoc :pull/all-ids all-ids))
         xs (if pattern
              (pull ctx pattern id+)
              id+)
@@ -253,7 +253,7 @@
   `:pull/relation-finalizer`
      - fn which takes in a map and returns either a conceptual db/id or a sequence or int array of db/ids
      - input map has keys `:pull/ctx`, `:pull/key`, `:pull/key-opts`, `:pull/concept`, `:db/id` and
-       optionally `:pull/pre-limit-ids`.
+       `:pull/all-ids`.
      - `:pull/concept` is the current concept being built up
      - an opportunity to associate a metadata ie to convey total count when limit is used, etc
      - returns the concept
