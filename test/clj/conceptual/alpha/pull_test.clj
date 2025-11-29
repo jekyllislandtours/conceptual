@@ -694,11 +694,11 @@
 
 
 (defn metadata-finalizer
-  [{:keys [pull/concept pull/pre-limit-ids pull/output-key]}]
-  (if-not pre-limit-ids
+  [{:keys [pull/concept pull/all-ids pull/output-key]}]
+  (if-not all-ids
     concept
     (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
-      (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)}))))
+      (assoc concept metadata-key {:summary/estimated-count (alength all-ids)}))))
 
 (deftest relation-filter-finalizer-test
   (expect {:sf/id "uss-e"
@@ -713,10 +713,12 @@
                                     {:sf/id "riker" :sf/name "William T. Riker"}]}
                       {:sf/id "uss-e-security-team"
                        :sf/name "Security Team"
+                       :sf/members:metadata {:summary/estimated-count 2}
                        :sf/members [{:sf/id "yar" :sf/name "Tasha Yar"}
                                     {:sf/id "worf" :sf/name "Worf"}]}
                       {:sf/id "uss-e-eng-team"
                        :sf/name "Engineering Team"
+                       :sf/members:metadata {:summary/estimated-count 1}
                        :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}
           (pull/pull {:pull/relation-value id-resolver
                       :pull/relation-finalizer metadata-finalizer}
@@ -755,17 +757,17 @@
 
 
 (defn unexpanded-finalizer
-  [{:keys [pull/concept pull/pre-limit-ids pull/output-key pull/key]}]
+  [{:keys [pull/concept pull/all-ids pull/output-key pull/key]}]
   (let [id+ (get concept key)
         ->external-id  (partial c/value :sf/id)
         v (if (int? id+)
             (->external-id id+)
             (mapv ->external-id id+))
         concept (assoc concept key v)]
-    (if-not pre-limit-ids
+    (if-not all-ids
       concept
       (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
-        (assoc concept metadata-key {:summary/estimated-count (count pre-limit-ids)})))))
+        (assoc concept metadata-key {:summary/estimated-count (alength all-ids)})))))
 
 (deftest unexpanded-relation-test
   (expect {:sf/id "uss-e"
@@ -797,10 +799,12 @@
                                     {:sf/id "riker" :sf/name "William T. Riker"}]}
                       {:sf/id "uss-e-security-team"
                        :sf/name "Security Team"
+                       :sf/members:metadata {:summary/estimated-count 2}
                        :sf/members [{:sf/id "yar" :sf/name "Tasha Yar"}
                                     {:sf/id "worf" :sf/name "Worf"}]}
                       {:sf/id "uss-e-eng-team"
                        :sf/name "Engineering Team"
+                       :sf/members:metadata {:summary/estimated-count 1}
                        :sf/members [{:sf/id "la-forge" :sf/name "Geordi La Forge"}]}]}
           (pull/pull {:pull/relation-value pre-indexed-relation-value
                       :pull/relation-finalizer metadata-finalizer}

@@ -13,6 +13,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Cache Clojure dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.clojure
+            ~/.gitlibs
+          key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
       # Sets up a Java Development Kit (JDK) environment.
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -29,16 +40,6 @@ jobs:
           clj-kondo: latest
           cljfmt: latest
 
-      - name: Cache Clojure dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.m2/repository
-            ~/.clojure
-            ~/.gitlibs
-          key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
-          restore-keys: |
-            ${{ runner.os }}-clojure-
 
       - name: Compile
         run: bb build:check
