@@ -7,6 +7,8 @@
 
 ;; inspiration from https://docs.datomic.com/query/query-pull.html
 
+(defonce ^:dynamic ^:private *store* (atom {}))
+
 (set! *warn-on-reflection* true)
 
 (def known-opts #{:limit :as :filter})
@@ -110,24 +112,37 @@
      - input map has keys `:pull/ctx`, `:pull/key-infos` and `:pull/relations`
      - opportunity to do any validation checks or transformations
      - items in `pull/key-infos` can be tagged with `:pull/relation?` if it is managed as a public relation
-     - will be called for each nested pattern and the outermost pattern"
+     - will be called for each nested pattern and the outermost pattern
+
+  `:pull/virtual-attributes-info`
+     - map of virtual attribute keys to maps.
+     - each value map has keys `:pull.virtual-attribute/resolver-fn`,
+
+"
   [{:keys [pull/relation?
            pull/pattern-finalizer]
+    keyword->virtual-attribute-info :pull/virtual-attributes-info
     :or {relation? (constantly false)
          pattern-finalizer default-pattern-finalizer} :as ctx} pattern]
-  (let [ks (java.util.ArrayList.)
+  (let [keyword->virtual-attribute-info (or keyword->virtual-attribute-info
+                                            (:pull/virtual-attributes @*store*)
+                                            {})
+        ks (java.util.ArrayList.)
         rels (java.util.ArrayList.)
         rel-rfn (fn [ans k sub-pattern]
                   (when-not (or (attr? k) (vector? k))
                     (throw (ex-info "relation must be a keyword or a vector"
                                     {::error ::invalid-relation
                                      :pull/key k})))
-                  (let [key-info (if (attr? k)
-                                   {:pull/key (keyword k)}
+                  (let [kw (if (attr? k) (keyword k) (-> k first keyword))
+                        virtual-info (get keyword->virtual-attribute-info kw)
+                        key-info (if (attr? k)
+                                   {:pull/key kw}
                                    (vector->key-info ctx k))]
-                    (when-not (relation? key-info)
+                    (when-not (or (relation? key-info)
+                                  (:pull.virtual-attribute/relation? virtual-info))
                       (throw (ex-info "not a relation" (assoc key-info ::error ::not-a-relation))))
-                    (conj ans (assoc key-info :pull/pattern (parse ctx sub-pattern)))))]
+                    (conj ans (assoc (merge key-info virtual-info) :pull/pattern (parse ctx sub-pattern)))))]
     (loop [[x & more] pattern]
       (if-not x
         (let [key-infos (vec ks)
@@ -148,12 +163,34 @@
               :pull/k->as k->as})))
         (do
           (cond
-            (attr? x) (if (relation? {:pull/key (keyword x)})
-                        (.add rels [{:pull/key (keyword x)}])
-                        (.add ks {:pull/key (keyword x)}))
-            (vector? x) (if (relation? {:pull/key (keyword (first x))}) ;; case when relation is in a vector without a pattern
-                          (.add rels [(vector->key-info ctx x)])
-                          (.add ks (vector->key-info ctx x)))
+            (attr? x) (let [x (keyword x)
+                            virtual-info (get keyword->virtual-attribute-info x)]
+                        (cond
+                          (and virtual-info (:pull.virtual-attribute/relation? virtual-info))
+                          (.add rels [(assoc virtual-info :pull/key x)])
+
+                          virtual-info
+                          (.add ks (assoc virtual-info :pull/key x))
+
+                          (relation? {:pull/key x})
+                          (.add rels [{:pull/key x}])
+
+                          :else
+                          (.add ks {:pull/key x})))
+            (vector? x) (let [k (-> x first keyword)
+                              virtual-info (get keyword->virtual-attribute-info k)]
+                          (cond
+                            (and virtual-info (:pull.virtual-attribute/relation? virtual-info))
+                            (.add rels [(assoc virtual-info :pull/key k)])
+
+                            virtual-info
+                            (.add ks (merge (vector->key-info ctx x) virtual-info))
+
+                            (relation? {:pull/key k}) ;; case when relation is in a vector without a pattern
+                            (.add rels [(vector->key-info ctx x)])
+
+                            :else
+                            (.add ks (vector->key-info ctx x))))
             (map? x) (.add rels (reduce-kv rel-rfn [] x)))
           (recur more))))))
 
@@ -163,11 +200,13 @@
   (c/value (:pull/key m) (:db/id m)))
 
 (defn apply-key-info
-  [c key-info]
+  [ctx key-info c]
   ;; NB `c` must already have key `key`
   (let [k (:pull/key key-info)
         {:keys [limit]} (:pull/key-opts key-info)
-        v (get c k)
+        v (if-let [resolver-fn (:pull.virtual-attribute/resolver-fn key-info)]
+            (resolver-fn (assoc ctx :pull/concept c))
+            (get c k))
         many? (coll? v)
         v' (cond->> v
              (and limit many?) (take limit))]
@@ -175,12 +214,12 @@
       (some? v') (assoc k v'))))
 
 (defn apply-all-key-infos
-  [key-infos c]
+  [ctx key-infos c]
   (loop [c c
          [key-info & more] key-infos]
     (if-not key-info
       c
-      (recur (apply-key-info c key-info) more))))
+      (recur (apply-key-info ctx key-info c) more))))
 
 (defn apply-relation-key-info
   [{:keys [pull/key pull/key-opts]} id+]
@@ -200,7 +239,7 @@
   [{:keys [pull/relation-value pull/relation-finalizer]
     :or {relation-value default-value
          relation-finalizer :pull/concept} :as ctx}
-   {:keys [pull/key pull/key-opts pull/pattern] :as relation} c]
+   {:keys [pull/key pull/key-opts pull/pattern pull.virtual-attribute/resolver-fn] :as relation} c]
   (let [depth (cond-> (::depth ctx)
                 (not pattern) dec)
         rel-opts {:pull/ctx ctx
@@ -210,7 +249,9 @@
                   :pull/depth depth
                   :pull/reified-relation? (some? pattern)
                   :db/id (:db/id c)}
-        id+ (relation-value rel-opts)
+        id+ (if resolver-fn
+              (resolver-fn rel-opts)
+              (relation-value rel-opts))
         ids (if (int? id+) id+ (i/set id+))
         {k' :k id+ :v all-ids :v-all} (apply-relation-key-info relation ids)
         rel-opts (cond-> rel-opts
@@ -269,7 +310,7 @@
         key-ids (c/keys->ids (conj ks :db/id))
         cb-opts {:pull/ctx ctx
                  :pull/k->as k->as}
-        xform (comp (map (partial apply-all-key-infos key-infos))
+        xform (comp (map (partial apply-all-key-infos ctx key-infos))
                     (map (partial reify-relations ctx relations))
                     (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
                     (map #(rename-keys (assoc cb-opts :pull/concept %)))
@@ -278,6 +319,25 @@
                           rm-db-id? (dissoc c :db/id)))))
         one? (int? id+)
         ids (if one? [id+] id+)
+        ;; TODO: consider looking up the full concept instead of project-map which might be slower
         cs (into [] xform (c/project-map key-ids ids))]
     (cond-> cs
       one? first)))
+
+
+
+;;----------------------------------------------------------------------
+;; Virtual Attributes
+;;----------------------------------------------------------------------
+(defn register-virtual-attribute!
+  "The `resolver-fn` will get the context with at least the key `:pull/concept`
+  which will have all the keys in the pattern as well as `:db/id`.  Therefore,
+  the resolver should use the `:db/id` to lookup the full concept."
+  [& {:keys [pull/virtual-attribute pull.virtual-attribute/resolver-fn
+             pull.virtual-attribute/relation?]}]
+  (assert (qualified-keyword? virtual-attribute))
+  (assert (ifn? resolver-fn))
+  (let [path [:pull/virtual-attributes virtual-attribute]
+        info (cond-> {:pull.virtual-attribute/resolver-fn resolver-fn}
+               (true? relation?) (assoc :pull.virtual-attribute/relation? relation?))]
+    (swap! *store* assoc-in path info)))

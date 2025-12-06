@@ -1,5 +1,6 @@
 (ns conceptual.alpha.pull-test
   (:require
+   [clojure.set :as set]
    [clojure.test :refer [deftest use-fixtures testing]]
    [conceptual.test.core :as test.core]
    [conceptual.core :as c]
@@ -220,17 +221,20 @@
              :pull/k->as {}}
             (f [:foo/bar :foo/baz :external/relation]))))
 
+
 (deftest apply-key-info-test
   ;; just the limit
   (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
+          (pull/apply-key-info {}
                                {:pull/key :sf/member-ids
-                                :pull/key-opts {:limit 2}}))
+                                :pull/key-opts {:limit 2}}
+                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}))
 
   ;; as is not applied till the end
   (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}
-                               {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}})))
+          (pull/apply-key-info {}
+                               {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}}
+                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]})))
 
 
 (deftest basic-pull-test
@@ -832,3 +836,124 @@
           (pull/pull {:pull/relation-value id-resolver}
                      (pull/parse {:pull/relation? sf-relation?} [:sf/id :sf/name {:sf/captain-id [:sf/id :sf/name :undefined/field-kd83jj]}])
                      (->db-id "uss-e"))))
+
+
+;;------------------------------------------------------------------------
+;; Parse Virtual Attributes
+;;------------------------------------------------------------------------
+(defn team-assigned-crew-ids-resolver
+  [{:keys [pull/concept] :as _rel-opts}]
+  (->> concept
+       :db/id
+       (c/value :sf/team-ids)
+       (map ->db-id)
+       (map #(c/value :sf/member-ids %))
+       (apply set/union)
+       (map ->db-id)
+       i/set))
+
+
+(defn teams-count-resolver
+  [{:keys [pull/concept] :as _ctx}]
+  ;; :pull/concept is guaranteed to only have `:db/id` the
+  ;; rest of the fields are dependent on the pull pattern specifed
+  (->> concept :db/id (c/value :sf/team-ids) count))
+
+(def virtual-attributes-info
+  {:sf/team-assigned-crew-ids
+   {:pull.virtual-attribute/resolver-fn team-assigned-crew-ids-resolver
+    :pull.virtual-attribute/relation? true}
+   :sf/teams-count
+   {:pull.virtual-attribute/resolver-fn teams-count-resolver}})
+
+(deftest parse-virtual-attribute-test
+  (expect {:pull/key-infos [{:pull/key :sf/id}
+                            {:pull/key :sf/type}
+                            {:pull/key :sf/name}
+                            {:pull/key :sf/team-ids}
+                            {:pull/key :sf/teams-count
+                             :pull.virtual-attribute/resolver-fn teams-count-resolver}]
+           :pull/relations []
+           :pull/k->as {}}
+          (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                      [:sf/id :sf/type :sf/name :sf/team-ids :sf/teams-count]))
+
+  (expect {:pull/key-infos [{:pull/key :sf/id}
+                            {:pull/key :sf/type}
+                            {:pull/key :sf/name}
+                            {:pull/key :sf/team-ids}
+                            {:pull/key :sf/teams-count
+                             :pull/key-opts {:as :sf/virtual-attr}
+                             :pull.virtual-attribute/resolver-fn teams-count-resolver}]
+           :pull/relations []
+           :pull/k->as {:sf/teams-count :sf/virtual-attr}}
+          (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                      [:sf/id :sf/type :sf/name :sf/team-ids [:sf/teams-count {:as :sf/virtual-attr}]])))
+
+(deftest parse-virtual-attribute-relation-test
+  (expect {:pull/key-infos [{:pull/key :sf/id}
+                            {:pull/key :sf/type}
+                            {:pull/key :sf/name}
+                            {:pull/key :sf/team-ids}]
+           :pull/relations [{:pull/key :sf/team-assigned-crew-ids
+                             :pull/key-opts {:as :sf/virtual-attr}
+                             :pull.virtual-attribute/relation? true
+                             :pull.virtual-attribute/resolver-fn team-assigned-crew-ids-resolver
+                             :pull/pattern {:pull/key-infos [{:pull/key :sf/id}
+                                                             {:pull/key :sf/name}]
+                                            :pull/relations []
+                                            :pull/k->as {}}}]
+           :pull/k->as {:sf/team-assigned-crew-ids :sf/virtual-attr}}
+          (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                      [:sf/id :sf/type :sf/name :sf/team-ids
+                       {[:sf/team-assigned-crew-ids {:as :sf/virtual-attr}] [:sf/id :sf/name]}])))
+
+
+(deftest virtual-attr-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id "picard"
+           :sf/team-ids ["uss-e-bridge-team"
+                         "uss-e-security-team"
+                         "uss-e-eng-team"
+                         "uss-e-away-team"
+                         "uss-e-med-team"]
+           :sf/teams-count 5}
+          (pull/pull {:pull/relation-value id-resolver}
+                     (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                                 [:sf/id :sf/name :sf/captain-id :sf/team-ids :sf/teams-count])
+                     (->db-id "uss-e")))
+
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id "picard"
+           :sf/teams-count 5}
+          (pull/pull {:pull/relation-value id-resolver}
+                     (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                                 [:sf/id :sf/name :sf/captain-id :sf/teams-count])
+                     (->db-id "uss-e"))))
+
+(deftest virtual-attr-relation-test
+  (let [result (pull/pull {:pull/relation-value id-resolver}
+                          (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                                      [:sf/id :sf/name :sf/captain-id :sf/team-ids
+                                       {[:sf/team-assigned-crew-ids {:as :sf/team-assigned-crew}]
+                                        [:sf/id]}])
+                          (->db-id "uss-e"))]
+    (expect {:sf/id "uss-e"
+             :sf/name "USS Enterprise"
+             :sf/captain-id "picard"
+             :sf/team-ids ["uss-e-bridge-team"
+                           "uss-e-security-team"
+                           "uss-e-eng-team"
+                           "uss-e-away-team"
+                           "uss-e-med-team"]
+             :sf/team-assigned-crew #{{:sf/id "picard"}
+                                      {:sf/id "riker"}
+                                      {:sf/id "troi"}
+                                      {:sf/id "data"}
+                                      {:sf/id "yar"}
+                                      {:sf/id "worf"}
+                                      {:sf/id "la-forge"}
+                                      {:sf/id "bev-crusher"}}}
+            (update result :sf/team-assigned-crew set))))
