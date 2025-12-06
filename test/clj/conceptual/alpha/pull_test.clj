@@ -27,6 +27,32 @@
   (expect false (pull/variable? :foo/bar)))
 
 
+(deftest paginate-test
+  (let [f (fn [ids page page-size]
+            (vec (pull/paginate (int-array ids) page page-size)))]
+    (expect [] (f [] 0 0))
+    (expect [] (f [] 0 1))
+    (expect [] (f [] 0 2))
+    (expect [] (f [1 2 3] 0 0))
+
+    (expect [1] (f [1 2 3] 0 1))
+    (expect [1 2] (f [1 2 3] 0 2))
+    (expect [1 2 3] (f [1 2 3] 0 3))
+
+    ;; step by odd page size
+    (expect [1 2 3] (f [1 2 3 4 5 6 7] 0 3))
+    (expect [4 5 6] (f [1 2 3 4 5 6 7] 1 3))
+    (expect [7] (f [1 2 3 4 5 6 7] 2 3))
+    (expect [] (f [1 2 3 4 5 6 7] 3 3))
+
+    ;; step by even page size
+    (expect [1 2] (f [1 2 3 4 5 6 7] 0 2))
+    (expect [3 4] (f [1 2 3 4 5 6 7] 1 2))
+    (expect [5 6] (f [1 2 3 4 5 6 7] 2 2))
+    (expect [7] (f [1 2 3 4 5 6 7] 3 2))
+    (expect [] (f [1 2 3 4 5 6 7] 4 2))))
+
+
 (defn ->db-id
   [id]
   (c/lookup-id :sf/id id))
@@ -87,6 +113,24 @@
              :pull/key :foo/bar}
             (f :foo/bar {:a :b}))))
 
+
+(deftest validated-page-params
+  (let [f (fn [k page max-page-size]
+            (try
+              (pull/validate-page-params k page max-page-size)
+              (catch Exception ex
+                (ex-data ex))))]
+    (expect nil (f :foo/bar 0 10))
+    (expect nil (f :foo/bar 1 10))
+    (expect {::pull/error ::pull/invalid-page-option-value
+             :pull/key :foo/bar}
+            (f :foo/bar -1 10))
+    ;; more than max-page-size is ok, because code does (min max-page-size *max-relation-page-size*)
+    (expect nil (f :foo/bar 1 (inc pull/*max-relation-page-size*)))
+    (expect {::pull/error ::pull/invalid-max-page-size-value
+             :pull/key :foo/bar}
+            (f :foo/bar 1 "42"))))
+
 (deftest vector->key-info-test
   (let [f (fn [v]
             (try
@@ -98,10 +142,10 @@
     (expect {:pull/key :foo/bar} (f [:foo/bar]))
     (expect {:pull/key :foo/bar} (f [:foo/bar {}]))
     (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world}} (f [:foo/bar {:as :hello/world}]))
-    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :limit 3}} (f [:foo/bar {:as :hello/world :limit 3}]))
-    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :limit 3}} (f [:foo/bar {'as "hello/world" 'limit 3}]))
+    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :max-page-size 3}} (f [:foo/bar {:as :hello/world :limit 3}]))
+    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :max-page-size 3}} (f [:foo/bar {'as "hello/world" 'limit 3}]))
     (expect {:pull/key :foo/bar
-             :pull/key-opts {:limit 3
+             :pull/key-opts {:max-page-size 3
                              :as :hello/world
                              :filter [:sexp/logical {:op/boolean 'and
                                                      :list/sexp [[:sexp/field 'sf/human?]]}]}}
@@ -147,21 +191,21 @@
 
     (expect {:pull/key-infos [{:pull/key :a}
                               {:pull/key :b}
-                              {:pull/key :c :pull/key-opts {:limit 3}}]
+                              {:pull/key :c :pull/key-opts {:max-page-size 3}}]
              :pull/relations []
              :pull/k->as {}}
             (f [:a :b [:c {:limit 3}]]))
 
     (expect {:pull/key-infos [{:pull/key :x/a}
                               {:pull/key :x/b}
-                              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+                              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
              :pull/relations []
              :pull/k->as {}}
             (f [:x/a :x/b [:x/c {:limit 3}]]))
 
     (expect {:pull/key-infos [{:pull/key :x/a}
                               {:pull/key :x/b}
-                              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+                              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
              :pull/relations [{:pull/key :x/rel
                                :pull/pattern {:pull/key-infos [{:pull/key :foo/a}
                                                                {:pull/key :foo/b}]
@@ -173,7 +217,7 @@
     (expect {:pull/key-infos
              [{:pull/key :x/a}
               {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
              :pull/relations
              [{:pull/key :x/rel
                :pull/key-opts {:as :x/foos}
@@ -187,18 +231,18 @@
     (expect {:pull/key-infos
              [{:pull/key :x/a}
               {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
              :pull/relations [{:pull/key :x/rel}]
              :pull/k->as {}}
-            (f '[x/a x/b  x/rel [x/c {:limit 3}]]))
+            (f '[x/a x/b  x/rel [x/c {:max-page-size 3}]]))
 
     (expect {:pull/key-infos
              [{:pull/key :x/a}
               {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:limit 3}}]
+              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
              :pull/relations [{:pull/key :x/rel :pull/key-opts {:as :x/foo}}]
              :pull/k->as {:x/rel :x/foo}}
-            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:limit 3}]]))
+            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:max-page-size 3}]]))
 
     ;; error
     (expect {::pull/error ::pull/invalid-opts-map
@@ -227,13 +271,19 @@
   (expect {:sf/member-ids ["picard" "riker"]}
           (pull/apply-key-info {}
                                {:pull/key :sf/member-ids
-                                :pull/key-opts {:limit 2}}
+                                :pull/key-opts {:max-page-size 2}}
+                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}))
+
+  (expect {:sf/member-ids ["picard" "riker"]}
+          (pull/apply-key-info {}
+                               {:pull/key :sf/member-ids
+                                :pull/key-opts {:max-page-size 2}}
                                {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}))
 
   ;; as is not applied till the end
   (expect {:sf/member-ids ["picard" "riker"]}
           (pull/apply-key-info {}
-                               {:pull/key :sf/member-ids :pull/key-opts {:limit 2 :as :sf/members}}
+                               {:pull/key :sf/member-ids :pull/key-opts {:max-page-size 2 :as :sf/members}}
                                {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]})))
 
 
@@ -839,7 +889,7 @@
 
 
 ;;------------------------------------------------------------------------
-;; Parse Virtual Attributes
+;; Virtual Attributes
 ;;------------------------------------------------------------------------
 (defn team-assigned-crew-ids-resolver
   [{:keys [pull/concept] :as _rel-opts}]
@@ -948,12 +998,83 @@
                            "uss-e-eng-team"
                            "uss-e-away-team"
                            "uss-e-med-team"]
-             :sf/team-assigned-crew #{{:sf/id "picard"}
-                                      {:sf/id "riker"}
-                                      {:sf/id "troi"}
-                                      {:sf/id "data"}
-                                      {:sf/id "yar"}
-                                      {:sf/id "worf"}
-                                      {:sf/id "la-forge"}
-                                      {:sf/id "bev-crusher"}}}
-            (update result :sf/team-assigned-crew set))))
+             :sf/team-assigned-crew [{:sf/id "picard"}
+                                     {:sf/id "riker"}
+                                     {:sf/id "troi"}
+                                     {:sf/id "data"}
+                                     {:sf/id "yar"}
+                                     {:sf/id "worf"}
+                                     {:sf/id "la-forge"}
+                                     {:sf/id "bev-crusher"}]})
+    result))
+
+(deftest virtual-attr-relation-pagination-test
+  (let [f (fn [page max-page-size]
+            (pull/pull {:pull/relation-value id-resolver}
+                       (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
+                                   [:sf/id :sf/name :sf/captain-id :sf/team-ids
+                                    {[:sf/team-assigned-crew-ids {:as :sf/team-assigned-crew
+                                                                  :page page
+                                                                  :max-page-size max-page-size}]
+                                     [:sf/id]}])
+                       (->db-id "uss-e")))
+        g (comp :sf/team-assigned-crew f)
+        result (f 0 2)]
+    (expect {:sf/id "uss-e"
+             :sf/name "USS Enterprise"
+             :sf/captain-id "picard"
+             :sf/team-ids ["uss-e-bridge-team"
+                           "uss-e-security-team"
+                           "uss-e-eng-team"
+                           "uss-e-away-team"
+                           "uss-e-med-team"]
+             :sf/team-assigned-crew [{:sf/id "picard"}
+                                     {:sf/id "riker"}]}
+            result)
+
+    ;;----------------------------------------------------------------------
+    ;; Even page size
+    ;;----------------------------------------------------------------------
+    ;; page 0, max-page-size 2
+    (expect [{:sf/id "picard"}
+             {:sf/id "riker"}]
+            (g 0 2))
+
+    ;; page 1, max-page-size 2
+    (expect [{:sf/id "troi"}
+             {:sf/id "data"}]
+            (g 1 2))
+
+
+    ;; page 2, max-page-size 2
+    (expect [{:sf/id "yar"}
+             {:sf/id "worf"}]
+            (g 2 2))
+
+    ;; page 3, max-page-size 2
+    (expect [{:sf/id "la-forge"}
+             {:sf/id "bev-crusher"}]
+            (g 3 2))
+
+    ;; page 4, max-page-size 2
+    (expect [] (g 4 2))
+
+    ;;----------------------------------------------------------------------
+    ;; Odd page size
+    ;;----------------------------------------------------------------------
+    ;; page 0, max-page-size 5
+    (expect [{:sf/id "picard"}
+             {:sf/id "riker"}
+             {:sf/id "troi"}
+             {:sf/id "data"}
+             {:sf/id "yar"}]
+            (g 0 5))
+
+    ;; page 1, max-page-size 5
+    (expect [{:sf/id "worf"}
+             {:sf/id "la-forge"}
+             {:sf/id "bev-crusher"}]
+            (g 1 5))
+
+    ;; page 2, max-page-size 5
+    (expect [] (g 2 5))))
