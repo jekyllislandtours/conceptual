@@ -1,17 +1,25 @@
 (ns conceptual.alpha.pull
-  (:require [conceptual.core :as c]
-            [conceptual.arrays :as a]
-            [conceptual.alpha.int-sets :as i]
-            [conceptual.alpha.filter :as c.filter]
-            [clojure.set :as set]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.arrays :as a]
+   [conceptual.alpha.int-sets :as i]
+   [conceptual.alpha.filter :as c.filter]
+   [clojure.set :as set])
+  (:import
+   (java.util Arrays)))
 
 ;; inspiration from https://docs.datomic.com/query/query-pull.html
 
-(defonce ^:dynamic ^:private *store* (atom {}))
+(def ^:dynamic *max-relation-page-size*
+  "`max-relation-page-size` because it gives the implementation freedom to adjust result set size based on needs without violating the contract"
+  10)
+
 
 (set! *warn-on-reflection* true)
 
-(def known-opts #{:limit :as :filter})
+;; NB limit is deprecated, use max-page-size
+;; `:page` is zero based
+(def known-opts #{:limit :as :filter :page :max-page-size})
 
 (declare pull)
 
@@ -42,6 +50,17 @@
                       {::error ::invalid-as-option-value
                        :pull/key k})))))
 
+(defn validate-page-params
+  [k page max-page-size]
+  (when (and page (not (and (int? page) (>= page 0))))
+    (throw (ex-info "`page` must be an integer greater than or equal to zero."
+                    {::error ::invalid-page-option-value
+                     :pull/key k})))
+  (when (and max-page-size (not (int? max-page-size)))
+    (throw (ex-info "`max-page-size` must be an integer greater than or equal to zero"
+                    {::error ::invalid-max-page-size-value
+                     :pull/key k}))))
+
 (defn variable?
   [x]
   (when (ident-like? x)
@@ -67,9 +86,10 @@
                                      {::error ::invalid-opts-map
                                       :pull/key k
                                       :pull/opts opts})))
-        {:keys [limit as]} opts
+        {:keys [limit as page max-page-size]} opts
         _ (validate-limit k limit)
         _ (validate-as k as)
+        _ (validate-page-params k page max-page-size)
         f-sexp|var (:filter opts)
         f-sexp (if (variable? f-sexp|var)
                  (get variables (keyword f-sexp|var))
@@ -78,7 +98,10 @@
         ;; TODO: don't conform the same filter repeatedly
         opts (cond-> opts
                f-sexp (assoc :filter (c.filter/conform f-sexp))
-               as (update :as keyword))]
+               as (update :as keyword)
+               limit (-> (dissoc :limit)
+                         (assoc :max-page-size limit))
+               max-page-size (assoc :max-page-size (min max-page-size *max-relation-page-size*)))]
     (when-let [unk-ks (->> (keys opts)
                            (remove known-opts)
                            set
@@ -124,9 +147,7 @@
     keyword->virtual-attribute-info :pull/virtual-attributes-info
     :or {relation? (constantly false)
          pattern-finalizer default-pattern-finalizer} :as ctx} pattern]
-  (let [keyword->virtual-attribute-info (or keyword->virtual-attribute-info
-                                            (:pull/virtual-attributes @*store*)
-                                            {})
+  (let [keyword->virtual-attribute-info (or keyword->virtual-attribute-info {})
         ks (java.util.ArrayList.)
         rels (java.util.ArrayList.)
         rel-rfn (fn [ans k sub-pattern]
@@ -203,13 +224,13 @@
   [ctx key-info c]
   ;; NB `c` must already have key `key`
   (let [k (:pull/key key-info)
-        {:keys [limit]} (:pull/key-opts key-info)
+        {:keys [max-page-size]} (:pull/key-opts key-info)
         v (if-let [resolver-fn (:pull.virtual-attribute/resolver-fn key-info)]
             (resolver-fn (assoc ctx :pull/concept c))
             (get c k))
         many? (coll? v)
         v' (cond->> v
-             (and limit many?) (take limit))]
+             (and max-page-size many?) (take max-page-size))]
     (cond-> c
       (some? v') (assoc k v'))))
 
@@ -221,16 +242,29 @@
       c
       (recur (apply-key-info ctx key-info c) more))))
 
+
+
+(defn paginate
+  ^int/1 [^int/1 ids page page-size]
+  (let [n (alength ids)
+        ^int start (* page page-size)
+        ^int end (min (+ start page-size) n)]
+    (if (>= start n)
+      i/+empty+
+      (Arrays/copyOfRange ids start end))))
+
 (defn apply-relation-key-info
   [{:keys [pull/key pull/key-opts]} id+]
-  (let [{:keys [limit as] f-sexp :filter} key-opts
+  (let [{:keys [as page max-page-size] f-sexp :filter} key-opts
+        page (or page 0)
+        max-page-size (min *max-relation-page-size*
+                           (or max-page-size *max-relation-page-size*))
         many? (a/int-array? id+)
         v (if (and many? f-sexp)
             (c.filter/evaluate-conformed f-sexp id+)
             id+)
-        too-many? (and limit many? (> (alength ^int/1 id+) limit))
-        v' (cond->> v
-             too-many? (take limit))]
+        v' (cond-> v
+             many? (paginate page max-page-size))]
     (cond-> {:k (or as key)
              :v v'}
       many? (assoc :v-all v))))
@@ -323,21 +357,3 @@
         cs (into [] xform (c/project-map key-ids ids))]
     (cond-> cs
       one? first)))
-
-
-
-;;----------------------------------------------------------------------
-;; Virtual Attributes
-;;----------------------------------------------------------------------
-(defn register-virtual-attribute!
-  "The `resolver-fn` will get the context with at least the key `:pull/concept`
-  which will have all the keys in the pattern as well as `:db/id`.  Therefore,
-  the resolver should use the `:db/id` to lookup the full concept."
-  [& {:keys [pull/virtual-attribute pull.virtual-attribute/resolver-fn
-             pull.virtual-attribute/relation?]}]
-  (assert (qualified-keyword? virtual-attribute))
-  (assert (ifn? resolver-fn))
-  (let [path [:pull/virtual-attributes virtual-attribute]
-        info (cond-> {:pull.virtual-attribute/resolver-fn resolver-fn}
-               (true? relation?) (assoc :pull.virtual-attribute/relation? relation?))]
-    (swap! *store* assoc-in path info)))
