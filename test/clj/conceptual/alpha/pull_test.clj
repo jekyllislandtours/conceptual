@@ -1078,3 +1078,108 @@
 
     ;; page 2, max-page-size 5
     (expect [] (g 2 5))))
+
+(deftest update-in-query-test
+  (let [query-fields [:sf/id :sf/name :sf/type]
+        query-joins {:sf/cap
+                     [:cap/name :cap/rank
+                      {:cap/medals [:medal/year :medal/type]}]
+                     [:sf/team {'as 'my-team}]
+                     [:team/name :team/size]}
+        query (conj query-fields query-joins)
+        add (fn [& attrs] #(vec (concat % attrs)))
+        rem (fn [& attrs] #(vec (remove (set attrs) %)))]
+
+    (testing "defaults"
+      (expect (pull/update-in-query query [] (add :sf/rank))
+              (pull/update-in-query query (add :sf/rank)))
+      (expect (pull/update-in-query query [:sf/cap] (add :cap/new))
+              (pull/update-in-query query :sf/cap (add :cap/new))))
+
+    (testing "root level attrs"
+      (expect [:sf/id :sf/name :sf/type :sf/rank query-joins]
+              (pull/update-in-query query [] (add :sf/rank)))
+      (expect [:sf/name :sf/type query-joins]
+              (pull/update-in-query query [] (rem :sf/id))))
+
+    (testing "1-level"
+      (expect {:sf/cap
+               [:cap/name :cap/rank :cap/new
+                {:cap/medals [:medal/year :medal/type]}]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]}
+              (last (pull/update-in-query query [:sf/cap] (add :cap/new))))
+
+      (expect {:sf/cap
+               [{:cap/medals [:medal/year :medal/type]}]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]}
+              (last (pull/update-in-query query
+                                          [:sf/cap]
+                                          (rem :cap/name :cap/rank)))))
+
+    (testing "2-level"
+      (expect {:sf/cap
+               [:cap/name :cap/rank
+                {:cap/medals [:medal/year :medal/type :medal/rank]}]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]}
+              (last (pull/update-in-query query
+                                          [:sf/cap :cap/medals]
+                                          (add :medal/rank))))
+
+      (expect {:sf/cap
+               [:cap/name :cap/rank
+                {:cap/medals [:medal/type]}]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]}
+              (last (pull/update-in-query query
+                                          [:sf/cap :cap/medals]
+                                          (rem :medal/year)))))
+
+    (testing "alias traversal"
+      (expect [:sf/id :sf/name :sf/type
+               {:sf/cap
+                [:cap/name :cap/rank
+                 {:cap/medals [:medal/year :medal/type]}]
+                [:sf/team {'as 'my-team}]
+                [:team/name :team/size :team/rank]}]
+              (pull/update-in-query query ['my-team] (add :team/rank)))
+
+      (expect (pull/update-in-query query ['my-team] (add :team/rank))
+              (pull/update-in-query query [:sf/team] (add :team/rank))))
+
+    (testing "removing all attrs from leaf join deletes the join"
+      (expect {:sf/cap [:cap/name :cap/rank]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]}
+              (last (pull/update-in-query query
+                                          [:sf/cap :cap/medals]
+                                          (constantly [])))))
+
+    (testing "removing all attrs from join deletes it"
+      (expect [:sf/id :sf/name :sf/type
+               {:sf/cap [:cap/name :cap/rank
+                         {:cap/medals [:medal/year :medal/type]}]}]
+              (pull/update-in-query query [:sf/team] (constantly [])))
+      (expect [:sf/id]
+              (pull/update-in-query [:sf/id {:sf/tags [:tag/name]}]
+                                    [:sf/tags] (constantly []))))
+
+    (testing "nonexistent path creates new join entry"
+      (expect {:sf/cap
+               [:cap/name :cap/rank
+                {:cap/medals [:medal/year :medal/type]}]
+               [:sf/team {'as 'my-team}]
+               [:team/name :team/size]
+               :sf/new-join [:new/attr]}
+              (last (pull/update-in-query query [:sf/new-join] (add :new/attr))))
+
+      (expect {:sf/cap [:cap/name :cap/rank
+                        {:cap/medals [:medal/year :medal/type]}]
+               [:sf/team {'as 'my-team}] [:team/name :team/size]
+               :sf/new-join [{[:sf/aliased '{as alien}] [:new/attr]}]}
+              (last (pull/update-in-query query
+                                          [:sf/new-join [:sf/aliased '{as alien}]]
+                                          (add :new/attr)))))))
+
