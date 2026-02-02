@@ -357,3 +357,45 @@
         cs (into [] xform (c/project-map key-ids ids))]
     (cond-> cs
       one? first)))
+
+(defn attrs-eq?
+  [a b]
+  (or (= a b)
+      (let [an (keyword a)
+            [bn1 bn2]
+            (if (vector? b)
+              [(first b) (-> b second (get 'as))]
+              [b])]
+        (or (= an (keyword bn1))
+            (= an (keyword bn2))))))
+
+(defn update-in-query
+  "Applies update-fn to the attributes vector at a given path in a pull query.
+   When update-fn produces an empty result for a nested level, the corresponding
+   join entry is removed. If all join entries are removed, the joins map is dropped.
+   When path targets a join that doesn't exist, a new entry is created.
+
+   (update-in-query '[:a {:j [:b]}] [:j] #(conj % :a))
+     => [:a {:j [:b :a]}]
+   "
+  ([q update-fn] (update-in-query q [] update-fn))
+  ([q path update-fn]
+   (let [path (if (attr? path) [path] path)
+         attrs (filterv attr? q)
+         joins (first (filter map? q))]
+     (if (empty? path)
+       (cond-> (update-fn attrs)
+         (seq joins) (conj joins))
+       (let [target (first path)
+             [lookup-join lookup-attrs]
+             (some (fn [[join-name attrs]]
+                     (when (attrs-eq? target join-name)
+                       [join-name attrs]))
+                   joins)
+             updated-query (update-in-query lookup-attrs (rest path) update-fn)
+             updated-joins (if (seq updated-query)
+                             (assoc joins (or lookup-join target) updated-query)
+                             (dissoc joins lookup-join))]
+         (cond-> attrs
+           (seq updated-joins) (conj updated-joins)))))))
+
