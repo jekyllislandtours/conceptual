@@ -3,8 +3,7 @@
    [conceptual.core :as c]
    [conceptual.arrays :as a]
    [conceptual.alpha.int-sets :as i]
-   [conceptual.alpha.filter :as c.filter]
-   [clojure.set :as set])
+   [conceptual.alpha.filter :as c.filter])
   (:import
    (java.util Arrays)))
 
@@ -70,6 +69,7 @@
   "Returns a map"
   [{:keys [pull/variables]} [k opts]]
   (let [k (keyword k)
+        key-id (c/key->id k)
         opts (cond
                (map? opts) (update-keys
                             opts
@@ -111,12 +111,13 @@
                        :pull/key k
                        :pull/unknown-opts unk-ks})))
     (cond-> {:pull/key k}
+      key-id (assoc :pull/key-id key-id)
       (seq opts) (assoc :pull/key-opts opts))))
 
 
 (defn default-pattern-finalizer
   [m]
-  (select-keys m [:pull/key-infos :pull/relations :pull/k->as]))
+  (select-keys m [:pull/key-infos :pull/relations]))
 
 
 (defn parse
@@ -131,7 +132,7 @@
      - only the `:filter` option on an expanded relation supports variables
 
   `:pull/pattern-finalizer`
-     - fn which takes in a map and returns a map with keys `:pull/key-infos`, `:pull/relations`, and `pull/k->as`
+     - fn which takes in a map and returns a map with keys `:pull/key-infos` and `:pull/relations`
      - input map has keys `:pull/ctx`, `:pull/key-infos` and `:pull/relations`
      - opportunity to do any validation checks or transformations
      - items in `pull/key-infos` can be tagged with `:pull/relation?` if it is managed as a public relation
@@ -158,7 +159,8 @@
                   (let [kw (if (attr? k) (keyword k) (-> k first keyword))
                         virtual-info (get keyword->virtual-attribute-info kw)
                         key-info (if (attr? k)
-                                   {:pull/key kw}
+                                   {:pull/key kw
+                                    :pull/key-id (c/key->id kw)}
                                    (vector->key-info ctx k))]
                     (when-not (or (relation? key-info)
                                   (:pull.virtual-attribute/relation? virtual-info))
@@ -167,24 +169,14 @@
     (loop [[x & more] pattern]
       (if-not x
         (let [key-infos (vec ks)
-              rels (reduce into [] rels)
-              k->as (java.util.HashMap.)]
-          (doseq [{:keys [pull/key pull/key-opts]} key-infos
-                  :let [{:keys [as]} key-opts]
-                  :when as]
-            (.put k->as key as))
-          (doseq [{:keys [pull/key pull/key-opts]} rels
-                  :let [{:keys [as]} key-opts]
-                  :when as]
-            (.put k->as key as))
-          (let [k->as (into {} k->as)]
-            (pattern-finalizer
-             {:pull/key-infos key-infos
-              :pull/relations rels
-              :pull/k->as k->as})))
+              rels (reduce into [] rels)]
+          (pattern-finalizer
+           {:pull/key-infos key-infos
+            :pull/relations rels}))
         (do
           (cond
             (attr? x) (let [x (keyword x)
+                            key-id (c/key->id x)
                             virtual-info (get keyword->virtual-attribute-info x)]
                         (cond
                           (and virtual-info (:pull.virtual-attribute/relation? virtual-info))
@@ -193,12 +185,18 @@
                           virtual-info
                           (.add ks (assoc virtual-info :pull/key x))
 
-                          (relation? {:pull/key x})
-                          (.add rels [{:pull/key x}])
+                          (and key-id (relation? {:pull/key x}))
+                          (.add rels [{:pull/key x
+                                       :pull/key-id key-id}])
+
+                          key-id
+                          (.add ks {:pull/key x
+                                    :pull/key-id key-id})
 
                           :else
                           (.add ks {:pull/key x})))
             (vector? x) (let [k (-> x first keyword)
+                              key-id (c/key->id k)
                               virtual-info (get keyword->virtual-attribute-info k)]
                           (cond
                             (and virtual-info (:pull.virtual-attribute/relation? virtual-info))
@@ -207,8 +205,11 @@
                             virtual-info
                             (.add ks (merge (vector->key-info ctx x) virtual-info))
 
-                            (relation? {:pull/key k}) ;; case when relation is in a vector without a pattern
+                            (and key-id (relation? {:pull/key k})) ;; case when relation is in a vector without a pattern
                             (.add rels [(vector->key-info ctx x)])
+
+                            key-id
+                            (.add ks (vector->key-info ctx x))
 
                             :else
                             (.add ks (vector->key-info ctx x))))
@@ -220,29 +221,30 @@
   [m]
   (c/value (:pull/key m) (:db/id m)))
 
-(defn apply-key-info
+(defn assoc-kv
   [ctx key-info c]
   ;; NB `c` must already have key `key`
   (let [k (:pull/key key-info)
-        {:keys [max-page-size]} (:pull/key-opts key-info)
-        v (if-let [resolver-fn (:pull.virtual-attribute/resolver-fn key-info)]
-            (resolver-fn (assoc ctx :pull/concept c))
-            (get c k))
+        key-id (:pull/key-id key-info)
+        {:keys [as max-page-size]} (:pull/key-opts key-info)
+        resolver-fn (:pull.virtual-attribute/resolver-fn key-info)
+        v (cond
+            key-id (c/value-0 key-id (:db/id c))
+            resolver-fn (resolver-fn (assoc ctx :pull/concept c))
+            :else nil)
         many? (coll? v)
         v' (cond->> v
              (and max-page-size many?) (take max-page-size))]
     (cond-> c
-      (some? v') (assoc k v'))))
+      (some? v') (assoc (or as k) v'))))
 
-(defn apply-all-key-infos
+(defn assoc-all-kvs
   [ctx key-infos c]
   (loop [c c
          [key-info & more] key-infos]
     (if-not key-info
       c
-      (recur (apply-key-info ctx key-info c) more))))
-
-
+      (recur (assoc-kv ctx key-info c) more))))
 
 (defn paginate
   ^int/1 [^int/1 ids page page-size]
@@ -273,11 +275,12 @@
   [{:keys [pull/relation-value pull/relation-finalizer]
     :or {relation-value default-value
          relation-finalizer :pull/concept} :as ctx}
-   {:keys [pull/key pull/key-opts pull/pattern pull.virtual-attribute/resolver-fn] :as relation} c]
+   {:keys [pull/key pull/key-id pull/key-opts pull/pattern pull.virtual-attribute/resolver-fn] :as relation} c]
   (let [depth (cond-> (::depth ctx)
                 (not pattern) dec)
         rel-opts {:pull/ctx ctx
                   :pull/key key
+                  :pull/key-id key-id
                   :pull/key-opts key-opts
                   :pull/concept c
                   :pull/depth depth
@@ -293,7 +296,8 @@
         xs (if pattern
              (pull ctx pattern id+)
              id+)
-        c (assoc c key xs) ;; use original key until ready to finalize to make it easier to validate actual attrs
+        c (assoc c k' xs)
+        ;; must pass along output-key for handling metadata etc
         c (relation-finalizer (assoc rel-opts :pull/concept c :pull/output-key k'))]
     c))
 
@@ -306,10 +310,6 @@
         c
         (recur (reify-relations* ctx r c) more)))))
 
-
-(defn rename-keys
-  [{:keys [pull/concept pull/k->as]}]
-  (set/rename-keys concept k->as))
 
 (def default-finalizer :pull/concept)
 
@@ -335,25 +335,23 @@
 
   `:pull/concept-finalizer`
      - fn for apply custom business logic to a concept before it is added to output. Returns the concept.
-     - input map has keys `:pull/ctx`, `:pull/k->as`, and `:pull/concept`
+     - input map has keys `:pull/ctx` and `:pull/concept`
      - `:pull/concept` is the current concept being built up"
   [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+]
-  (let [{:keys [pull/key-infos pull/relations pull/k->as]} parsed-pattern
+  (let [{:keys [pull/key-infos pull/relations]} parsed-pattern
         ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
-        key-ids (c/keys->ids (conj ks :db/id))
         cb-opts {:pull/ctx ctx
-                 :pull/k->as k->as}
-        xform (comp (map (partial apply-all-key-infos ctx key-infos))
+                 :pull/parsed-pattern parsed-pattern}
+        xform (comp (map (fn [id] {:db/id id}))
+                    (map (partial assoc-all-kvs ctx key-infos))
                     (map (partial reify-relations ctx relations))
                     (map #(concept-finalizer (assoc cb-opts :pull/concept %)))
-                    (map #(rename-keys (assoc cb-opts :pull/concept %)))
-                 (map (fn [c]
-                        (cond-> c
-                          rm-db-id? (dissoc c :db/id)))))
+                    (map (fn [c]
+                           (cond-> c
+                             rm-db-id? (dissoc c :db/id)))))
         one? (int? id+)
         ids (if one? [id+] id+)
-        ;; TODO: consider looking up the full concept instead of project-map which might be slower
-        cs (into [] xform (c/project-map key-ids ids))]
+        cs (into [] xform ids)]
     (cond-> cs
       one? first)))
