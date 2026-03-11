@@ -139,39 +139,58 @@
                 (ex-data ex))))]
 
     ;; success
-    (expect {:pull/key :foo/bar} (f [:foo/bar]))
-    (expect {:pull/key :foo/bar} (f [:foo/bar {}]))
-    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world}} (f [:foo/bar {:as :hello/world}]))
-    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :max-page-size 3}} (f [:foo/bar {:as :hello/world :limit 3}]))
-    (expect {:pull/key :foo/bar :pull/key-opts {:as :hello/world :max-page-size 3}} (f [:foo/bar {'as "hello/world" 'limit 3}]))
-    (expect {:pull/key :foo/bar
+    (expect {:pull/key :sf/id
+             :pull/key-id (c/key->id :sf/id)}
+            (f [:sf/id]))
+
+    (expect {:pull/key :sf/id
+             :pull/key-id (c/key->id :sf/id)}
+            (f [:sf/id {}]))
+
+    (expect {:pull/key :sf/id
+             :pull/key-id (c/key->id :sf/id)
+             :pull/key-opts {:as :hello/world}}
+            (f [:sf/id {:as :hello/world}]))
+
+    (expect {:pull/key :sf/member-ids
+             :pull/key-id (c/key->id :sf/member-ids)
+             :pull/key-opts {:as :hello/world :max-page-size 3}}
+            (f [:sf/member-ids {:as :hello/world :limit 3}]))
+
+    (expect {:pull/key :sf/member-ids
+             :pull/key-id (c/key->id :sf/member-ids)
+             :pull/key-opts {:as :hello/world :max-page-size 3}}
+            (f [:sf/member-ids {'as "hello/world" 'limit 3}]))
+
+    (expect {:pull/key :sf/member-ids
+             :pull/key-id (c/key->id :sf/member-ids)
              :pull/key-opts {:max-page-size 3
                              :as :hello/world
                              :filter [:sexp/logical {:op/boolean 'and
                                                      :list/sexp [[:sexp/field 'sf/human?]]}]}}
             (pull/vector->key-info {:pull/variables {:$x 'sf/human?}}
-                                   [:foo/bar {:as :hello/world :limit 3 :filter '$x}]))
+                                   [:sf/member-ids {:as :hello/world :limit 3 :filter '$x}]))
 
     ;; errors
     (expect {::pull/error ::pull/unknown-options
-             :pull/key :foo/bar
+             :pull/key :sf/id
              :pull/unknown-opts #{:meow}}
-            (f [:foo/bar {:meow 23}]))
+            (f [:sf/id {:meow 23}]))
 
     (expect {::pull/error ::pull/invalid-opts-map
-             :pull/key :foo/bar
+             :pull/key :sf/id
              :pull/opts :meow}
-            (f [:foo/bar :meow]))
+            (f [:sf/id :meow]))
 
     (expect {::pull/error ::pull/invalid-opts-map-key
-             :pull/key :foo/bar
+             :pull/key :sf/id
              :pull/opts {12 22}
              :pull/opts-key 12}
-            (f [:foo/bar {12 22}]))))
+            (f [:sf/id {12 22}]))))
 
 (deftest parse-test
   (let [relation? (fn [{:keys [pull/key]}]
-                    (#{:x/rel} key))
+                    (#{:sf/team-ids} key))
         f (fn [pattern]
             (try
               (pull/parse {:pull/relation? relation?} pattern)
@@ -179,112 +198,95 @@
                 (ex-data ex))))]
 
     ;; success
-    (expect {:pull/key-infos [{:pull/key :foo/bar}]
-             :pull/relations []
-             :pull/k->as {}}
-            (f [:foo/bar]))
+    (expect {:pull/key-infos [{:pull/key :sf/id
+                               :pull/key-id (c/key->id :sf/id)}]
+             :pull/relations []}
+            (f [:sf/id]))
 
-    (expect {:pull/key-infos [{:pull/key :foo/bar} {:pull/key :foo/baz}]
-             :pull/relations []
-             :pull/k->as {}}
-            (f [:foo/bar :foo/baz]))
+    (expect {:pull/key-infos [{:pull/key :sf/id
+                               :pull/key-id (c/key->id :sf/id)}
+                              {:pull/key :sf/rank
+                               :pull/key-id (c/key->id :sf/rank)}]
+             :pull/relations []}
+            (f [:sf/id :sf/rank]))
 
-    (expect {:pull/key-infos [{:pull/key :a}
-                              {:pull/key :b}
-                              {:pull/key :c :pull/key-opts {:max-page-size 3}}]
-             :pull/relations []
-             :pull/k->as {}}
-            (f [:a :b [:c {:limit 3}]]))
+    (expect {:pull/key-infos [{:pull/key :sf/id
+                               :pull/key-id (c/key->id :sf/id)}
+                              {:pull/key :sf/rank
+                               :pull/key-id (c/key->id :sf/rank)}]
+             :pull/relations [{:pull/key :sf/team-ids
+                               :pull/key-id (c/key->id :sf/team-ids)
+                               :pull/key-opts {:max-page-size 3}}]}
+            (f [:sf/id :sf/rank [:sf/team-ids {:limit 3}]]))
 
-    (expect {:pull/key-infos [{:pull/key :x/a}
-                              {:pull/key :x/b}
-                              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
-             :pull/relations []
-             :pull/k->as {}}
-            (f [:x/a :x/b [:x/c {:limit 3}]]))
-
-    (expect {:pull/key-infos [{:pull/key :x/a}
-                              {:pull/key :x/b}
-                              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
-             :pull/relations [{:pull/key :x/rel
-                               :pull/pattern {:pull/key-infos [{:pull/key :foo/a}
-                                                               {:pull/key :foo/b}]
-                                              :pull/relations []
-                                              :pull/k->as {}}}]
-             :pull/k->as {}}
-            (f [:x/a :x/b [:x/c {:limit 3}] {:x/rel [:foo/a :foo/b]}]))
+    (expect {:pull/key-infos [{:pull/key :sf/id
+                               :pull/key-id (c/key->id :sf/id)}
+                              {:pull/key :sf/rank
+                               :pull/key-id (c/key->id :sf/rank)}]
+             :pull/relations [{:pull/key :sf/team-ids
+                               :pull/key-id (c/key->id :sf/team-ids)
+                               :pull/key-opts {:max-page-size 3}
+                               :pull/pattern {:pull/key-infos [{:pull/key :sf/id
+                                                                :pull/key-id (c/key->id :sf/id)}
+                                                               {:pull/key :sf/name
+                                                                :pull/key-id (c/key->id :sf/name)}]
+                                              :pull/relations []}}]}
+            (f [:sf/id :sf/rank {[:sf/team-ids {:limit 3}] [:sf/id :sf/name]}]))
 
     (expect {:pull/key-infos
-             [{:pull/key :x/a}
-              {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
+             [{:pull/key :sf/id
+               :pull/key-id (c/key->id :sf/id)}
+              {:pull/key :sf/rank
+               :pull/key-id (c/key->id :sf/rank)}]
              :pull/relations
-             [{:pull/key :x/rel
-               :pull/key-opts {:as :x/foos}
-               :pull/pattern
-               {:pull/key-infos [{:pull/key :foo/a} {:pull/key :foo/b}]
-                :pull/relations []
-                :pull/k->as {}}}]
-             :pull/k->as {:x/rel :x/foos}}
-            (f [:x/a :x/b [:x/c {:limit 3}] {[:x/rel {:as :x/foos}] [:foo/a :foo/b]}]))
-
-    (expect {:pull/key-infos
-             [{:pull/key :x/a}
-              {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
-             :pull/relations [{:pull/key :x/rel}]
-             :pull/k->as {}}
-            (f '[x/a x/b  x/rel [x/c {:max-page-size 3}]]))
-
-    (expect {:pull/key-infos
-             [{:pull/key :x/a}
-              {:pull/key :x/b}
-              {:pull/key :x/c :pull/key-opts {:max-page-size 3}}]
-             :pull/relations [{:pull/key :x/rel :pull/key-opts {:as :x/foo}}]
-             :pull/k->as {:x/rel :x/foo}}
-            (f '[x/a x/b  [x/rel {:as x/foo}] [x/c {:max-page-size 3}]]))
+             [{:pull/key :sf/team-ids
+               :pull/key-id (c/key->id :sf/team-ids)
+               :pull/key-opts {:max-page-size 3}}
+              {:pull/key :sf/team-ids
+               :pull/key-id (c/key->id :sf/team-ids)
+               :pull/key-opts {:as :sf/team-members}
+               :pull/pattern {:pull/key-infos [{:pull/key :sf/id
+                                                :pull/key-id (c/key->id :sf/id)}
+                                               {:pull/key :sf/name
+                                                :pull/key-id (c/key->id :sf/name)}]
+                              :pull/relations []}}]}
+            (f [:sf/id :sf/rank
+                [:sf/team-ids {:limit 3}]
+                {[:sf/team-ids {:as :sf/team-members}] [:sf/id :sf/name]}]))
 
     ;; error
     (expect {::pull/error ::pull/invalid-opts-map
-             :pull/key :foo/bar
+             :pull/key :sf/id
              :pull/opts :as}
-            (f [[:foo/bar :as]]))))
+            (f [[:sf/id :as]]))))
 
-(deftest parse-external-relation-test
-  (let [relation? (fn [{:keys [pull/key]}]
-                    (some? (#{:external/relation} key)))
-        f (fn [pattern]
-            (try
-              (pull/parse {:pull/relation? relation?} pattern)
-              (catch Exception ex
-                (ex-data ex))))]
+(deftest assoc-kv-test
+  (let [db-id (c/lookup-id :sf/id "uss-e-bridge-team")]
+    ;; just the limit
+    (expect {:db/id db-id
+             :sf/member-ids ["picard"]}
+            (pull/assoc-kv {}
+                           {:pull/key :sf/member-ids
+                            :pull/key-id (c/key->id :sf/member-ids)
+                            :pull/key-opts {:max-page-size 1}}
+                           {:db/id db-id}))
 
-    (expect {:pull/key-infos [{:pull/key :foo/bar}
-                              {:pull/key :foo/baz}]
-             :pull/relations [{:pull/key :external/relation}]
-             :pull/k->as {}}
-            (f [:foo/bar :foo/baz :external/relation]))))
+    (expect {:db/id db-id
+             :sf/member-ids ["picard" "riker"]}
+            (pull/assoc-kv {}
+                           {:pull/key :sf/member-ids
+                            :pull/key-id (c/key->id :sf/member-ids)
+                            :pull/key-opts {:max-page-size 2}}
+                           {:db/id db-id}))
 
-
-(deftest apply-key-info-test
-  ;; just the limit
-  (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {}
-                               {:pull/key :sf/member-ids
-                                :pull/key-opts {:max-page-size 2}}
-                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}))
-
-  (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {}
-                               {:pull/key :sf/member-ids
-                                :pull/key-opts {:max-page-size 2}}
-                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]}))
-
-  ;; as is not applied till the end
-  (expect {:sf/member-ids ["picard" "riker"]}
-          (pull/apply-key-info {}
-                               {:pull/key :sf/member-ids :pull/key-opts {:max-page-size 2 :as :sf/members}}
-                               {:sf/member-ids ["picard" "riker" "data" "troi" "worf"]})))
+    ;; as is applied here so we can support 1 key aliased many times
+    (expect {:db/id db-id
+             :sf/members ["picard" "riker"]}
+            (pull/assoc-kv {:db/id db-id}
+                           {:pull/key :sf/member-ids
+                            :pull/key-id (c/key->id :sf/member-ids)
+                            :pull/key-opts {:max-page-size 2 :as :sf/members}}
+                           {:db/id db-id}))))
 
 
 (deftest basic-pull-test
@@ -339,12 +341,11 @@
 
 
 (defn id-resolver
-  [{:keys [pull/key db/id]}]
+  [{:keys [pull/key db/id] :as m}]
   (let [v (c/value key id)]
     (if (coll? v)
       (mapv ->db-id v)
       (->db-id v))))
-
 
 ;; NB for the relations the data is returned in sorted :db/id order
 
@@ -563,7 +564,7 @@
       (->db-id v))))
 
 (defn internal->external-relation-finalizer
-  [{:keys [pull/concept pull/key pull/reified-relation?]}]
+  [{:keys [pull/concept pull/key pull/reified-relation?] :as m}]
   (cond-> concept
     (not reified-relation?)
     (assoc key (mapv (partial c/value :sf/id) (get concept key)))))
@@ -608,9 +609,24 @@
 
 
 (defn restricted-keys-finalizer
-  [{:keys [pull/k->as pull/concept]}]
-  (let [all-restricted (conj #{:sf/id} (k->as :sf/id))]
+  [{:keys [pull/concept pull/parsed-pattern] :as m}]
+  (let [{:keys [pull/k->as]} parsed-pattern
+        all-restricted (set/union #{:sf/id} (set (get k->as :sf/id)))]
     (apply dissoc concept all-restricted)))
+
+(defn restricted-pattern-finalizer
+  [{:keys [pull/key-infos pull/relations] :as m}]
+  (let [k->as (into {}
+                    (for [{:keys [pull/key pull/key-opts]} key-infos
+                          :let [{:keys [as]} key-opts]
+                          :when as]
+                      [key #{as}]))
+        r->as (into {}
+                    (for [{:keys [pull/key pull/key-opts]} relations
+                          :let [{:keys [as]} key-opts]
+                          :when as]
+                      [key #{as}]))]
+    (assoc m :pull/k->as (merge-with set/union k->as r->as))))
 
 
 (deftest finalizer-test
@@ -628,7 +644,8 @@
              :sf/captain {:sf/name "Jean-Luc Picard"}}
             (pull/pull {:pull/relation-value id-resolver
                         :pull/concept-finalizer restricted-keys-finalizer}
-                       (pull/parse {:pull/relation? sf-relation?}
+                       (pull/parse {:pull/relation? sf-relation?
+                                    :pull/pattern-finalizer restricted-pattern-finalizer}
                                    [:sf/id :sf/name {[:sf/captain-id {:as :sf/captain}] [[:sf/id {:as :sneaky/id}] :sf/name]}])
                        (->db-id "uss-e"))))
 
@@ -645,7 +662,8 @@
                          :sf/members [{:sf/name "Geordi La Forge"}]}]}
             (pull/pull {:pull/relation-value id-resolver
                         :pull/concept-finalizer restricted-keys-finalizer}
-                       (pull/parse {:pull/relation? sf-relation?}
+                       (pull/parse {:pull/relation? sf-relation?
+                                    :pull/pattern-finalizer restricted-pattern-finalizer}
                                    [:sf/id
                                     :sf/name
                                     {[:sf/captain-id {:as :sf/captain}] [[:sf/id {:as :captain/id}] :sf/name]}
@@ -811,17 +829,18 @@
 
 
 (defn unexpanded-finalizer
-  [{:keys [pull/concept pull/all-ids pull/output-key pull/key]}]
-  (let [id+ (get concept key)
+  [{:keys [pull/concept pull/all-ids pull/output-key] :as m}]
+  (let [id+ (get concept output-key)
         ->external-id  (partial c/value :sf/id)
         v (if (int? id+)
             (->external-id id+)
             (mapv ->external-id id+))
-        concept (assoc concept key v)]
+        concept (assoc concept output-key v)]
     (if-not all-ids
       concept
       (let [metadata-key (keyword (str (symbol output-key) ":metadata"))]
         (assoc concept metadata-key {:summary/estimated-count (alength all-ids)})))))
+
 
 (deftest unexpanded-relation-test
   (expect {:sf/id "uss-e"
@@ -917,43 +936,53 @@
    {:pull.virtual-attribute/resolver-fn teams-count-resolver}})
 
 (deftest parse-virtual-attribute-test
-  (expect {:pull/key-infos [{:pull/key :sf/id}
-                            {:pull/key :sf/type}
-                            {:pull/key :sf/name}
-                            {:pull/key :sf/team-ids}
+  (expect {:pull/key-infos [{:pull/key :sf/id
+                             :pull/key-id (c/key->id :sf/id)}
+                            {:pull/key :sf/type
+                             :pull/key-id (c/key->id :sf/type)}
+                            {:pull/key :sf/name
+                             :pull/key-id (c/key->id :sf/name)}
+                            {:pull/key :sf/team-ids
+                             :pull/key-id (c/key->id :sf/team-ids)}
                             {:pull/key :sf/teams-count
                              :pull.virtual-attribute/resolver-fn teams-count-resolver}]
-           :pull/relations []
-           :pull/k->as {}}
+           :pull/relations []}
           (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
                       [:sf/id :sf/type :sf/name :sf/team-ids :sf/teams-count]))
 
-  (expect {:pull/key-infos [{:pull/key :sf/id}
-                            {:pull/key :sf/type}
-                            {:pull/key :sf/name}
-                            {:pull/key :sf/team-ids}
+  (expect {:pull/key-infos [{:pull/key :sf/id
+                             :pull/key-id (c/key->id :sf/id)}
+                            {:pull/key :sf/type
+                             :pull/key-id (c/key->id :sf/type)}
+                            {:pull/key :sf/name
+                             :pull/key-id (c/key->id :sf/name)}
+                            {:pull/key :sf/team-ids
+                             :pull/key-id (c/key->id :sf/team-ids)}
                             {:pull/key :sf/teams-count
                              :pull/key-opts {:as :sf/virtual-attr}
                              :pull.virtual-attribute/resolver-fn teams-count-resolver}]
-           :pull/relations []
-           :pull/k->as {:sf/teams-count :sf/virtual-attr}}
+           :pull/relations []}
           (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
                       [:sf/id :sf/type :sf/name :sf/team-ids [:sf/teams-count {:as :sf/virtual-attr}]])))
 
 (deftest parse-virtual-attribute-relation-test
-  (expect {:pull/key-infos [{:pull/key :sf/id}
-                            {:pull/key :sf/type}
-                            {:pull/key :sf/name}
-                            {:pull/key :sf/team-ids}]
+  (expect {:pull/key-infos [{:pull/key :sf/id
+                             :pull/key-id (c/key->id :sf/id)}
+                            {:pull/key :sf/type
+                             :pull/key-id (c/key->id :sf/type)}
+                            {:pull/key :sf/name
+                             :pull/key-id (c/key->id :sf/name)}
+                            {:pull/key :sf/team-ids
+                             :pull/key-id (c/key->id :sf/team-ids)}]
            :pull/relations [{:pull/key :sf/team-assigned-crew-ids
                              :pull/key-opts {:as :sf/virtual-attr}
                              :pull.virtual-attribute/relation? true
                              :pull.virtual-attribute/resolver-fn team-assigned-crew-ids-resolver
-                             :pull/pattern {:pull/key-infos [{:pull/key :sf/id}
-                                                             {:pull/key :sf/name}]
-                                            :pull/relations []
-                                            :pull/k->as {}}}]
-           :pull/k->as {:sf/team-assigned-crew-ids :sf/virtual-attr}}
+                             :pull/pattern {:pull/key-infos [{:pull/key :sf/id
+                                                              :pull/key-id (c/key->id :sf/id)}
+                                                             {:pull/key :sf/name
+                                                              :pull/key-id (c/key->id :sf/name)}]
+                                            :pull/relations []}}]}
           (pull/parse {:pull/virtual-attributes-info virtual-attributes-info}
                       [:sf/id :sf/type :sf/name :sf/team-ids
                        {[:sf/team-assigned-crew-ids {:as :sf/virtual-attr}] [:sf/id :sf/name]}])))
@@ -1078,3 +1107,64 @@
 
     ;; page 2, max-page-size 5
     (expect [] (g 2 5))))
+
+
+(defn multiple-aliases-relation-finalizer
+  [{:keys [pull/key pull/output-key pull/concept pull/reified-relation?] :as m}]
+  (if reified-relation?
+    concept
+    (assoc concept output-key (c/value key (:db/id concept)))))
+
+(deftest field-multiple-aliases-test
+  (expect {:sf/id "picard"
+           :starfleet/id "picard"
+           :system/id "picard"
+           :federation/id "picard"
+           :sf/name "Jean-Luc Picard"
+           :sf/rank "Captain"}
+          (pull/pull {:pull/relation-value id-resolver
+                      :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                     (pull/parse {:pull/relation? sf-relation?}
+                                 [:sf/id
+                                  [:sf/id {:as :starfleet/id}]
+                                  [:sf/id {:as :system/id}]
+                                  [:sf/id {:as :federation/id}]
+                                  :sf/name :sf/rank])
+                     (->db-id "picard"))))
+
+(deftest to-one-relation-mutliple-aliases-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id "picard"
+           :federation/captain-id "picard"}
+          (pull/pull {:pull/relation-value id-resolver
+                      :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                     (pull/parse {:pull/relation? sf-relation?}
+                                 [:sf/id
+                                  :sf/name
+                                  :sf/captain-id
+                                  [:sf/captain-id {:as :federation/captain-id}]])
+                     (->db-id "uss-e"))))
+
+(deftest to-many-relation-mutliple-aliases-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id "picard"
+           :sf/team-ids ["uss-e-bridge-team"
+                         "uss-e-security-team"
+                         "uss-e-eng-team"
+                         "uss-e-away-team"
+                         "uss-e-med-team"]
+           :sf/teams [{:sf/id "uss-e-bridge-team"
+                       :sf/name "Bridge Team"}
+                      {:sf/id "uss-e-security-team"
+                       :sf/name "Security Team"}]}
+          (pull/pull {:pull/relation-value id-resolver
+                      :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                     (pull/parse {:pull/relation? sf-relation?}
+                                 [:sf/id
+                                  :sf/name
+                                  :sf/captain-id
+                                  :sf/team-ids
+                                  {[:sf/team-ids {:as :sf/teams :limit 2}] [:sf/id :sf/name]}])
+                     (->db-id "uss-e"))))
