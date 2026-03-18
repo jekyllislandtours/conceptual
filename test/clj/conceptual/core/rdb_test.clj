@@ -66,3 +66,18 @@
 
     (expect false (contains? (c/seek :hello/world) :test/tag?))
     (expect false (contains? (set (c/ids :test/tag?)) id))))
+
+
+(deftest gh-dbmap-equality-test
+  (let [x (c/lookup :sf/id "picard")]
+    (expect x x))
+
+  (expect (c/lookup :sf/id "picard")
+          (c/lookup :sf/id "picard"))
+
+  (expect true (= (c/lookup :sf/id "picard")
+                  (c/lookup :sf/id "picard")))
+
+  ;; negative
+  (expect false (= (c/lookup :sf/id "picard")
+                   (c/lookup :sf/id "riker"))))
