@@ -118,7 +118,7 @@ public class DBMap extends AFn implements ILookup, IPersistentMap, Map, Iterable
         if (o == null || getClass() != o.getClass()) return false;
 
         DBMap dbMap = (DBMap) o;
-        return id != dbMap.id && db.equals(dbMap.db);
+        return id == dbMap.id && db.equals(dbMap.db);
     }
 
     /** Returns the hash code value for this map. */
