@@ -1,4 +1,5 @@
 (ns conceptual.core
+  (:refer-clojure :exclude [mapv])
   (:require [conceptual.arrays :refer [int-array-class]]
             [conceptual.int-sets :as i]
             [clojure.data.int-map :as int-map]
@@ -72,6 +73,10 @@
   "Returns a database instance if it exists."
   ^DB [] @*db*)
 
+(defn db?
+  [x]
+  (instance? DB x))
+
 (defn key->id
   "Given a keyword identity returns the id or `nil`."
   (^Integer [^Keyword k] (key->id (db) k))
@@ -120,18 +125,18 @@
     (swap! *db* (fn [db] (.insert ^WritableDB db nil ks vs))))
   ;; add :db/tag? to :db/tag? itself
   (swap! *db* (fn [db] (let [id (key->id db :db/tag?)]
-                        (.update ^WritableDB db nil id id true))))
+                         (.update ^WritableDB db nil id id true))))
   ;; add :db/tag? to :db/property?
   (swap! *db* (fn [db] (let [id (key->id db :db/property?)
-                            kid (key->id db :db/tag?)]
-                        (.update ^WritableDB db nil id kid true))))
+                             kid (key->id db :db/tag?)]
+                         (.update ^WritableDB db nil id kid true))))
   ;; insert :db/unique?
   (let [[^ints ks vs] (map->kvs (db) unique-default-concept)]
     (swap! *db* (fn [db] (.insert ^WritableDB db nil ks vs))))
   ;; tag :db/key as being unique so it gets indexed
   (swap! *db* (fn [db] (let [id (key->id db :db/key)
-                            kid (key->id db :db/unique?)]
-                        (.update ^WritableDB db nil id kid true))))
+                             kid (key->id db :db/unique?)]
+                         (.update ^WritableDB db nil id kid true))))
   ;; add remaining items... should now index any :db/unique? keys
   (swap! *db*
          (fn [db]
@@ -393,8 +398,7 @@
   ([key id] (invoke (db) key id))
   ([^DB db key id]
    (when-let [k-fn (value db :db/fn key)]
-     (k-fn id ;;(value db key id)
-      ))))
+     (k-fn id))))
 
 (defn invokei
   "Reversed arguments from invoke."
@@ -414,7 +418,7 @@
   "Given the id for a concept returns a lazy Map for that concept."
   ([id] (seek (db) id))
   ([^DB db id]
-    (when-let [int-id (if (keyword? id) (key->id db id) id)]
+   (when-let [int-id (if (keyword? id) (key->id db id) id)]
      (.get db int-id))))
 
 (defn ids
@@ -425,8 +429,41 @@
   (^int/1 [db id]
    (or (:db/ids (seek db id)) i/+empty+)))
 
+;; NB. no filter, remove or keep to discourage potentially slow code
+;;     of course, you can use transducers to get that anyway
+(defn- map-transducer
+  [db k]
+  (fn [rf]
+    (let [kid (if (int? k) k (key->id db k))]
+      (fn
+        ([] (rf))
+        ([result] (rf result))
+        ([result id]
+         (rf result (value-0 db kid id)))))))
+
+(defn- mapv-with-db
+  "Like `clojure.core/mapv` but takes either a keyword or an int representing an attribute.
+  This should be used for values that are *NOT* int ids.  See also `conceptual.int-sets`."
+  ([db k]
+   (map-transducer db k))
+  ([db k ids]
+   (persistent! (transduce (map-transducer db k) conj! (transient []) ids))))
+
+(defn mapv
+  "Like `clojure.core/mapv` but takes either a keyword or an int representing an attribute.
+  For the 2 arity fn, the first arg is db then the second arg must be a key and if the first
+  arg is a key then the second arg must be ids"
+  ([k]
+   (mapv-with-db (db) k))
+  ([db|k k|ids]
+   (if (db? db|k)
+     (mapv-with-db db|k k|ids)
+     (mapv-with-db (db) db|k k|ids)))
+  ([db k ids]
+   (mapv-with-db db k ids)))
+
 (defn proj-0
-  ([^ints ks id] (proj-0 db ks id))
+  ([^ints ks id] (proj-0 (db) ks id))
   ([^DB db ^ints ks id] (apply vector (map #(value db % id) ks))))
 
 (defn proj
@@ -441,9 +478,7 @@
    (project (db) ks ids))
   ([^DB db ks ids]
    (let [^ints key-ids (normalize-ids db ks)]
-     (map #(proj-0 db key-ids %) ids)
-     ;;(for [^int id ids] (proj-0 key-ids id))
-     )))
+     (map #(proj-0 db key-ids %) ids))))
 
 (defn ->persistent-map [^DBMap m]
   (when m
@@ -496,8 +531,8 @@
     (swap! *db*
            (fn [db]
              (.update ^WritableDB db aggr ^int k (key->id db :db/ids)
-                             (i/difference (i/union (ids db k) (.ids aggr k))
-                                           (.removeIds aggr k)))))))
+                      (i/difference (i/union (ids db k) (.ids aggr k))
+                                    (.removeIds aggr k)))))))
 
 (defmacro with-aggr-0
   ([^DB db binding & bodies]

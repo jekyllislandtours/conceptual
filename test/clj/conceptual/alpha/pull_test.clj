@@ -1168,3 +1168,30 @@
                                   :sf/team-ids
                                   {[:sf/team-ids {:as :sf/teams :limit 2}] [:sf/id :sf/name]}])
                      (->db-id "uss-e"))))
+
+
+(deftest all-relations-fetched-without-sub-pull-pattern-test
+  (let [relation-finalizer (fn [{:keys [pull/key pull/output-key pull/all-ids pull/concept pull/reified-relation?] :as m}]
+                             (if reified-relation?
+                               concept
+                               (assoc concept output-key (mapv #(c/value :sf/id %) all-ids))))]
+    (binding [pull/*max-relation-page-size* 2]
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+               :sf/team-ids ["uss-e-bridge-team"
+                             "uss-e-security-team"
+                             "uss-e-eng-team"
+                             "uss-e-away-team"
+                             "uss-e-med-team"]
+               :sf/teams [{:sf/id "uss-e-bridge-team"
+                           :sf/name "Bridge Team"}
+                          {:sf/id "uss-e-security-team"
+                           :sf/name "Security Team"}]}
+              (pull/pull {:pull/relation-value id-resolver
+                          :pull/relation-finalizer relation-finalizer}
+                         (pull/parse {:pull/relation? sf-relation?}
+                                     [:sf/id
+                                      :sf/name
+                                      :sf/team-ids
+                                      {[:sf/team-ids {:as :sf/teams}] [:sf/id :sf/name]}])
+                         (->db-id "uss-e"))))))

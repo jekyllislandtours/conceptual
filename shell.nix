@@ -1,7 +1,6 @@
 { use_zsh ? "true" }:
 let
-  # as of 28 Oct 2025. See: https://status.nixos.org
-  nixpkgs = fetchTarball "https://github.com/NixOS/nixpkgs/archive/01f116e4df6a15f4ccdffb1bcd41096869fb385c.tar.gz";
+  nixpkgs = fetchTarball "https://github.com/NixOS/nixpkgs/archive/c7f47036d3df2add644c46d712d14262b7d86c0c.tar.gz";
   pkgs = import nixpkgs { config = {}; overlays = []; };
 in
 
