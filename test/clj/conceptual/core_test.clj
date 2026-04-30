@@ -37,3 +37,29 @@
 
 (deftest ids-of-unknown-key-returns-empty-test
   (expect [] (vec (c/ids :a-key-i-made-up--kjadiak383))))
+
+
+(deftest mapv-test
+  (let [expected (for [id (c/ids :sf/id)]
+                   (c/value :sf/id id))
+        all-no-db (c/mapv :sf/id (c/ids :sf/id))
+        all-with-db (c/mapv (c/db) :sf/id (c/ids :sf/id))
+        all-transduced (transduce (c/mapv (c/db) :sf/id) conj [] (c/ids :sf/id))
+        all-transduced-no-db (transduce (c/mapv :sf/id) conj [] (c/ids :sf/id))
+        filtered (transduce (comp (c/mapv :sf/id)
+                                  (filter (fn [s]
+                                            (> (count s) 15))))
+                            conj
+                            []
+                            (c/ids :sf/id))]
+
+    (expect expected all-no-db)
+    (expect expected all-with-db)
+    (expect expected all-transduced)
+    (expect expected all-transduced-no-db)
+    (expect vector? all-no-db)
+    (expect vector? all-with-db)
+    (expect vector? all-transduced)
+    (expect vector? all-transduced-no-db)
+    (expect true (> (count all-no-db) (count filtered)))
+    (expect vector? filtered)))
