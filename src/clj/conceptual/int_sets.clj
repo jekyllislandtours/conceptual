@@ -1,5 +1,5 @@
 (ns conceptual.int-sets
-  (:refer-clojure :exclude [contains? conj disj dedupe keep mapcat set sort take])
+  (:refer-clojure :exclude [contains? conj disj dedupe map mapcat set sort take])
   (:import (conceptual.util IntegerSets IntArrayList)
            (java.util Arrays)))
 
@@ -202,20 +202,20 @@
   ^int/1 [xs]
   (IntArrayList/dedupe xs))
 
-(defn- keep-int-set
+(defn- map-int-set
   [f ^int/1 xs]
   (let [ans (IntArrayList/new)]
     (dotimes [i (alength xs)]
       (.add ans ^Number (f (aget xs i))))
     (.toSortedIntSet ans)))
 
-(defn keep
+(defn map
   "[ALPHA] Returns an int set of applying `f` to `xs`. `f` must return
   either `nil` or an integer. `nil` return values are ignored
   and won't be in the output int set."
   ^int/1 [f xs]
   (if (= int/1 (class xs))
-    (keep-int-set f xs)
+    (map-int-set f xs)
     ;; we're not doing count since it might be a lazy seq
     (let [ans (IntArrayList/new)]
       (reduce (fn [^IntArrayList l id]
@@ -224,7 +224,6 @@
               ans
               xs)
       (.toSortedIntSet ans))))
-
 
 (defn- mapcat-int-set
   [f ^int/1 xs]

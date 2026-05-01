@@ -115,7 +115,7 @@
   (expect [1 3 9] (vec (i/set [9 1 nil 3]))))
 
 
-(deftest keep-test
+(deftest map-test
   (let [f {0 0
            1 10
            2 20
@@ -123,9 +123,9 @@
            4 nil
            5 50}]
     (expect [0 10 20 30 50]
-            (vec (i/keep f (int-array (keys f)))))
+            (vec (i/map f (int-array (keys f)))))
     (expect [0 10 20 30 50]
-            (vec (i/keep f (keys f))))))
+            (vec (i/map f (keys f))))))
 
 (deftest mapcat-test
   (let [f {0 (int-array [0])

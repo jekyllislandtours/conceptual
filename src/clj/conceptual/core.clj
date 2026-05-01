@@ -462,6 +462,22 @@
   ([db k ids]
    (mapv-with-db db k ids)))
 
+(defn imap
+  "[ALPHA] An `i/map` over values of `k` from each id in `ids`."
+  (^int/1 [k ids]
+   (imap (db) k ids))
+  (^int/1 [db k ids]
+   (let [kid (if (int? k) k (key->id db k))]
+     (i/map (partial value-0 db kid) ids))))
+
+(defn imapcat
+  "[ALPHA] An `i/mapcat` over values of `k` from each id in `ids`."
+  (^int/1 [k ids]
+   (imapcat (db) k ids))
+  (^int/1 [db k ids]
+   (let [kid (if (int? k) k (key->id db k))]
+     (i/mapcat (partial value-0 db kid) ids))))
+
 (defn proj-0
   ([^ints ks id] (proj-0 (db) ks id))
   ([^DB db ^ints ks id] (apply vector (map #(value db % id) ks))))

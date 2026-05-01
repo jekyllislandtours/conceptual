@@ -1,6 +1,8 @@
 (ns conceptual.core-test
   (:require
    [conceptual.core :as c]
+   [conceptual.arrays :as a]
+   [conceptual.int-sets :as i]
    [clojure.test :refer [deftest use-fixtures testing]]
    [conceptual.test.core :as test.core]
    [expectations.clojure.test :refer [expect]]))
@@ -63,3 +65,17 @@
     (expect vector? all-transduced-no-db)
     (expect true (> (count all-no-db) (count filtered)))
     (expect vector? filtered)))
+
+(deftest imap-test
+  (let [ids (c/imap :sf/-starship-id (c/ids :sf/crew?))]
+    (expect a/int-array? ids)
+    (expect (vec ids) (vec (c/ids :sf/starship?)))))
+
+(deftest imapcat-test
+  (let [ids (c/imapcat :sf/-member-ids (c/ids :sf/team?))]
+    (expect a/int-array? ids)
+    (expect (vec ids)
+            (->> (c/ids :sf/team?)
+                 (c/mapv :sf/-member-ids)
+                 (apply i/union)
+                 vec))))
