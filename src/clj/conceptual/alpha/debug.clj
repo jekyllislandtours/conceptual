@@ -1,7 +1,9 @@
 (ns conceptual.alpha.debug
-  (:require [conceptual.core :as c]
-            [conceptual.int-sets :as i]
-            [clojure.data :as data]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.int-sets :as i]
+   [clojure.data :as data]
+   [clojure.pprint]))
 
 (defn known-keys
   "Returns all known keys that are not of the `:db` namespace."
@@ -32,3 +34,10 @@
                (seq input-only))
        {:conceptual-only-keys (into (sorted-set) conceptual-only)
         :input-only-keys (into (sorted-set) input-only)}))))
+
+
+(defn dump
+  ([] (dump (c/db)))
+  ([db]
+   (doseq [i (range (inc (c/max-id db)))]
+     (clojure.pprint/pprint (c/seek db i)))))

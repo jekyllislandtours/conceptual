@@ -1,11 +1,11 @@
 (ns conceptual.core
   (:refer-clojure :exclude [mapv])
-  (:require [conceptual.arrays :refer [int-array-class]]
-            [conceptual.int-sets :as i]
-            [clojure.data.int-map :as int-map]
-            [clojure.pprint])
-  (:import [conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB]
-           [clojure.lang Keyword]))
+  (:require
+   [conceptual.int-sets :as i]
+   [clojure.data.int-map :as int-map])
+  (:import
+   (conceptual.core DB DBMap IndexAggregator PersistentDB WritableDB)
+   (clojure.lang Keyword)))
 
 (set! *warn-on-reflection* true)
 
@@ -58,7 +58,7 @@
    {:db/key :db/to-many-relation? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/to-one-relation? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/inverse-relation :db/type Integer :db/property? true :db/relation? true :db/to-one-relation? true}
-   {:db/key :db/ids :db/type int-array-class :db/relation? true :db/to-many-relation? true :db/property? true}
+   {:db/key :db/ids :db/type int/1 :db/relation? true :db/to-many-relation? true :db/property? true}
    {:db/key :db/fn? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}])
 
@@ -125,7 +125,7 @@
     [ks vs]))
 
 (defn- map->undefined-keys
-  [^DB db m]
+  [db m]
   (some->> m keys (remove (partial key->id db))))
 
 (defn create-db!
@@ -183,7 +183,7 @@
   ([ks] (keys->ids (db) ks))
   ([^DB db ks]
    (cond
-     (instance? int-array-class ks) ks
+     (instance? int/1 ks) ks
      (or (sequential? ks)
          (set? ks)) (i/map (partial key->id db) ks))))
 
@@ -196,33 +196,25 @@
      (when (keyword? key)
        (.getKeys db ^int (key->id db key))))))
 
-;; TODO: reconcile this with normalize-ids, probably can remove
-(defn ^:deprecated ordered-ids
-  "Like keys->ids but does NOT eliminate duplicates or sort. This is useful
-  for projections where the order of the projection matters."
-  ([ks] (ordered-ids (db) ks))
-  ([db ks]
-   (let [f (partial key->id db)]
-     (int-array (filter identity (map f ks))))))
-
 (defn normalize-ids
-  "Like keys->ids but does NOT eliminate duplicates or sort. This is useful
-  for projections where the order of the projection matters."
+  "Like `keys->ids` but does NOT eliminate duplicates or sort. This is useful
+  for projections where the order of the projection matters. Unknown keys
+  will be ignored and therefore the input count of ks may not be the same
+  as the output array length. `nil` can't be in a primitive int array."
   ([ks] (normalize-ids (db) ks))
   ([db ks]
    (cond
-     (instance? int-array-class ks) ks
+     (instance? int/1 ks) ks
      (or (sequential? ks)
-         (set? ks)) (let [f (partial key->id db)]
-                      (->> ks
-                           (map f)
-                           (filter identity)
-                           int-array)))))
+         (set? ks)) (->> ks
+                         (map (partial key->id db))
+                         (filter identity)
+                         int-array))))
 
 (defn id->key
   "Given and id returns the key."
   ([id]
-   (id->key (db) ^int id))
+   (id->key (db) id))
   ([^DB db id]
    (.getValue db ^int id ^int -key)))
 
@@ -634,12 +626,6 @@
   [& args]
   (reset! *db* (create-db!))
   (apply load-pickle! args))
-
-(defn dump
-  ([] (dump (db)))
-  ([^DB db]
-   (doseq [i (range (inc (max-id db)))]
-     (clojure.pprint/pprint (seek db i)))))
 
 (defn init!
   []

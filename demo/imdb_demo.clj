@@ -1,14 +1,17 @@
 (ns imdb-demo
-  (:require [conceptual.core :as c]
-            [conceptual.schema :as s]
-            [conceptual.int-sets :as i]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
-            [clojure.string :as str])
-  (:import [java.net URL]
-           [java.io File BufferedInputStream]
-           [java.util.zip GZIPInputStream]
-           [java.nio.file Files StandardCopyOption]))
+  (:require
+   [conceptual.core :as c]
+   [conceptual.alpha.debug :as debug]
+   [conceptual.schema :as s]
+   [conceptual.int-sets :as i]
+   [clojure.java.io :as io]
+   [clojure.set :as set]
+   [clojure.string :as str])
+  (:import
+   (java.net URL)
+   (java.io File)
+   (java.util.zip GZIPInputStream)
+   (java.nio.file Files StandardCopyOption)))
 
 
 ;; Let's populate conceptual with some data.
@@ -665,7 +668,7 @@
   (reset-db!)
 
   ;; dump entire db to stdout - don't use if db is too big :D
-  (c/dump)
+  (debug/dump)
 
   ;; load the ratings
   (time (load-ratings!))
