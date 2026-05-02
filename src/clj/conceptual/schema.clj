@@ -19,14 +19,14 @@
   ([db aggr key type]
    (declare-property! db aggr key type {}))
   ([^DB db ^IndexAggregator aggr ^Keyword key type opts]
-   (c/insert! ^DB db ^IndexAggregator aggr (merge {:db/key key
-                                                   :db/type type
-                                                   :db/property? true}
-                                                  opts))))
+   (c/insert! db aggr (merge {:db/key key
+                              :db/type type
+                              :db/property? true}
+                             opts))))
 
 (defn declare-properties!
-  "Given a list of property specs of the form [key type] or [key type opts],
-   declares the set of properties."
+  "`args` is a list of property specs of the form `[key type]` or `[key type opts]`,
+   declares the set of properties. `key` is a keyword, `type` a class and `opts` a map"
   ([args]
    (c/with-aggr [aggr]
      (declare-properties! aggr args)))
@@ -34,7 +34,7 @@
    (swap! *db* declare-properties! aggr args))
   ([^DB db ^IndexAggregator aggr args]
    (reduce (fn [-db arg]
-             (apply (partial declare-property! -db aggr) arg))
+             (apply declare-property! -db aggr arg))
            db args)))
 
 (defn declare-tag!
@@ -46,14 +46,15 @@
    (declare-property! db aggr key Boolean {:db/tag? true})))
 
 (defn declare-tags!
+  "`args` is a seq of tupls ie `[[:sf/crew?] [:sf/team?]]` etc"
   ([args]
    (c/with-aggr [aggr]
      (declare-tags! ^IndexAggregator aggr args)))
   ([aggr args]
    (swap! *db* declare-tags! aggr args))
   ([^DB db ^IndexAggregator aggr args]
-   (reduce (fn [db arg]
-             (apply (partial declare-tag! db aggr) arg))
+   (reduce (fn [db [kw]]
+             (declare-tag! db aggr kw))
            db args)))
 
 (defn declare-to-one-relation!
@@ -95,7 +96,7 @@
                             (vector (first a) {:db/inverse-relation
                                                (c/value db :db/id (second a))}) a))]
      (reduce (fn [db arg]
-               (apply (partial declare-to-one-relation! db aggr) arg))
+               (apply declare-to-one-relation! db aggr arg))
              db args))))
 
 (defn declare-to-many-relations!
@@ -109,31 +110,11 @@
                             (vector (first a) {:db/inverse-relation
                                                (c/value db :db/id (second a))}) a))]
      (reduce (fn [db arg]
-               (apply (partial declare-to-many-relation! db aggr) arg))
+               (apply declare-to-many-relation! db aggr arg))
              db args))))
 
-(defn key-map
-  "Creates a map of the-key's value to id for the given set key or id.
-   Assumes the mapping is one to one."
-  ([the-set the-key] (key-map (c/db) the-set the-key))
-  ([db the-set the-key]
-   (some->> (c/ids db the-set)
-            (c/project db [the-key :db/id])
-            (into {}))))
-
-(defn multi-key-map
-  "Creates a map of the-key's value to a vector of all of the ids with that value."
-  ([the-set the-key] (multi-key-map (c/db) the-set the-key))
-  ([^DB db the-set the-key]
-   (->> the-set
-        (partial c/ids db)
-        (c/project db [the-key :db/id])
-        (group-by first)
-        (map (fn [[k v]] [k (mapv second v)]))
-        (into {}))))
-
 (defn add-inverse-relations!
-  "Given an seq of [relationKeyA inverseRelationKeyB] adds and inverse relation
+  "`args` is a seq of tupls `[relationKeyA inverseRelationKeyB]`. Adds an inverse relation
   (i.e. :db/inverse-relation) to the concept represented by inverseRelationKeyB."
   ([args]
    (c/with-aggr [aggr]
@@ -146,6 +127,28 @@
                         {:db/key k
                          :db/inverse-relation (some-> v second (partial c/valuei db :db/id))}))
            db args)))
+
+
+(defn key-map
+  "Creates a map of the-key's value to id for the given set key or id.
+   Assumes the mapping is one to one."
+  ([the-set the-key] (key-map (c/db) the-set the-key))
+  ([db the-set the-key]
+   (some->> (c/ids db the-set)
+            (c/project db [the-key :db/id])
+            (into {}))))
+
+
+(defn multi-key-map
+  "Creates a map of the-key's value to a vector of all of the ids with that value."
+  ([the-set the-key] (multi-key-map (c/db) the-set the-key))
+  ([^DB db the-set the-key]
+   (->> the-set
+        (c/ids db)
+        (c/project db [the-key :db/id])
+        (group-by first)
+        (map (fn [[k v]] [k (mapv second v)]))
+        (into {}))))
 
 #_(defn add-tag!
     "Add a tag represented by the 'tag-key' to a
