@@ -487,7 +487,7 @@ public final class RDB implements DB, WritableDB {
     public WritableDB insert(final IndexAggregator aggregator, final int[] ks, final Object[] vs) {
         final int id = maxId + 1;
         final int[] ks1 = new int[ks.length + 1];
-        ks1[0] = 0;
+        ks1[0] = 0; // magic! DB.ID_ID which has a value of 0
         System.arraycopy(ks, 0, ks1, 1, ks.length);
         final Object[] vs1 = new Object[ks1.length];
         vs1[0] = id;

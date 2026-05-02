@@ -15,7 +15,6 @@ public class IndexAggregator {
 
     public void add(int key, int id) {
         List<Integer> index = indexAddMap.get(key);
-        //if (index == null) index = new LinkedList<>();
         if (index == null) index = new ArrayList<>();
         index.add(id);
         indexAddMap.put(key, index);
@@ -23,7 +22,6 @@ public class IndexAggregator {
 
     public void remove(int key, int id) {
         List<Integer> index = indexRemoveMap.get(key);
-        //if (index == null) index = new LinkedList<>();
         if (index == null) index = new ArrayList<>();
         index.add(id);
         indexRemoveMap.put(key, index);
@@ -62,23 +60,19 @@ public class IndexAggregator {
     }
 
     public int[] ids(int key) {
-        int[] result = null;
+        int[] result = IntegerSets.EMPTY;
         List<Integer> addList = indexAddMap.get(key);
         if (addList != null) {
             result = IntegerSets.listToIntArray(addList);
-        } else {
-            result = new int[] {};
         }
         return result;
     }
 
     public int[] removeIds(int key) {
-        int[] result = null;
+      int[] result = IntegerSets.EMPTY;
         List<Integer> removeList = indexRemoveMap.get(key);
         if (removeList != null) {
             result = IntegerSets.listToIntArray(removeList);
-        } else {
-            result = new int[] {};
         }
         return result;
     }
