@@ -425,7 +425,7 @@
      (.get db int-id))))
 
 (defn ids
-  "Shorthand method for {:db/ids (seek id)}. Given a the for a property/attribute
+  "Shorthand method for `(:db/ids (seek id))`. Given a the for a property/attribute
    returns the set of concepts having that property/attribute."
   (^int/1 [id]
    (ids @*db* id))
@@ -545,20 +545,31 @@
 ;; and if they are index them.
 
 (defn apply-aggregator!
-  [^IndexAggregator aggr]
-  ;;(println "apply-aggregator!" (vec (.keys aggr)))
-  (doseq [k (.keys aggr)]
-    (swap! *db*
-           (fn [db]
-             (.update ^WritableDB db aggr ^int k (key->id db :db/ids)
-                      (i/difference (i/union (ids db k) (.ids aggr k))
-                                    (.removeIds aggr k)))))))
+  ([^IndexAggregator aggr]
+   (apply-aggregator! (db) aggr))
+  ([^DB db ^IndexAggregator aggr]
+   ;; aggregator keeps track of schema keys that are added and removed as well as the :db/id
+   ;; of those concepts.  Here we add to the key's `:db/ids` those that were added and
+   ;; remove the db ids that were removed.
+
+   ;; Assume the concept for :sf/rank looks like `{:db/id 9 :db/key :sf/rank :db/ids []}`
+   ;; if a concept `{:db/id 42 :sf/rank "Captain"} is added then
+   ;; the concept for `:sf/rank` is looked up and its `:db/ids` field is
+   ;; updated to have the value 42 ie
+   ;; {:db/id 9 :db/key :sf/rank :db/ids [42]}
+   (let [db-ids-id (key->id db :db/ids)]
+     (doseq [k (.keys aggr)]
+       (swap! *db*
+              (fn [db]
+                (.update ^WritableDB db aggr ^int k db-ids-id
+                         (i/difference (i/union (ids db k) (.ids aggr k))
+                                       (.removeIds aggr k)))))))))
 
 (defmacro with-aggr-0
-  ([^DB db binding & bodies]
+  ([db binding & bodies]
    `(let [~(first binding) (IndexAggregator.)]
       ~@bodies
-      (apply-aggregator! ^DB ~db ~(first binding)))))
+      (apply-aggregator! ~db ~(first binding)))))
 
 (defmacro with-aggr
   ([binding & bodies]
