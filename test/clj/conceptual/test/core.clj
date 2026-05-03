@@ -72,7 +72,12 @@
                     [:sf/human?]
                     [:sf/android?]
                     [:sf/klingon?]
-                    [:sf/betazoid?]]))
+                    [:sf/betazoid?]])
+
+
+  (s/declare-inverse-to-many-relations!
+   ;; a team has references to crew members, so add :sf/team-ids on each crew member
+   [[:sf/member-ids :sf/belongs-to-team-ids]]))
 
 (def sf-test-data
   [;; USS Enterprise

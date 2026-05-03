@@ -4,10 +4,12 @@
    [expectations.clojure.test :refer [expect]]
    [clojure.test :refer [deftest]]))
 
+
+(def basic-pickle-max-id 15) ;; 15 base properties ie :db/id :db/key :db/relation? etc defined by the system
+
 (deftest create-db-test!
   (c/create-db!)
-  (println @c/*db*)
-  (expect 13 (c/max-id))
+  (expect basic-pickle-max-id (c/max-id))
   (expect true (c/value :db/tag? :db/tag?))
   (expect true (c/value :db/tag? :db/property?))
-  (expect 14 (count (c/value :db/ids :db/key))))
+  (expect (inc basic-pickle-max-id) (count (c/value :db/ids :db/key))))

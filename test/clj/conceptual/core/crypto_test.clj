@@ -15,6 +15,8 @@
    (java.security SecureRandom)))
 
 
+(def basic-pickle-max-id 15) ;; 15 base properties ie :db/id :db/key :db/relation? etc defined by the system
+
 (defn bytes->str [bytes]
   (map identity bytes))
 
@@ -55,18 +57,17 @@
           _ (.init cipher Cipher/ENCRYPT_MODE key)
 
           decipher (Cipher/getInstance "AES")
-          _ (.init decipher Cipher/DECRYPT_MODE key)
-          ]
+          _ (.init decipher Cipher/DECRYPT_MODE key)]
       ;; ensure pickle path
       (io/make-parents pickle-path)
 
       ;; pickle setup
       (c/create-db!)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       ;; compact the PersistentDB into an RDB type
       (c/compact!)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       ;; type should be RDB
       (expect true (instance? conceptual.core.RDB (c/db)))
@@ -78,6 +79,6 @@
       ;; reset then load the pickle
       (c/reset-pickle! :filename pickle-path
                        :cipher decipher)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       (io/delete-file pickle-path))))

@@ -8,6 +8,7 @@ import java.util.*;
 
 public class IndexAggregator {
 
+  // TODO: Could be a map of Integer to IntArrayList which might simplify other code in this class?
     Map<Integer, List<Integer>> indexAddMap = new HashMap<>();
     Map<Integer, List<Integer>> indexRemoveMap = new HashMap<>();
 
@@ -85,6 +86,10 @@ public class IndexAggregator {
         return index.assoc(key, ((IPersistentMap) index.valAt(key, PersistentHashMap.EMPTY)).without(val));
     }
 
+  /**
+   * Used to update unique indices.  ie if the unique index was `:sf/id` adds a
+   * value to the index keyed by `:sf/id` ie {:sf/id {"picard" 42 "worf" 84}}
+   */
     public static IPersistentMap updateIndices(final IPersistentMap indices,
                                                final int id,
                                                final int[] keys,

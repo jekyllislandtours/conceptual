@@ -15,10 +15,11 @@ public interface DB extends Counted {
     int RELATION_TAG_ID = 7;
     int TO_MANY_RELATION_TAG_ID = 8;
     int TO_ONE_RELATION_TAG_ID = 9;
-    int INVERSE_RELATION_TAG_ID = 10;
-    int IDS_ID = 11;
-    int FN_TAG_ID = 12;
-    int FN_ID = 13;
+    int INVERSE_TO_ONE_RELATION_TAG_ID = 10;
+    int INVERSE_TO_MANY_RELATION_TAG_ID = 11;
+    int IDS_ID = 12;
+    int FN_TAG_ID = 13;
+    int FN_ID = 14;
 
     /**
      * Returns the identity of this database.

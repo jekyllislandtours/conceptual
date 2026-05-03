@@ -57,7 +57,9 @@
    {:db/key :db/relation? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/to-many-relation? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/to-one-relation? :db/type Boolean :db/property? true :db/tag? true}
-   {:db/key :db/inverse-relation :db/type Integer :db/property? true :db/relation? true :db/to-one-relation? true}
+   {:db/key :db/inverse-to-one-relation? :db/type Boolean :db/property? true :db/relation? true :db/tag? true}
+   {:db/key :db/inverse-to-many-relation? :db/type Boolean :db/property? true :db/relation? true :db/tag? true}
+   {:db/key :db/inverse-key-id :db/type Integer :db/property? true}
    {:db/key :db/ids :db/type int/1 :db/relation? true :db/to-many-relation? true :db/property? true}
    {:db/key :db/fn? :db/type Boolean :db/property? true :db/tag? true}
    {:db/key :db/fn :db/type clojure.lang.IFn :db/property? true}])

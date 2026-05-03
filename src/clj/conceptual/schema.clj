@@ -92,12 +92,9 @@
   ([aggr args]
    (swap! *db* declare-to-one-relations! aggr args))
   ([^DB db ^IndexAggregator aggr args]
-   (let [tuple-fn (fn [a] (if (> (count a) 1)
-                            (vector (first a) {:db/inverse-relation
-                                               (c/value db :db/id (second a))}) a))]
-     (reduce (fn [db arg]
-               (apply declare-to-one-relation! db aggr arg))
-             db args))))
+   (reduce (fn [db arg]
+             (apply declare-to-one-relation! db aggr arg))
+           db args)))
 
 (defn declare-to-many-relations!
   ([args]
@@ -106,12 +103,92 @@
   ([aggr args]
    (swap! *db* declare-to-many-relations! aggr args))
   ([^DB db ^IndexAggregator aggr args]
-   (let [tuple-fn (fn [a] (if (> (count a) 1)
-                            (vector (first a) {:db/inverse-relation
-                                               (c/value db :db/id (second a))}) a))]
-     (reduce (fn [db arg]
-               (apply declare-to-many-relation! db aggr arg))
-             db args))))
+   (reduce (fn [db arg]
+             (apply declare-to-many-relation! db aggr arg))
+           db args)))
+
+
+(defn declare-inverse-to-one-relation!
+  ([key inverse-key]
+   (c/with-aggr [aggr]
+     (declare-inverse-to-one-relation! aggr key inverse-key)))
+  ([aggr key inverse-key]
+   (swap! *db* declare-inverse-to-one-relation! aggr key inverse-key))
+  ([db aggr key inverse-key]
+   (declare-inverse-to-one-relation! db aggr key  inverse-key {}))
+  ([^DB db ^IndexAggregator aggr ^Keyword key ^Keyword inverse-key opts]
+   (let [new-db (declare-property! db aggr inverse-key Integer
+                                   (merge {:db/relation? true
+                                           :db/to-many-relation? true
+                                           :db/inverse-to-one-relation? true
+                                           :db/inverse-key-id (c/key->id db key)}
+                                          opts))]
+     (c/update! new-db aggr {:db/id (c/key->id new-db key)
+                             :db/inverse-key-id (c/key->id new-db inverse-key)}))))
+
+
+;; want to specify an optional fn, gets the db db/id key
+(defn declare-inverse-to-one-relations!
+  "`args+` is a seq of tupls ie `[:sf/member-ids :sf/team-ids {}]."
+  ([args+]
+   (c/with-aggr [aggr]
+     (declare-inverse-to-one-relations! aggr args+)))
+  ([aggr args+]
+   (swap! *db* declare-inverse-to-one-relations! aggr args+))
+  ([^DB db ^IndexAggregator aggr args+]
+   (reduce (fn [db args]
+             (apply declare-inverse-to-one-relation! db aggr args))
+           db args+)))
+
+
+(defn declare-inverse-to-many-relation!
+  ([key inverse-key]
+   (c/with-aggr [aggr]
+     (declare-inverse-to-many-relation! aggr key inverse-key)))
+  ([aggr key inverse-key]
+   (swap! *db* declare-inverse-to-many-relation! aggr key inverse-key))
+  ([db aggr key inverse-key]
+   (declare-inverse-to-many-relation! db aggr key  inverse-key {}))
+  ([^DB db ^IndexAggregator aggr ^Keyword key ^Keyword inverse-key opts]
+   (let [new-db (declare-property! db aggr inverse-key int/1
+                                   (merge {:db/relation? true
+                                           :db/to-many-relation? true
+                                           :db/inverse-to-many-relation? true
+                                           :db/inverse-key-id (c/key->id db key)}
+                                          opts))]
+     (c/update! new-db aggr {:db/id (c/key->id new-db key)
+                             :db/inverse-key-id (c/key->id new-db inverse-key)}))))
+
+
+;; want to specify an optional fn, gets the db db/id key
+(defn declare-inverse-to-many-relations!
+  "`args+` is a seq of tupls ie `[:sf/member-ids :sf/team-ids {}]."
+  ([args+]
+   (c/with-aggr [aggr]
+     (declare-inverse-to-many-relations! aggr args+)))
+  ([aggr args+]
+   (swap! *db* declare-inverse-to-many-relations! aggr args+))
+  ([^DB db ^IndexAggregator aggr args+]
+   (reduce (fn [db args]
+             (apply declare-inverse-to-many-relation! db aggr args))
+           db args+)))
+
+(comment
+
+  -inputs
+
+  (vec (c/ids :db/inverse-key-id))
+
+  (->> (c/ids :db/inverse-key-id)
+       (map c/seek)
+       (map :db/inverse-key-id))
+
+  (c/seek 34)
+
+
+  )
+
+
 
 (defn add-inverse-relations!
   "`args` is a seq of tupls `[relationKeyA inverseRelationKeyB]`. Adds an inverse relation
@@ -127,7 +204,6 @@
                         {:db/key k
                          :db/inverse-relation (some-> v second (partial c/valuei db :db/id))}))
            db args)))
-
 
 (defn key-map
   "Creates a map of the-key's value to id for the given set key or id.

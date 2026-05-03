@@ -74,6 +74,8 @@
     :test/edn {:hello "dude" 1 [5 6]}
     :test/tag? true}])
 
+(def basic-pickle-max-id 15) ;; 15 base properties ie :db/id :db/key :db/relation? etc defined by the system
+
 (deftest basic-pickle-test
   (testing "The most basic transcoder test"
     (let [pickle-path "temp/test_pickle.sz"]
@@ -82,11 +84,11 @@
 
       ;; pickle setup
       (c/create-db!)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       ;; compact the PersistentDB into an RDB type
       (c/compact!)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       ;; type should be RDB
       (expect true (instance? conceptual.core.RDB (c/db)))
@@ -94,7 +96,7 @@
       ;; pickle round-trip
       (c/pickle! :filename pickle-path)
       (c/load-pickle! :filename pickle-path)
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       (io/delete-file pickle-path))))
 
@@ -107,7 +109,7 @@
       ;; pickle setup
       (c/create-db!)
 
-      (expect 13 (c/max-id))
+      (expect basic-pickle-max-id (c/max-id))
 
       ;; declare a test schema
       (declare-test-schema!)
