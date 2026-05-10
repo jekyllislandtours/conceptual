@@ -40,6 +40,16 @@
 (deftest ids-of-unknown-key-returns-empty-test
   (expect [] (vec (c/ids :a-key-i-made-up--kjadiak383))))
 
+(deftest value-0-test
+  (let [id (first (c/ids :sf/id))
+        kid (c/key->id :sf/id)]
+    (expect int? id)
+    (expect int? kid)
+    (expect string? (c/value-0 kid id))
+    (testing "either nil does not throw error, returns nil"
+      (expect nil (c/value-0 kid nil))
+      (expect nil (c/value-0 nil 42))
+      (expect nil (c/value-0 nil nil)))))
 
 (deftest mapv-test
   (let [expected (for [id (c/ids :sf/id)]
@@ -78,4 +88,9 @@
             (->> (c/ids :sf/team?)
                  (c/mapv :sf/-member-ids)
                  (apply i/union)
-                 vec))))
+                 vec)))
+
+  (testing "nil id does not throw"
+    (expect zero? (->> (repeat 10 nil)
+                       (c/imapcat :sf/-member-ids)
+                       alength))))

@@ -362,12 +362,14 @@
    (.getMaxId db)))
 
 (defn value-0
-  "Lowest level interface to getValue. (swaps the order of id and key to better
-  leverage the threading function ->>)."
-  ([key id]
-   (.getValue (db) ^int id ^int key))
-  ([^DB db key id]
-   (.getValue db ^int id ^int key)))
+  "Lowest level interface to getValue. (swaps the order of id and key-id to better
+  leverage the threading macro ->>). If either `kid` or `id` are `nil` returns a `nil`.
+  Otherwise `kid` and `id` must both be integers."
+  ([kid id]
+   (value-0 (db) kid id))
+  ([^DB db kid id]
+   (when (and kid id)
+     (.getValue db ^int id ^int kid))))
 
 (defn ^:private value-1
   ([key id]
@@ -380,19 +382,20 @@
 
 (defn value
   "Given a key and id returns the value for the key on the given id."
-  ([key id] (value (db) key id))
-  ([db key id]
+  ([kw|kid id]
+   (value (db) kw|kid id))
+  ([db kw|kid id]
    (if (instance? Number id)
-     (value-1 db key id) ;; do something else here
+     (value-1 db kw|kid id) ;; do something else here
      (when (keyword? id)
-       (value-1 db key (key->id db id))))))
+       (value-1 db kw|kid (key->id db id))))))
 
 (defn valuei
   "Same as value, but the arguments are swapped."
-  ([id key]
-   (value key id))
-  ([db id key]
-   (value db key id)))
+  ([id kw|kid]
+   (value kw|kid id))
+  ([db id kw|kid]
+   (value db kw|kid id)))
 
 (defn invoke
   ([key id] (invoke (db) key id))
@@ -561,9 +564,10 @@
      (doseq [k (.keys aggr)]
        (swap! *db*
               (fn [db]
-                (.update ^WritableDB db aggr ^int k db-ids-id
-                         (i/difference (i/union (ids db k) (.ids aggr k))
-                                       (.removeIds aggr k)))))))))
+                (let [ids' (-> (ids db k)
+                               (i/union (.ids aggr k))
+                               (i/difference (.removeIds aggr k)))]
+                  (.update ^WritableDB db aggr ^int k db-ids-id ids'))))))))
 
 (defmacro with-aggr-0
   ([db binding & bodies]
