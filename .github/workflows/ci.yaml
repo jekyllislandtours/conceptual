@@ -11,10 +11,10 @@ jobs:
     steps:
       # Checks out your repository under $GITHUB_WORKSPACE
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Cache Clojure dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.m2/repository
@@ -32,7 +32,7 @@ jobs:
           java-version: '21' # Long-Term Support (LTS) release
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@13.4
+        uses: DeLaGuardo/setup-clojure@13.6.0
         with:
           # The value must indicate a particular version of the tool, or use 'latest'
           cli: latest       # Clojure CLI based on tools.deps
