@@ -1,9 +1,9 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        org.clojure/data.int-map {:mvn/version "1.3.0"}
-        org.clojure/data.fressian {:mvn/version "1.1.0"}
-        com.taoensso/nippy {:mvn/version "3.4.2"}
-        org.apache.commons/commons-pool2 {:mvn/version "2.12.0"}
-        org.apache.commons/commons-compress {:mvn/version "1.27.1"}
+{:deps {org.clojure/clojure {:mvn/version "1.12.4"}
+        org.clojure/data.int-map {:mvn/version "1.3.1"}
+        org.clojure/data.fressian {:mvn/version "1.1.1"}
+        com.taoensso/nippy {:mvn/version "3.6.2"}
+        org.apache.commons/commons-pool2 {:mvn/version "2.13.1"}
+        org.apache.commons/commons-compress {:mvn/version "1.28.0"}
         org.iq80.snappy/snappy {:mvn/version "0.5"}}
 
  :paths ["src/clj" "target/classes"]
@@ -12,8 +12,8 @@
  {:build
   {:ns-default build
    :deps
-   {io.github.clojure/tools.build {:git/tag "v0.10.5" :git/sha "2a21b7a"}
-    slipset/deps-deploy {:mvn/version "0.2.2"}}}
+   {io.github.clojure/tools.build {:git/tag "v0.10.13" :git/sha "ae52edf"}
+    slipset/deps-deploy {:mvn/version "0.2.3"}}}
 
 
   ;; the walkthrough requires some memory
@@ -24,16 +24,16 @@
 
   :dev {:extra-paths ["dev"]}
 
-  :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1250"}}
+  :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
              :main-opts  ["-m" "antq.core"]}
 
   :debug
-  {:extra-deps {djblue/portal                         {:mvn/version "0.58.2"}
+  {:extra-deps {djblue/portal                         {:mvn/version "0.64.1"}
                 com.github.jpmonettas/flow-storm-dbg  {:mvn/version "3.7.5"}
                 com.github.jpmonettas/flow-storm-inst {:mvn/version "3.7.5"}}}
 
   :cider
-  {:extra-deps {cider/cider-nrepl {:mvn/version "0.50.2"}}
+  {:extra-deps {cider/cider-nrepl {:mvn/version "0.59.0"}}
    :main-opts  ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware]"]}
 
   :test
@@ -41,8 +41,8 @@
    :extra-paths ["test/clj" "test/resources"]
    :extra-deps
    {lambdaisland/kaocha                     {:mvn/version "1.91.1392"}
-    org.clojure/test.check                  {:mvn/version "1.1.1"}
-    com.github.seancorfield/expectations    {:mvn/version "2.1.201"}}}}
+    org.clojure/test.check                  {:mvn/version "1.1.3"}
+    com.github.seancorfield/expectations    {:mvn/version "2.2.214"}}}}
 
  :deps/prep-lib {:ensure "target/classes"
                  :alias :build
