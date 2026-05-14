@@ -88,7 +88,7 @@
   (when (or sort sort-by)
     (validate-sort-params* k sort sort-by)))
 
-(defn- normalize-sort-params
+(defn normalize-sort-params
   "Adds in `:sort` `:asc` if no `:sort` key is present.
    `sort-by` is converted to a keyword or a vec of keywords.`
   should be called after `validate-sort-params` "
@@ -302,7 +302,6 @@
       i/+empty+
       (Arrays/copyOfRange ids start end))))
 
-
 (defn- apply-sort
   "`ids` is an array of primitive ints, `-sort` a keyword and `-sort-by`
   is either a keyword or a vector of keywords representing sort by attr(s).
@@ -311,14 +310,14 @@
   (let [compare-fn (if (= :desc -sort)
                      compare-inverse
                      compare)
-        ks (if (keyword? -sort-by)
-             [-sort-by]
-             -sort-by)
-        xs (c/project-map (conj ks :db/id) ids)]
-    ;; TODO: make more efficient
-    (->> xs
-         (sort-by (apply juxt ks) compare-fn)
-         (map :db/id)
+        ks-fn (if (keyword? -sort-by)
+                -sort-by
+                (apply juxt -sort-by))]
+    (->> ids
+         (sequence (comp (map c/seek)
+                         (remove nil?)))
+         (sort-by ks-fn compare-fn)
+         (mapv :db/id)
          int-array)))
 
 (defn apply-relation-key-info
