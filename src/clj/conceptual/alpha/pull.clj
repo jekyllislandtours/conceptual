@@ -19,6 +19,7 @@
 ;; NB limit is deprecated, use max-page-size
 ;; `:page` is zero based
 (def known-opts #{:limit :as :filter :page :max-page-size})
+(def ^:private sort-directions #{:asc :desc})
 
 (declare pull)
 
@@ -60,6 +61,47 @@
                     {::error ::invalid-max-page-size-value
                      :pull/key k}))))
 
+
+(defn- validate-sort-params*
+  [k sort sort-by]
+  (when (and sort (not sort-by))
+    (throw (ex-info "`sort-by` is required if `sort` is specified" {::error ::invalid-sort-by-option-value
+                                                                    :pull/key k})))
+  (when sort
+    (cond
+      (not (ident-like? sort))
+      (throw (ex-info "`sort` must be either a string, symbol or keyword" {::error ::invalid-sort-option-type
+                                                                           :pull/key k}))
+      (not (sort-directions (keyword sort)))
+      (throw (ex-info "`sort` must be either `asc` or `desc`." {::error ::invalid-sort-option-value
+                                                                :pull/key k}))))
+  (cond
+    (ident-like? sort-by) nil
+    (and (seq sort-by)
+         (every? ident-like? sort-by)) nil
+    :else (throw (ex-info "`sort-by` must be a string, symbol, keyword or a vector of string, symbol or keyword"
+                          {::error ::invalid-sort-by-option-value
+                           :pull/key k}))))
+
+(defn validate-sort-params
+  [k sort sort-by]
+  (when (or sort sort-by)
+    (validate-sort-params* k sort sort-by)))
+
+(defn- normalize-sort-params
+  "Adds in `:sort` `:asc` if no `:sort` key is present.
+   `sort-by` is converted to a keyword or a vec of keywords.`
+  should be called after `validate-sort-params` "
+  [{:keys [sort sort-by] :as opts}]
+  (if (nil? sort-by)
+    opts
+    (let [sort-by (if (ident-like? sort-by)
+                    (keyword sort-by)
+                    (mapv keyword sort-by))]
+      (cond-> (assoc opts :sort-by sort-by)
+        (nil? sort) (assoc :sort :asc)
+        sort (update :sort keyword)))))
+
 (defn variable?
   [x]
   (when (ident-like? x)
@@ -67,7 +109,9 @@
 
 (defn vector->key-info
   "Returns a map"
-  [{:keys [pull/variables]} [k opts]]
+  [{:keys [pull/variables
+           pull/validate-key-info]
+    :or {validate-key-info (constantly nil)}} [k opts]]
   (let [k (keyword k)
         key-id (c/key->id k)
         opts (cond
@@ -86,10 +130,11 @@
                                      {::error ::invalid-opts-map
                                       :pull/key k
                                       :pull/opts opts})))
-        {:keys [limit as page max-page-size]} opts
+        {:keys [limit as page max-page-size sort sort-by]} opts
         _ (validate-limit k limit)
         _ (validate-as k as)
         _ (validate-page-params k page max-page-size)
+        _ (validate-sort-params k sort sort-by)
         f-sexp|var (:filter opts)
         f-sexp (if (variable? f-sexp|var)
                  (get variables (keyword f-sexp|var))
@@ -101,24 +146,22 @@
                as (update :as keyword)
                limit (-> (dissoc :limit)
                          (assoc :max-page-size limit))
-               max-page-size (assoc :max-page-size (min max-page-size *max-relation-page-size*)))]
-    (when-let [unk-ks (->> (keys opts)
-                           (remove known-opts)
-                           set
-                           not-empty)]
-      (throw (ex-info "Unknown options"
-                      {::error ::unknown-options
-                       :pull/key k
-                       :pull/unknown-opts unk-ks})))
-    (cond-> {:pull/key k}
-      key-id (assoc :pull/key-id key-id)
-      (seq opts) (assoc :pull/key-opts opts))))
+               max-page-size (assoc :max-page-size (min max-page-size *max-relation-page-size*))
+               true normalize-sort-params)
+        key-info (cond-> {:pull/key k}
+                   key-id (assoc :pull/key-id key-id)
+                   (seq opts) (assoc :pull/key-opts opts))]
+    ;; Give caller ability to validate other options
+    (validate-key-info key-info)
+    key-info))
 
+(defn- compare-inverse
+  [x y]
+  (unchecked-multiply-int -1 (compare x y)))
 
 (defn default-pattern-finalizer
   [m]
   (select-keys m [:pull/key-infos :pull/relations]))
-
 
 (defn parse
   "Returns a data structure for processing
@@ -142,7 +185,11 @@
      - map of virtual attribute keys to maps.
      - each value map has keys `:pull.virtual-attribute/resolver-fn`,
 
-"
+  `:pull/validate-key-info`
+     - fn which takes in a map, should throw if there are errors.
+     - input map has keys `:pull/key`, `:pull/key-opts`
+     - `:pull/key` is a keyword
+     - `:pull/key-opts` is a map"
   [{:keys [pull/relation?
            pull/pattern-finalizer]
     keyword->virtual-attribute-info :pull/virtual-attributes-info
@@ -255,9 +302,31 @@
       i/+empty+
       (Arrays/copyOfRange ids start end))))
 
+
+(defn- apply-sort
+  "`ids` is an array of primitive ints, `-sort` a keyword and `-sort-by`
+  is either a keyword or a vector of keywords representing sort by attr(s).
+  Defaults to ascending sort if `-sort` is not `:desc`."
+  [-sort -sort-by ids]
+  (let [compare-fn (if (= :desc -sort)
+                     compare-inverse
+                     compare)
+        ks (if (keyword? -sort-by)
+             [-sort-by]
+             -sort-by)
+        xs (c/project-map (conj ks :db/id) ids)]
+    ;; TODO: make more efficient
+    (->> xs
+         (sort-by (apply juxt ks) compare-fn)
+         (map :db/id)
+         int-array)))
+
 (defn apply-relation-key-info
   [{:keys [pull/key pull/key-opts]} id+]
-  (let [{:keys [as page max-page-size] f-sexp :filter} key-opts
+  (let [{:keys [as page max-page-size]
+         -sort :sort
+         -sort-by :sort-by
+         f-sexp :filter} key-opts
         page (or page 0)
         max-page-size (min *max-relation-page-size*
                            (or max-page-size *max-relation-page-size*))
@@ -265,6 +334,10 @@
         v (if (and many? f-sexp)
             (c.filter/evaluate-conformed f-sexp id+)
             id+)
+        ;; must sort before paginate and only valid for to-many relations
+        v (if (and many? -sort-by)
+            (apply-sort -sort -sort-by v)
+            v)
         v' (cond-> v
              many? (paginate page max-page-size))]
     (cond-> {:k (or as key)
@@ -336,9 +409,14 @@
   `:pull/concept-finalizer`
      - fn for apply custom business logic to a concept before it is added to output. Returns the concept.
      - input map has keys `:pull/ctx` and `:pull/concept`
-     - `:pull/concept` is the current concept being built up"
-  [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+]
-  (let [{:keys [pull/key-infos pull/relations]} parsed-pattern
+     - `:pull/concept` is the current concept being built up
+
+  `opts`
+     - optional map of keys `sort` and `sort-by`"
+  [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+ & {:keys [sort sort-by] :as opts}]
+  (validate-sort-params nil sort sort-by)
+  (let [{:keys [sort sort-by]} (normalize-sort-params opts)
+        {:keys [pull/key-infos pull/relations]} parsed-pattern
         ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
         cb-opts {:pull/ctx ctx
@@ -352,6 +430,9 @@
                              rm-db-id? (dissoc c :db/id)))))
         one? (int? id+)
         ids (if one? [id+] id+)
+        ids (if sort-by
+              (apply-sort sort sort-by ids)
+              ids)
         cs (into [] xform ids)]
     (cond-> cs
       one? first)))

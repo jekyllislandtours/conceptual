@@ -114,7 +114,7 @@
             (f :foo/bar {:a :b}))))
 
 
-(deftest validated-page-params
+(deftest validate-page-params-test
   (let [f (fn [k page max-page-size]
             (try
               (pull/validate-page-params k page max-page-size)
@@ -130,6 +130,43 @@
     (expect {::pull/error ::pull/invalid-max-page-size-value
              :pull/key :foo/bar}
             (f :foo/bar 1 "42"))))
+
+(deftest validate-sort-params-test
+  (let [f (fn [k sort-direction sort-by]
+            (try
+              (pull/validate-sort-params k sort-direction sort-by)
+              (catch Exception ex
+                (ex-data ex))))]
+    (expect nil (f :foo/bar nil nil))
+    (expect nil (f :foo/bar nil :a))
+    (expect nil (f :foo/bar nil :a/b))
+    (expect nil (f :foo/bar nil "a/b"))
+    (expect nil (f :foo/bar nil 'a/b))
+    (expect nil (f :foo/bar nil 'a/b))
+    (expect nil (f :foo/bar "asc" 'a/b))
+    (expect nil (f :foo/bar "desc" 'a/b))
+    (expect nil (f :foo/bar "desc" ['a/b]))
+    (expect nil (f :foo/bar :desc ['a/b]))
+
+    (expect {::pull/error
+             ::pull/invalid-sort-option-type
+             :pull/key :foo/bar}
+            (f :foo/bar 2 'a/b))
+
+    (expect {::pull/error
+             ::pull/invalid-sort-option-type
+             :pull/key :foo/bar}
+            (f :foo/bar ["foo"] 'a/b))
+
+    (expect {::pull/error
+             ::pull/invalid-sort-option-value
+             :pull/key :foo/bar}
+            (f :foo/bar "foo" 'a/b))
+
+    (expect {::pull/error
+             ::pull/invalid-sort-by-option-value,
+             :pull/key :foo/bar}
+            (f :foo/bar :desc nil))))
 
 (deftest vector->key-info-test
   (let [f (fn [v]
@@ -166,27 +203,39 @@
              :pull/key-id (c/key->id :sf/member-ids)
              :pull/key-opts {:max-page-size 3
                              :as :hello/world
+                             :sort :desc
+                             :sort-by [:sf/name]
                              :filter [:sexp/logical {:op/boolean 'and
                                                      :list/sexp [[:sexp/field 'sf/human?]]}]}}
             (pull/vector->key-info {:pull/variables {:$x 'sf/human?}}
-                                   [:sf/member-ids {:as :hello/world :limit 3 :filter '$x}]))
+                                   [:sf/member-ids {:as :hello/world :limit 3 :filter '$x 'sort "desc" 'sort-by ['sf/name]}]))
 
-    ;; errors
-    (expect {::pull/error ::pull/unknown-options
-             :pull/key :sf/id
-             :pull/unknown-opts #{:meow}}
-            (f [:sf/id {:meow 23}]))
+    (testing "unknown options are allowed. Not restricting because it gives applications flexibility to communicate other info."
+      (expect {:pull/key :sf/id :pull/key-id 30 :pull/key-opts {:meow 23}}
+              (f [:sf/id {:meow 23}])))
 
-    (expect {::pull/error ::pull/invalid-opts-map
-             :pull/key :sf/id
-             :pull/opts :meow}
-            (f [:sf/id :meow]))
-
+    ;; error -- keys must be `ident-like?`
     (expect {::pull/error ::pull/invalid-opts-map-key
              :pull/key :sf/id
              :pull/opts {12 22}
              :pull/opts-key 12}
-            (f [:sf/id {12 22}]))))
+            (f [:sf/id {12 22}]))
+
+
+    (testing "validate-key-info"
+      (let [validate-key-info (fn [{:keys [pull/key pull/key-opts]}]
+                                (when (and (= key :sf/team-ids)
+                                           (= :sf/name (:sort-by key-opts)))
+                                  (throw (ex-info "not-allowed" {:meow true}))))]
+
+        (expect map? (pull/vector->key-info {:pull/validate-key-info validate-key-info}
+                                            [:sf/team-ids {:limit 3}]))
+        (expect {:meow true}
+                (try
+                  (pull/vector->key-info {:pull/validate-key-info validate-key-info}
+                                         [:sf/team-ids {:limit 3 :sort-by :sf/name}])
+                  (catch Exception ex
+                    (ex-data ex))))))))
 
 (deftest parse-test
   (let [relation? (fn [{:keys [pull/key]}]
@@ -241,7 +290,9 @@
              :pull/relations
              [{:pull/key :sf/team-ids
                :pull/key-id (c/key->id :sf/team-ids)
-               :pull/key-opts {:max-page-size 3}}
+               :pull/key-opts {:max-page-size 3
+                               :sort :asc
+                               :sort-by :sf/name}}
               {:pull/key :sf/team-ids
                :pull/key-id (c/key->id :sf/team-ids)
                :pull/key-opts {:as :sf/team-members}
@@ -251,7 +302,7 @@
                                                 :pull/key-id (c/key->id :sf/name)}]
                               :pull/relations []}}]}
             (f [:sf/id :sf/rank
-                [:sf/team-ids {:limit 3}]
+                [:sf/team-ids {:limit 3 :sort-by :sf/name}]
                 {[:sf/team-ids {:as :sf/team-members}] [:sf/id :sf/name]}]))
 
     ;; error
@@ -1195,3 +1246,99 @@
                                       :sf/team-ids
                                       {[:sf/team-ids {:as :sf/teams}] [:sf/id :sf/name]}])
                          (->db-id "uss-e"))))))
+
+
+
+(deftest apply-sort-test
+  (let [la-forge-id (c/lookup-id :sf/id "la-forge")
+        picard-id (c/lookup-id :sf/id "picard")
+        riker-id (c/lookup-id :sf/id "riker")
+        worf-id (c/lookup-id :sf/id "worf")]
+
+    (testing "single attr asc sort"
+      (expect [la-forge-id picard-id riker-id worf-id]
+              (->> [picard-id riker-id worf-id la-forge-id]
+                   (#'pull/apply-sort :asc :sf/id)
+                   vec)))
+
+    (testing "single attr desc sort"
+      (expect [worf-id riker-id picard-id la-forge-id]
+              (->> [picard-id riker-id worf-id la-forge-id]
+                   (#'pull/apply-sort :desc :sf/id)
+                   vec)))
+
+    (testing "multi attr asc sort"
+      (expect [picard-id riker-id la-forge-id worf-id]
+              (->> [picard-id riker-id worf-id la-forge-id]
+                   (#'pull/apply-sort :asc [:sf/rank :sf/name])
+                   vec)))
+
+    (testing "multi attr desc sort"
+      (expect [worf-id la-forge-id riker-id picard-id]
+              (->> [picard-id riker-id worf-id la-forge-id]
+                   (#'pull/apply-sort :desc [:sf/rank :sf/name])
+                   vec)))))
+
+(deftest sort-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/captain-id "picard"
+           :sf/team-ids ["uss-e-bridge-team"
+                         "uss-e-security-team"
+                         "uss-e-eng-team"
+                         "uss-e-away-team"
+                         "uss-e-med-team"]
+           :sf/teams [{:sf/id "uss-e-away-team" :sf/name "Away Team"}
+                      {:sf/id "uss-e-bridge-team" :sf/name "Bridge Team"}
+                      {:sf/id "uss-e-eng-team" :sf/name "Engineering Team"}
+                      {:sf/id "uss-e-med-team" :sf/name "Medical Team"}
+                      {:sf/id "uss-e-security-team" :sf/name "Security Team"}]}
+          (pull/pull {:pull/relation-value id-resolver
+                      :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                     (pull/parse {:pull/relation? sf-relation?}
+                                 [:sf/id
+                                  :sf/name
+                                  :sf/captain-id
+                                  :sf/team-ids
+                                  {[:sf/team-ids {:as :sf/teams :sort-by :sf/name}]
+                                   [:sf/id :sf/name]}])
+                     (->db-id "uss-e")))
+
+  (testing "limit applied after sort"
+    (expect {:sf/id "uss-e"
+             :sf/teams [{:sf/id "uss-e-away-team" :sf/name "Away Team"}
+                        {:sf/id "uss-e-bridge-team" :sf/name "Bridge Team"}]}
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                       (pull/parse {:pull/relation? sf-relation?}
+                                   [:sf/id
+                                    {[:sf/team-ids {:as :sf/teams :limit 2 :sort-by :sf/name}]
+                                     [:sf/id :sf/name]}])
+                       (->db-id "uss-e"))))
+
+  (testing "limit applied after sort desc"
+    (expect {:sf/id "uss-e"
+             :sf/teams [{:sf/id "uss-e-security-team" :sf/name "Security Team"}
+                        {:sf/id "uss-e-med-team" :sf/name "Medical Team"}]}
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                       (pull/parse {:pull/relation? sf-relation?}
+                                   [:sf/id
+                                    {[:sf/team-ids {:as :sf/teams :limit 2 :sort :desc :sort-by :sf/name}]
+                                     [:sf/id :sf/name]}])
+                       (->db-id "uss-e")))))
+
+(deftest sort-root-pattern-test
+  (expect [{:sf/id "uss-e-away-team" :sf/name "Away Team"}
+           {:sf/id "uss-e-bridge-team" :sf/name "Bridge Team"}
+           {:sf/id "uss-e-eng-team" :sf/name "Engineering Team"}
+           {:sf/id "uss-e-med-team" :sf/name "Medical Team"}
+           {:sf/id "uss-e-security-team" :sf/name "Security Team"}]
+  (pull/pull {:pull/relation-value id-resolver
+              :pull/relation-finalizer multiple-aliases-relation-finalizer}
+             (pull/parse {:pull/relation? sf-relation?}
+                         [:sf/id :sf/name])
+             (->> ["uss-e-eng-team" "uss-e-bridge-team" "uss-e-security-team" "uss-e-away-team" "uss-e-med-team"]
+                  (mapv ->db-id)
+                  i/set)
+             :sort-by :sf/name)))
