@@ -61,51 +61,69 @@
                     {::error ::invalid-max-page-size-value
                      :pull/key k}))))
 
+(defn- invalid?
+  [x]
+  (= ::invalid x))
 
-(defn- validate-sort-params*
-  [k sort sort-by]
-  (when (and sort (not sort-by))
-    (throw (ex-info "`sort-by` is required if `sort` is specified" {::error ::invalid-sort-by-option-value
-                                                                    :pull/key k})))
-  (when sort
-    (cond
-      (not (ident-like? sort))
-      (throw (ex-info "`sort` must be either a string, symbol or keyword" {::error ::invalid-sort-option-type
-                                                                           :pull/key k}))
-      (not (sort-directions (keyword sort)))
-      (throw (ex-info "`sort` must be either `asc` or `desc`." {::error ::invalid-sort-option-value
-                                                                :pull/key k}))))
+(defn- conform-sort
+  [x]
   (cond
-    (ident-like? sort-by) nil
-    (and (seq sort-by)
-         (every? ident-like? sort-by)) nil
-    :else (throw (ex-info "`sort-by` must be a string, symbol, keyword or a vector of string, symbol or keyword"
-                          {::error ::invalid-sort-by-option-value
-                           :pull/key k}))))
+    (nil? x) :asc
+    (ident-like? x) (or (sort-directions (keyword x))
+                        ::invalid)
+    :else ::invalid))
+
+(defn- conform-sort-by
+  [x]
+  (cond
+    (nil? x) nil
+    (ident-like? x) (keyword x)
+    (and (seq x)
+         (every? ident-like? x) ) (mapv keyword x)
+    :else ::invalid))
 
 (defn validate-sort-params
   [k sort sort-by]
   (when (or sort sort-by)
-    (validate-sort-params* k sort sort-by)))
+    (when (and sort (not sort-by))
+      (throw (ex-info "`sort-by` is required if `sort` is specified" {::error ::invalid-sort-by-option-value
+                                                                      :pull/key k})))
+    (when (invalid? (conform-sort sort))
+      (throw (ex-info "`sort` must be either `asc` or `desc`." {::error ::invalid-sort-option-value
+                                                                :pull/key k})))
+    (when (invalid? (conform-sort-by sort-by))
+      (throw (ex-info "`sort-by` must be a string, symbol, keyword or a vector of string, symbol or keyword"
+                      {::error ::invalid-sort-by-option-value
+                       :pull/key k})))))
 
-(defn normalize-sort-params
+(defn conform-sort-params
   "Adds in `:sort` `:asc` if no `:sort` key is present.
    `sort-by` is converted to a keyword or a vec of keywords.`
-  should be called after `validate-sort-params` "
+  should be called after `validate-sort-params`. Invalid values
+  for `sort` and `sort-by` are nil"
   [{:keys [sort sort-by] :as opts}]
-  (if (nil? sort-by)
-    opts
-    (let [sort-by (if (ident-like? sort-by)
-                    (keyword sort-by)
-                    (mapv keyword sort-by))]
-      (cond-> (assoc opts :sort-by sort-by)
-        (nil? sort) (assoc :sort :asc)
-        sort (update :sort keyword)))))
+  (if (or sort sort-by)
+    (let [sort-by (conform-sort-by sort-by)
+          sort (conform-sort sort)
+          sort-invalid? (invalid? sort)
+          sort-by-invalid? (invalid? sort-by)]
+      (cond-> opts
+        sort-invalid? (dissoc :sort)
+        sort-by-invalid? (dissoc :sort-by)
+        (not sort-invalid?) (assoc :sort sort)
+        (not sort-by-invalid?) (assoc :sort-by sort-by)))
+    opts))
 
 (defn variable?
   [x]
   (when (ident-like? x)
     (-> x symbol str (.charAt 0) (= \$))))
+
+(defn- resolve-variable
+  [variables k]
+  (if (variable? k)
+    (get variables (keyword k))
+    k))
 
 (defn vector->key-info
   "Returns a map"
@@ -134,20 +152,22 @@
         _ (validate-limit k limit)
         _ (validate-as k as)
         _ (validate-page-params k page max-page-size)
+        sort (resolve-variable variables sort)
+        sort-by (resolve-variable variables sort-by)
         _ (validate-sort-params k sort sort-by)
-        f-sexp|var (:filter opts)
-        f-sexp (if (variable? f-sexp|var)
-                 (get variables (keyword f-sexp|var))
-                 f-sexp|var)
+        f-sexp (resolve-variable variables (:filter opts))
 
         ;; TODO: don't conform the same filter repeatedly
         opts (cond-> opts
+
                f-sexp (assoc :filter (c.filter/conform f-sexp))
                as (update :as keyword)
                limit (-> (dissoc :limit)
                          (assoc :max-page-size limit))
                max-page-size (assoc :max-page-size (min max-page-size *max-relation-page-size*))
-               true normalize-sort-params)
+               (or sort sort-by) (-> (assoc :sort sort)
+                                     (assoc :sort-by sort-by)
+                                     conform-sort-params))
         key-info (cond-> {:pull/key k}
                    key-id (assoc :pull/key-id key-id)
                    (seq opts) (assoc :pull/key-opts opts))]
@@ -414,7 +434,7 @@
      - optional map of keys `sort` and `sort-by`"
   [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+ & {:keys [sort sort-by] :as opts}]
   (validate-sort-params nil sort sort-by)
-  (let [{:keys [sort sort-by]} (normalize-sort-params opts)
+  (let [{:keys [sort sort-by]} (conform-sort-params opts)
         {:keys [pull/key-infos pull/relations]} parsed-pattern
         ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
