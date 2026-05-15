@@ -149,12 +149,7 @@
     (expect nil (f :foo/bar :desc ['a/b]))
 
     (expect {::pull/error
-             ::pull/invalid-sort-option-type
-             :pull/key :foo/bar}
-            (f :foo/bar 2 'a/b))
-
-    (expect {::pull/error
-             ::pull/invalid-sort-option-type
+             ::pull/invalid-sort-option-value
              :pull/key :foo/bar}
             (f :foo/bar ["foo"] 'a/b))
 
@@ -1342,3 +1337,23 @@
                   (mapv ->db-id)
                   i/set)
              :sort-by :sf/name)))
+
+
+(deftest sort-variables-test
+  (expect {:sf/id "uss-e"
+           :sf/name "USS Enterprise"
+           :sf/teams [{:sf/id "uss-e-security-team" :sf/name "Security Team"}
+                      {:sf/id "uss-e-med-team" :sf/name "Medical Team"}
+                      {:sf/id "uss-e-eng-team" :sf/name "Engineering Team"}
+                      {:sf/id "uss-e-bridge-team" :sf/name "Bridge Team"}
+                      {:sf/id "uss-e-away-team" :sf/name "Away Team"}]}
+          (pull/pull {:pull/relation-value id-resolver
+                      :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                     (pull/parse {:pull/relation? sf-relation?
+                                  :pull/variables {:$sort "desc"
+                                                   :$sort-by "sf/name"}}
+                                 [:sf/id
+                                  :sf/name
+                                  {[:sf/team-ids {:as :sf/teams "sort" "$sort" :sort-by :$sort-by}]
+                                   [:sf/id :sf/name]}])
+                     (->db-id "uss-e"))))
