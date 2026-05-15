@@ -192,7 +192,7 @@
 
   `:pull/variables`
      - a map of keyword variables to values. variables must begin with a `$` char
-     - only the `:filter` option on an expanded relation supports variables
+     - only the `:filter`, `sort` and `sort-by` options on an expanded relation supports variables
 
   `:pull/pattern-finalizer`
      - fn which takes in a map and returns a map with keys `:pull/key-infos` and `:pull/relations`
