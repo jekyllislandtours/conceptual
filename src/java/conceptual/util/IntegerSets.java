@@ -217,6 +217,95 @@ public final class IntegerSets {
     }
 
     /**
+     * Returns the sum of all lengths.
+     */
+    private static int sumLengths(final int[][] sets) {
+        int ans = 0;
+        for (int i=0; i < sets.length; i++) {
+            if (null != sets[i]) {
+                ans += sets[i].length;
+            }
+        }
+        return ans;
+    }
+
+
+  private final static int[] union2(final int[][] sets, int start) {
+        if (null == sets || 0 == sets.length) { return EMPTY; }
+        final int n = sumLengths(sets); // trying to prevent allocations along the way
+        IntArrayList ial = new IntArrayList(n);
+        for (int i=start; i < sets.length; i++) {
+            ial.addAll(sets[i]);
+        }
+        return ial.toSortedIntSet();
+  }
+
+    /**
+     * Returns the set union of all the input sorted int sets.
+     * It is safe to pass `null` as the input as well as `null` sets in the array.
+     *
+     * This method is NOT thread safe.
+     * This does NOT modify the input sets.
+     *
+     * @param sets array of sorted integer sets
+     * @return union of input sets
+     */
+    public final static int[] union2(final int[][] sets) {
+      return union2(sets, 0);
+    }
+
+  /**
+   * Same as difference but returns the input setA if b is null or empty.
+   */
+    public final static int[] difference2(final int[] setA, final int[] setB) {
+        boolean isEmptyA = (null == setA) || (0 == setA.length);
+        boolean isEmptyB = (null == setB) || (0 == setB.length);
+        if (isEmptyA) { return EMPTY; }
+        if (isEmptyB) { return setA; }
+
+        int[] difference = EMPTY;
+        int i=0, j=0;
+        int count = 0;
+        difference = new int[setA.length];
+        while (true) {
+            if (i == setA.length) {
+                break; // exit condition
+            } else if (j == setB.length || setA[i] < setB[j]) {
+                difference[count] = setA[i];
+                count++;
+                if (i < setA.length) i++;
+            } else if (setA[i] > setB[j]) {
+                // b is not in a
+                if (j < setB.length) j++;
+            } else if (setA[i] == setB[j]) {
+                // do not count... this is difference
+                if (i < setA.length) i++;
+                if (j < setB.length) j++;
+            }
+        }
+        int[] temp = new int[count];
+        System.arraycopy(difference, 0, temp, 0, count);
+        difference = temp;
+        return difference;
+    }
+
+  public final static int[] difference2(final int[][] sets) {
+    if (null == sets || 0 == sets.length) { return EMPTY; }
+
+    if (1 == sets.length) {
+      if (null == sets[0]) {
+        return EMPTY;
+      } else {
+        return sets[0];
+      }
+    }
+
+    // more than 1 set
+    return difference2(sets[0], union2(sets, 1));
+  }
+
+
+    /**
      * <p>getUnion</p>
      *
      * @param setA an array of int.
@@ -702,89 +791,6 @@ public final class IntegerSets {
         }
         builder.append("}");
         System.out.println(builder.toString());
-    }
-
-    /**
-     * <p>main</p>
-     *
-     * @param args an array of {@link java.lang.String} objects.
-     */
-    public static void main(String[] args) {
-        int size = 10000;
-        int maxIter = 100000;
-        double p = 0.5;
-
-        int[] a = new int[size];
-        int[] b = new int[size];
-
-        Random random = new Random();
-        int aCount = 0;
-        int bCount = 0;
-        for (int i=0; i < size; i++) {
-            if (random.nextDouble() > (1.0d - p)) {
-                a[aCount] = i;
-                aCount++;
-            }
-            if (random.nextDouble() > (1.0d - p)) {
-                b[bCount] = i;
-                bCount++;
-            }
-        }
-        int[] tempA = new int[aCount];
-        System.arraycopy(a, 0, tempA, 0, aCount);
-        a = tempA;
-        int[] tempB = new int[bCount];
-        System.arraycopy(b, 0, tempB, 0, bCount);
-        b = tempB;
-
-        printArray("a (" + a.length + ")", a);
-        printArray("b (" + b.length + ")", b);
-
-        long startTime = 0;
-        long endTime = 0;
-        long difference = 0;
-
-        int[] set = null;
-
-        set = getIntersection(a, b);
-        printArray("getIntersection (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getIntersection(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getUnion(a, b);
-        printArray("getUnion (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getUnion(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getDifference(a, b);
-        printArray("getDifference (" + set.length + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getDifference(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
-
-        set = getIntersectionAndUnionCount(a, b);
-        printArray("getIntersectionAndUnionCount (" + set[0] + ", " + set[1] + ")", set);
-        startTime = System.currentTimeMillis();
-        for (int i=0; i < maxIter; i++) {
-            set = getIntersectionAndUnionCount(a, b);
-        }
-        endTime = System.currentTimeMillis();
-        difference = (endTime - startTime);
-        System.out.println("time = " + difference + " ms, " + difference/(double) maxIter + " ms/oper");
     }
 
     public static final void encode(final int[] array, final OutputStream os) throws IOException {
