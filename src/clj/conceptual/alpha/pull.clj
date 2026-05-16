@@ -2,7 +2,7 @@
   (:require
    [conceptual.core :as c]
    [conceptual.arrays :as a]
-   [conceptual.alpha.int-sets :as i]
+   [conceptual.int-sets :as i]
    [conceptual.alpha.filter :as c.filter])
   (:import
    (java.util Arrays)))
