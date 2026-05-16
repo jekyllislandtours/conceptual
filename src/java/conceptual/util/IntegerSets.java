@@ -258,10 +258,8 @@ public final class IntegerSets {
    * Same as difference but returns the input setA if b is null or empty.
    */
     public final static int[] difference2(final int[] setA, final int[] setB) {
-        boolean isEmptyA = (null == setA) || (0 == setA.length);
-        boolean isEmptyB = (null == setB) || (0 == setB.length);
-        if (isEmptyA) { return EMPTY; }
-        if (isEmptyB) { return setA; }
+        if ((null == setA) || (0 == setA.length)) { return EMPTY; }
+        if ((null == setB) || (0 == setB.length)) { return setA; }
 
         int[] difference = EMPTY;
         int i=0, j=0;
