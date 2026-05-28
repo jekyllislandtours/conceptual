@@ -335,3 +335,8 @@
   (expect [] (vec (i/remove identity [nil])))
   (expect [1 3] (vec (i/remove even? (i/set [1 2 3 4]))))
   (expect [1 3] (vec (i/remove even? [1 2 3 4]))))
+
+
+(deftest not-empty-test
+  (expect nil (i/not-empty (i/set)))
+  (expect [1 2 3] (vec (i/not-empty (i/set [1 2 3])))))

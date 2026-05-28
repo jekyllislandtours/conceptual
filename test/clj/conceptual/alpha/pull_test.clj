@@ -1357,3 +1357,76 @@
                                   {[:sf/team-ids {:as :sf/teams "sort" "$sort" :sort-by :$sort-by}]
                                    [:sf/id :sf/name]}])
                      (->db-id "uss-e"))))
+
+
+(defn custom-relation-paginator
+  [{:keys [pull/key pull/key-opts]} ids]
+  (if (= :sf/team-ids key)
+    ids
+    (pull/default-paginator key-opts ids)))
+
+(deftest custom-paginate-relation-test
+  (let [f (fn [paginator]
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation-finalizer multiple-aliases-relation-finalizer
+                        :pull/paginator paginator}
+                       (pull/parse {:pull/relation? sf-relation?
+                                    :pull/variables {:$sort "desc"
+                                                     :$sort-by "sf/name"}}
+                                   [:sf/id
+                                    :sf/name
+                                    {[:sf/team-ids {:as :sf/teams "sort" "$sort" :sort-by :$sort-by}]
+                                     [:sf/id :sf/name]}])
+                       (->db-id "uss-e")))]
+    (binding [pull/*max-relation-page-size* 2]
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+               :sf/teams [{:sf/id "uss-e-security-team" :sf/name "Security Team"}
+                          {:sf/id "uss-e-med-team" :sf/name "Medical Team"}]}
+              (f nil))
+      (expect {:sf/id "uss-e"
+               :sf/name "USS Enterprise"
+               :sf/teams [{:sf/id "uss-e-security-team" :sf/name "Security Team"}
+                          {:sf/id "uss-e-med-team" :sf/name "Medical Team"}
+                          {:sf/id "uss-e-eng-team" :sf/name "Engineering Team"}
+                          {:sf/id "uss-e-bridge-team" :sf/name "Bridge Team"}
+                          {:sf/id "uss-e-away-team" :sf/name "Away Team"}]}
+              (f custom-relation-paginator)))))
+
+
+(deftest top-level-pagination-test
+  (let [team-ids (c/value :sf/-team-ids (->db-id "uss-e"))
+        f (fn [& {:keys [page max-page-size]}]
+            (pull/pull {:pull/relation-value id-resolver
+                        :pull/relation-finalizer multiple-aliases-relation-finalizer}
+                       (pull/parse {:pull/relation? sf-relation?}
+                                   [:sf/id
+                                    :sf/name])
+                       team-ids
+                       :sort-by :sf/name
+                       :page page
+                       :max-page-size max-page-size))]
+
+    ;; testing baseline, no page or max-page-size
+    (expect [{:sf/id "uss-e-away-team", :sf/name "Away Team"}
+             {:sf/id "uss-e-bridge-team", :sf/name "Bridge Team"}
+             {:sf/id "uss-e-eng-team", :sf/name "Engineering Team"}
+             {:sf/id "uss-e-med-team", :sf/name "Medical Team"}
+             {:sf/id "uss-e-security-team", :sf/name "Security Team"}]
+            (f))
+
+    ;; with pagination
+    (expect [{:sf/id "uss-e-away-team", :sf/name "Away Team"}
+             {:sf/id "uss-e-bridge-team", :sf/name "Bridge Team"}]
+            (f :page 0 :max-page-size 2))
+
+    ;; next page
+    (expect [{:sf/id "uss-e-eng-team", :sf/name "Engineering Team"}
+             {:sf/id "uss-e-med-team", :sf/name "Medical Team"}]
+            (f :page 1 :max-page-size 2))
+
+    (expect [{:sf/id "uss-e-security-team", :sf/name "Security Team"}]
+            (f :page 2 :max-page-size 2))
+
+    ;; empty result when page exceeds data
+    (expect [] (f :page 3 :max-page-size 2))))
