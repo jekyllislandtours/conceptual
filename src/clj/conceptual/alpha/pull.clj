@@ -203,7 +203,9 @@
 
   `:pull/virtual-attributes-info`
      - map of virtual attribute keys to maps.
-     - each value map has keys `:pull.virtual-attribute/resolver-fn`,
+     - each value map has keys:
+         `:pull.virtual-attribute/resolver-fn`
+         `:pull.virtual-attribute/relation?`
 
   `:pull/validate-key-info`
      - fn which takes in a map, should throw if there are errors.
@@ -286,7 +288,24 @@
 
 (defn default-value
   [m]
-  (c/value (:pull/key m) (:db/id m)))
+  (c/value-0 (:pull/key-id m) (:db/id m)))
+
+(defn paginate
+  (^int/1 [^int/1 ids]
+   (paginate ids 0 *max-relation-page-size*))
+  (^int/1 [^int/1 ids {:keys [page max-page-size]}]
+   (let [page (or page 0)
+         max-page-size (min *max-relation-page-size*
+                            (or max-page-size *max-relation-page-size*))]
+     (paginate ids page max-page-size)))
+  (^int/1 [^int/1 ids page page-size]
+   (let [n (alength ids)
+         ^int start (* page page-size)
+         ^int end (min (+ start page-size) n)]
+     (if (>= start n)
+       i/+empty+
+       (Arrays/copyOfRange ids start end)))))
+
 
 (defn assoc-kv
   [ctx key-info c]
@@ -305,7 +324,7 @@
     (cond-> c
       (some? v') (assoc (or as k) v'))))
 
-(defn assoc-all-kvs
+(defn- assoc-all-kvs
   [ctx key-infos c]
   (loop [c c
          [key-info & more] key-infos]
@@ -313,14 +332,18 @@
       c
       (recur (assoc-kv ctx key-info c) more))))
 
-(defn paginate
-  ^int/1 [^int/1 ids page page-size]
-  (let [n (alength ids)
-        ^int start (* page page-size)
-        ^int end (min (+ start page-size) n)]
-    (if (>= start n)
-      i/+empty+
-      (Arrays/copyOfRange ids start end))))
+(defn default-paginator
+  ^int/1 [{:keys [page max-page-size]} ^int/1 ids]
+  (let [page (or page 0)
+        max-page-size (min *max-relation-page-size*
+                           (or max-page-size *max-relation-page-size*))]
+    (paginate ids page max-page-size)))
+
+(defn- paginate-relation
+  ^int/1 [{:keys [pull/ctx pull/key-opts] :as rel-opts} ^int/1 ids]
+  (if-let [paginator (:pull/paginator ctx)]
+    (paginator rel-opts ids)
+    (paginate ids key-opts)))
 
 (defn- apply-sort
   "`ids` is an array of primitive ints, `-sort` a keyword and `-sort-by`
@@ -340,15 +363,12 @@
          (mapv :db/id)
          int-array)))
 
-(defn apply-relation-key-info
-  [{:keys [pull/key pull/key-opts]} id+]
-  (let [{:keys [as page max-page-size]
+(defn- apply-relation-key-info
+  [rel-opts {:keys [pull/key pull/key-opts]} id+]
+  (let [{:keys [as]
          -sort :sort
          -sort-by :sort-by
          f-sexp :filter} key-opts
-        page (or page 0)
-        max-page-size (min *max-relation-page-size*
-                           (or max-page-size *max-relation-page-size*))
         many? (a/int-array? id+)
         v (if (and many? f-sexp)
             (c.filter/evaluate-conformed f-sexp id+)
@@ -357,11 +377,12 @@
         v (if (and many? -sort-by)
             (apply-sort -sort -sort-by v)
             v)
-        v' (cond-> v
-             many? (paginate page max-page-size))]
+        v' (cond->> v
+             many? (paginate-relation rel-opts))]
     (cond-> {:k (or as key)
              :v v'}
       many? (assoc :v-all v))))
+
 
 (defn reify-relations*
   [{:keys [pull/relation-value pull/relation-finalizer]
@@ -382,7 +403,7 @@
               (resolver-fn rel-opts)
               (relation-value rel-opts))
         ids (if (int? id+) id+ (i/set id+))
-        {k' :k id+ :v all-ids :v-all} (apply-relation-key-info relation ids)
+        {k' :k id+ :v all-ids :v-all} (apply-relation-key-info rel-opts relation ids)
         rel-opts (cond-> rel-opts
                    all-ids (assoc :pull/all-ids all-ids))
         xs (if pattern
@@ -430,9 +451,18 @@
      - input map has keys `:pull/ctx` and `:pull/concept`
      - `:pull/concept` is the current concept being built up
 
+  `:pull/paginator`
+     - 2 aritiy fn to apply custom pagination logic
+     - first arg is a map with keys `:pull/ctx`, and whatever was passed as `opts` when invoked for the top level
+       and other keys such as `:pull/key` `:pull/key-opts` when invoked for paginating a to-many relation
+     - second args is an int array of conceptual db ids
+
   `opts`
-     - optional map of keys `sort` and `sort-by`"
-  [{:keys [pull/concept-finalizer] :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+ & {:keys [sort sort-by] :as opts}]
+     - optional map of keys `sort`, `sort-by`, `page` and `max-page-size`"
+  [{:keys [pull/concept-finalizer
+           pull/paginator]
+    :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+ &
+   {:keys [sort sort-by page] :as opts}]
   (validate-sort-params nil sort sort-by)
   (let [{:keys [sort sort-by]} (conform-sort-params opts)
         {:keys [pull/key-infos pull/relations]} parsed-pattern
@@ -449,9 +479,13 @@
                              rm-db-id? (dissoc c :db/id)))))
         one? (int? id+)
         ids (if one? [id+] id+)
-        ids (if sort-by
-              (apply-sort sort sort-by ids)
-              ids)
+        ids (cond->> ids
+              sort-by (apply-sort sort sort-by))
+        ids (if-not page
+              ids
+              (if paginator
+                (paginator (merge cb-opts opts) ids)
+                (default-paginator opts ids)))
         cs (into [] xform ids)]
     (cond-> cs
       one? first)))

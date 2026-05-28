@@ -1,8 +1,9 @@
 (ns conceptual.int-sets
   "Functions in this namespace are non-lazy by default."
-  (:refer-clojure :exclude [= contains? conj disj filter map mapcat remove set take])
-  (:import (conceptual.util IntegerSets IntArrayList)
-           (java.util Arrays)))
+  (:refer-clojure :exclude [= contains? conj disj empty? filter map mapcat not-empty remove set take])
+  (:import
+   (conceptual.util IntegerSets IntArrayList)
+   (java.util Arrays)))
 
 (set! *warn-on-reflection* true)
 
@@ -11,6 +12,16 @@
 (defn int-array?
   [x]
   (clojure.core/= int/1 (class x)))
+
+(defn empty?
+  [x]
+  (if x
+    (zero? (alength ^int/1 x))
+    true))
+
+(defn not-empty
+  [x]
+  (if (empty? x) nil x))
 
 (defn- chunked-reduce
   "Acts similarly to reduce except f is passed chunk-size number of
