@@ -9,8 +9,6 @@
    [expectations.clojure.test :refer [expect]])
   (:import (clojure.lang ExceptionInfo)))
 
-
-
 (use-fixtures :each test.core/with-rdb)
 
 (defmacro expect-error
@@ -37,7 +35,7 @@
                     :value [:type/numbers-coll #{23 42}]}]
           (s/conform ::f/op-sexp '(contains? foo/bar [23 42])))
 
-  (expect false (s/valid? ::f/op-sexp '(-> 23 foo/bar)))
+  (expect true (s/valid? ::f/op-sexp '(-> 23 foo/bar)))
   (expect false (s/valid? ::f/op-sexp '(= 23 foo/bar 45)))
 
   (expect false (s/valid? ::f/sexp '(and ((= foo/bar 23))))))
@@ -118,9 +116,11 @@
 (defn eval-sexp
   ([sexp] (eval-sexp sexp (test-db-ids)))
   ([sexp init-ids]
-   (eval-sexp {} sexp init-ids))
-  ([ctx sexp init-ids]
-   (->> (f/evaluate ctx sexp init-ids)
+   (eval-sexp {} (f/get-registry) sexp init-ids))
+  ([ctx registry sexp]
+   (eval-sexp ctx registry sexp (test-db-ids)))
+  ([ctx registry sexp init-ids]
+   (->> (f/evaluate ctx registry sexp init-ids)
         (map (partial c/value :test/id))
         set)))
 
@@ -547,106 +547,69 @@
         field-custom-fn (fn [_ctx _filter-info ids]
                           (vswap! field-counter inc)
                           ids)
-        context-custom-fn (fn [_ctx _filter-info ids]
-                            (vswap! context-counter inc)
-                            ids)]
-    (try
-      ;; register methods that just returns ids and increments counter
-      (defmethod f/custom-reducer '[= test/int] [_ _] tuple-custom-fn)
-      (defmethod f/custom-reducer 'test/string [_ _] field-custom-fn)
-      (defmethod f/custom-reducer 'test/keyword [{:keys [custom?]} _]
-        (when custom? context-custom-fn))
+        context-custom-fn (fn [{:keys [custom?] :as _ctx} _filter-info ids]
+                            (when custom?
+                              (vswap! context-counter inc)
+                              ids))
+        registry (-> (f/new-registry)
+                     (f/register-reducer! '[= test/int] tuple-custom-fn)
+                     (f/register-reducer! 'test/string field-custom-fn)
+                     (f/register-reducer! 'test/keyword context-custom-fn))]
 
-      (expect #{:hello/there :hello/world :hello/friend :hello/dude}
-              (eval-sexp '(= test/int 3456)))
-      (expect 1 @tuple-counter)
+    (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+            (eval-sexp {} registry '(= test/int 3456)))
+    (expect 1 @tuple-counter)
 
-      (expect #{:hello/there :hello/world :hello/friend :hello/dude}
-              (eval-sexp '(= test/string "non-existing-value")))
-      (expect 1 @field-counter)
+    (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+            (eval-sexp {} registry '(= test/string "non-existing-value")))
+    (expect 1 @field-counter)
 
+    (testing "reducer with context"
+      (binding [f/*enable-index-scan* true]
+        ;; as expected no matching value
+        (expect #{} (eval-sexp {:custom? false} registry '(= test/keyword :non-existent-ii3j8ejafajeija)))
 
-      (testing "custom-reducer with context"
-        (binding [f/*enable-index-scan* true]
-          ;; as expected no matching value
-          (expect #{} (eval-sexp {:custom? false} '(= test/keyword :non-existent-ii3j8ejafajeija) (test-db-ids)))
+        (expect 0 @context-counter)
 
-          (expect 0 @context-counter)
-
-          ;; custom reducer invoked that returns all ids passed in
-          (expect #{:hello/there :hello/world :hello/friend :hello/dude}
-                  (eval-sexp {:custom? true} '(= test/keyword :non-existent-ii3j8ejafajeija) (test-db-ids)))
-          (expect 1 @context-counter)))
-
-      (finally
-        (remove-method f/custom-reducer '[= test/int])
-        (remove-method f/custom-reducer 'test/string)
-        (remove-method f/custom-reducer 'test/keyword)))))
+        ;; reducer invoked that returns all ids passed in
+        (expect #{:hello/there :hello/world :hello/friend :hello/dude}
+                (eval-sexp {:custom? true} registry '(= test/keyword :non-existent-ii3j8ejafajeija)))
+        (expect 1 @context-counter)))))
 
 
 (deftest custom-op-val-form-test
   (let [search-counter (volatile! 0)
         search-op-fn (fn [_ctx _filter-info ids]
                        (vswap! search-counter inc)
-                       ids)]
-
-    (expect false (s/valid? ::f/sexp '(search "hello")))
-    (try
-      ;; register methods that just returns ids and increments counter
-      (defmethod f/custom-op? 'search [_] true)
-      (defmethod f/custom-op-reducer 'search [_ _] search-op-fn)
-
-      (f/evaluate '(search "hello") (int-array []))
-
-      (expect 1 @search-counter)
-
-      (finally
-        (remove-method f/custom-op? 'search)
-        (remove-method f/custom-op-reducer 'search)))))
-
-
+                       ids)
+        registry (-> (f/new-registry)
+                     (f/register-op! 'search search-op-fn))]
+    (expect true (s/valid? ::f/sexp '(search "hello")))
+    (f/evaluate registry '(search "hello") i/+empty+)
+    (expect 1 @search-counter)))
 
 (deftest custom-op-form-test
   (let [full-moon-counter (volatile! 0)
         full-moon-op-fn (fn [_ctx _filter-info ids]
                           (vswap! full-moon-counter inc)
-                          ids)]
+                          ids)
+        registry (-> (f/new-registry)
+                     (f/register-op! 'full-moon? full-moon-op-fn))]
 
-    (expect false (s/valid? ::f/sexp '(full-moon?)))
-    (try
-      ;; register methods that just returns ids and increments counter
-      (defmethod f/custom-op? 'full-moon? [_] true)
-      (defmethod f/custom-op-reducer 'full-moon? [_ _] full-moon-op-fn)
-
-      (f/evaluate '(full-moon?) (int-array []))
-
-      (expect 1 @full-moon-counter)
-
-      (finally
-        (remove-method f/custom-op? 'full-moon?)
-        (remove-method f/custom-op-reducer 'full-moon?)))))
-
-
+    (expect true (s/valid? ::f/sexp '(full-moon?)))
+    (f/evaluate registry '(full-moon?) i/+empty+)
+    (expect 1 @full-moon-counter)))
 
 (deftest namespaced-custom-op-form-test
   (let [full-moon-counter (volatile! 0)
         full-moon-op-fn (fn [_ctx _filter-info ids]
                           (vswap! full-moon-counter inc)
-                          ids)]
-
-    (expect false (s/valid? ::f/sexp '(astro/full-moon?)))
-    (try
-      ;; register methods that just returns ids and increments counter
-      (defmethod f/custom-op? 'astro/full-moon? [_] true)
-      (defmethod f/custom-op-reducer 'astro/full-moon? [_ _] full-moon-op-fn)
-
-      (f/evaluate '(astro/full-moon?) (int-array []))
-
-      (expect 1 @full-moon-counter)
-
-      (finally
-        (remove-method f/custom-op? 'astro/full-moon?)
-        (remove-method f/custom-op-reducer 'astro/full-moon?)))))
+                          ids)
+        registry (-> (f/new-registry)
+                     (f/register-op! 'astro/full-moon? full-moon-op-fn))]
+    (expect true (s/valid? ::f/sexp '(astro/full-moon?)))
+    (f/evaluate registry '(astro/full-moon?) i/+empty+)
+    (expect 1 @full-moon-counter)))
 
 
 (deftest unknown-field-as-predicate-test
