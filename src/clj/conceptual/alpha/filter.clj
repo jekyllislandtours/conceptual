@@ -5,6 +5,36 @@
    [conceptual.core :as c]
    [conceptual.int-sets :as i]))
 
+
+(def ^:no-doc ^:dynamic *registry* (atom {}))
+
+(defn new-registry
+  "Create a new empty registry"
+  []
+  {:conceptual.filter/reducers {}
+   :conceptual.filter/ops {}})
+
+(defn register-reducer!
+  "`k` is either a field or a tuple `[op field]` and `f` is a
+  3-arity function that takes a `ctx`, `filter-info` and `ids` is a sorted int set."
+  ([k f]
+   (swap! *registry* register-reducer! k f))
+  ([registry k f]
+   (assoc-in registry [:conceptual.filter/reducers k] f)))
+
+(defn register-op!
+  "`op` is a custom operation and `f` is a
+  3-arity function that takes a `ctx`, `filter-info` and `ids` is a sorted int set"
+  ([op f]
+   (swap! *registry* register-op! op f))
+  ([registry op f]
+   (assoc-in registry [:conceptual.filter/ops op] f)))
+
+(defn get-registry
+  []
+  @*registry*)
+
+
 ;; prevent slow index scans by default
 (def ^:dynamic *enable-index-scan* false)
 
@@ -20,19 +50,19 @@
 
 (def +operators+ (set/union +comparison-operators+ +set-operators+))
 
+(def +boolean-operators+ '#{and or})
+(s/def ::boolean-op +boolean-operators+)
 
-(defmulti custom-op? identity)
-(defmethod custom-op? :default [_] false)
+(defn custom-op?
+  [x]
+  (and (symbol? x)
+       (not (+boolean-operators+ x))))
 
 (s/def ::op (s/or :op/comparison +comparison-operators+
                   :op/set +set-operators+
                   :op/custom custom-op?))
 
-(def +boolean-operators+ '#{and or})
-(s/def ::boolean-op +boolean-operators+)
-
 (s/def ::field qualified-symbol?)
-
 
 (def +scalar-types+
   #{:type/string :type/keyword :type/boolean :type/number})
@@ -288,26 +318,13 @@
    'exists? exists-reducer})
 
 
-(defmulti custom-reducer
-  "Dispatch is off of a tuple [op-symbol field-symbol] or just a `field-symbol`.
-  This should return either `nil` or a fn that takes in a `ctx`, `filter-info` and `ids`
-  and returns modified `ids`. `nil` return value implies using the default logic.
-  The `ctx` has key `::sexp` which is the conformed s-expression."
-  (fn [_ctx tuple-or-sym] tuple-or-sym))
-
-(defmethod custom-reducer :default [_ _] nil)
-
-
-(defmulti custom-op-reducer (fn [_ctx op-sym] op-sym))
-(defmethod custom-op-reducer :default [_ op-sym]
-  (throw (ex-info "no custom-op-reducer method for dispatch op" {:op op-sym})))
-
 (defn lookup-reducer
   [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
-  (let [ctx (assoc ctx ::sexp filter-expr)]
-    (or (custom-reducer ctx [op field])
-        (custom-reducer ctx field)
-        (when (= :op/custom op-type) (custom-op-reducer ctx op))
+  (let [ctx (assoc ctx ::sexp filter-expr)
+        registry (::registry ctx)]
+    (or (get-in registry [:conceptual.filter/reducers [op field]])
+        (get-in registry [:conceptual.filter/reducers field])
+        (when (= :op/custom op-type) (get-in registry [:conceptual.filter/ops op]))
         (cond
           (= :op/set op-type) (+set-op->reducer-fn+ op)
           (-> field keyword c/seek :db/tag?) tag-reducer
@@ -359,14 +376,18 @@
   ([conformed-sexp init-ids]
    (evaluate-sexp {} conformed-sexp init-ids))
   ([ctx conformed-sexp init-ids]
-   (evaluate-sexp ctx conformed-sexp init-ids)))
+   (evaluate-conformed ctx (get-registry) conformed-sexp init-ids))
+  ([ctx registry conformed-sexp init-ids]
+   (evaluate-sexp (assoc ctx ::registry registry) conformed-sexp init-ids)))
 
 (defn evaluate
-  "`sexp` is an s-expression. `init-ids` is a sorted int array"
+  "`sexp` is an s-expression. `init-ids` is a sorted int array, `ctx` is a map."
   ([sexp init-ids]
-   (evaluate {} sexp init-ids))
-  ([ctx sexp init-ids]
-   (evaluate-conformed ctx (conform sexp) init-ids)))
+   (evaluate (get-registry) sexp init-ids))
+  ([registry sexp init-ids]
+   (evaluate {} registry sexp init-ids))
+  ([ctx registry sexp init-ids]
+   (evaluate-conformed ctx registry (conform sexp) init-ids)))
 
 
 (defn error-code
