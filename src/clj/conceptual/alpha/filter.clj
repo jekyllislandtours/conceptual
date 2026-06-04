@@ -3,8 +3,10 @@
    [clojure.spec.alpha :as s]
    [clojure.set :as set]
    [conceptual.core :as c]
-   [conceptual.int-sets :as i]))
+   [conceptual.int-sets :as i])
+  (:import (conceptual.util IntArrayList)))
 
+(set! *warn-on-reflection* true)
 
 (def ^:no-doc ^:dynamic *registry* (atom {}))
 
@@ -42,21 +44,23 @@
   [enabled?]
   (alter-var-root #'*enable-index-scan* (constantly enabled?)))
 
-(def +comparison-operators+
+(def ^:no-doc ^:private +comparison-operators+
   '#{= > >= < <= not=})
 
-(def +set-operators+
-  '#{contains? not-contains? intersects? subset? superset? exists?})
+(def ^:no-doc ^:private +set-operators+
+  '#{contains? intersects? subset? superset? exists?})
 
-(def +operators+ (set/union +comparison-operators+ +set-operators+))
-
-(def +boolean-operators+ '#{and or})
+(def ^:private +boolean-operators+ '#{and or})
 (s/def ::boolean-op +boolean-operators+)
 
-(defn custom-op?
+(s/def ::not #{'not})
+
+(def ^:no-doc ^:private +logical-operators+ (conj +boolean-operators+ 'not))
+
+(defn- custom-op?
   [x]
   (and (symbol? x)
-       (not (+boolean-operators+ x))))
+       (not (+logical-operators+ x))))
 
 (s/def ::op (s/or :op/comparison +comparison-operators+
                   :op/set +set-operators+
@@ -64,7 +68,7 @@
 
 (s/def ::field qualified-symbol?)
 
-(def +scalar-types+
+(def ^:no-doc ^:private +scalar-types+
   #{:type/string :type/keyword :type/boolean :type/number})
 
 (s/def ::value
@@ -110,17 +114,32 @@
   (s/and list? (s/+ ::op-sexp)))
 
 
+;; negation has one and only one s-expr
+;; :single/sexp does not have `:sexp/no ::not-sexp` because we don't want to support double negatives
+;; ie `(not (not some/tag?))` is not supported because it is the same as `some/tag?`
+(s/def ::not-sexp
+  (s/and list? (s/cat :op/not ::not
+                      :single/sexp (s/or :sexp/logical ::logical-sexp
+                                         :sexp/op ::op-sexp
+                                         :sexp/field ::field))))
+
+
+;; logical sexps can have more than s-exprs
 (s/def ::logical-sexp
   (s/and list? (s/cat :op/boolean ::boolean-op
                       :list/sexp (s/+ (s/or :sexp/logical ::logical-sexp
                                             :sexp/op ::op-sexp
-                                            :sexp/field ::field)))))
+                                            :sexp/field ::field
+                                            :sexp/not ::not-sexp)))))
+
+
 
 (s/def ::sexp
   (s/or :sexp/logical ::logical-sexp
+        :sexp/not ::not-sexp
         :sexp/op ::op-sexp))
 
-(def +comparison-operator->fn+
+(def ^:no-doc ^:private +comparison-operator->fn+
   {'= = '> > '>= >= '< < '<= <= 'not= not=})
 
 
@@ -128,7 +147,7 @@
   [sexp]
   (cond
     (qualified-symbol? sexp) (list 'and sexp)
-    (#{'or 'and} (first sexp)) sexp
+    (+logical-operators+ (first sexp)) sexp
     :else (list 'and sexp)))
 
 (defn conform
@@ -143,7 +162,7 @@
                        :explanation (s/explain-data ::sexp sexp)})))
     ans))
 
-(defn filter-expr-value-collection?
+(defn- filter-expr-value-collection?
   [{[val-type] :filter/value}]
   (contains? #{:type/strings-coll
                :type/strings-set
@@ -158,23 +177,23 @@
     :keys [field-xform]
     :or {field-xform identity}}
    init-ids]
-  (let [field (keyword field)]
-    (loop [[id & ids] init-ids
-           ans (transient [])]
+  (let [field (keyword field)
+        ans (IntArrayList/new)]
+    (loop [[id & ids] init-ids]
       (if-not id
-        (-> ans persistent! int-array)
+        (.toSortedIntSet ans)
         (if-some [found (c/value field id)]
           (let [found (field-xform found)
                 outcome? (case sexp-type
                            :sexp/op-field-val (pred found the-value)
-                           :sexp/op-val-field (pred the-value found))
-                ans (cond-> ans
-                      outcome? (conj! id))]
-            (recur ids ans))
-          (recur ids ans))))))
+                           :sexp/op-val-field (pred the-value found))]
+            (when outcome?
+              (.add ans ^int id))
+            (recur ids))
+          (recur ids))))))
 
 
-(defn index-scan-filter
+(defn- index-scan-filter
   "`init-ids` is the starting sorted int set, could be nil.
   NB negations ie not= only operate on concepts that have the field
   for performance reasons."
@@ -191,7 +210,7 @@
     (filter-ids pred filter-info ids)))
 
 
-(defn collection?
+(defn- collection?
   [field]
   (some->> field keyword c/seek :db/type class (.isAssignableFrom (class clojure.lang.IPersistentCollection))))
 
@@ -237,10 +256,6 @@
                  :sexp/op-field-val contains?-reducer-coll-sym-scalar-val)]
      (in-fn ctx pred filter-info ids))))
 
-
-(defn not-contains?-reducer
-  [ctx filter-info ids]
-  (contains?-reducer ctx (complement contains?) filter-info ids))
 
 (defn- set-op-reducer
   [ctx pred {[_op-type op] :filter/op field :filter/field [_v-type] :filter/value :as filter-info} ids]
@@ -309,16 +324,15 @@
                                                       :field field})))
   (i/intersection ids (c/ids (keyword field))))
 
-(def +set-op->reducer-fn+
+(def ^:no-doc ^:private +set-op->reducer-fn+
   {'contains? contains?-reducer
-   'not-contains? not-contains?-reducer
    'intersects? intersection-reducer
    'subset? subset-reducer
    'superset? superset-reducer
    'exists? exists-reducer})
 
 
-(defn lookup-reducer
+(defn- lookup-reducer
   [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
   (let [ctx (assoc ctx ::sexp filter-expr)
         registry (::registry ctx)]
@@ -335,7 +349,7 @@
 
 
 
-(defmulti evaluate-sexp (fn [_ctx conformed-sexp _ids] (first conformed-sexp)))
+(defmulti ^:no-doc ^:private evaluate-sexp (fn [_ctx conformed-sexp _ids] (first conformed-sexp)))
 
 (defmethod evaluate-sexp :sexp/op
   [ctx [_ [op-sexp-type filter-info]] ids]
@@ -347,22 +361,29 @@
   ;; same logic as (exists? field)
   (i/intersection ids (c/ids (keyword field))))
 
-(defn and-sexps
+
+(defmethod evaluate-sexp :sexp/not
+  [ctx [_ {:keys [single/sexp]}] ids]
+  (i/difference ids (evaluate-sexp ctx sexp ids)))
+
+(defn- and-sexps
   [ctx sexp-info init-ids]
   (loop [[sexp & more] (:list/sexp sexp-info)
          ids init-ids]
-    (if-not sexp
-      ids
+    (if sexp
       ;; need this intersection because sexp might be an or expr for example
-      (recur more (i/intersection ids (evaluate-sexp (assoc ctx ::anding? true) sexp ids))))))
+      (recur more (i/intersection ids (evaluate-sexp (assoc ctx ::anding? true) sexp ids)))
+      ids)))
 
-(defn or-sexps
+(defn- or-sexps
   [ctx sexp-info init-ids]
-  (loop [[sexp & more] (:list/sexp sexp-info)
-         ids-coll []]
-    (if-not sexp
-      (apply i/union ids-coll)
-      (recur more (conj ids-coll (evaluate-sexp (dissoc ctx ::anding?) sexp init-ids))))))
+  (let [ans (IntArrayList/new)] ;; more performant to use IntArrayList then apply i/union
+    (loop [[sexp & more] (:list/sexp sexp-info)]
+      (if sexp
+        (do
+          (.addAll ans ^int/1 (evaluate-sexp (dissoc ctx ::anding?) sexp init-ids))
+          (recur more))
+        (.toSortedIntSet ans)))))
 
 (defmethod evaluate-sexp :sexp/logical
   [ctx [_ sexp-info] init-ids]
@@ -370,7 +391,6 @@
     (case boolean-op
       and (and-sexps ctx sexp-info init-ids)
       or (or-sexps ctx sexp-info init-ids))))
-
 
 (defn evaluate-conformed
   ([conformed-sexp init-ids]

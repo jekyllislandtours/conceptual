@@ -41,11 +41,45 @@
   (expect false (s/valid? ::f/sexp '(and ((= foo/bar 23))))))
 
 
+
+(deftest not-sexp-test
+  (expect true (s/valid? ::f/not-sexp '(not a/tag?)))
+  (expect true (s/valid? ::f/not-sexp '(not (= foo/bar 5))))
+  ;; don't support double/triple etc negatives
+  (expect false (s/valid? ::f/not-sexp '(not (not sf/android?))))
+  (expect false (s/valid? ::f/not-sexp '(not (not (not sf/android?)))))
+  ;; one and only one item to the right of the 'not
+  (expect false (s/valid? ::f/not-sexp '(not)))
+  (expect false (s/valid? ::f/not-sexp '(not a/tag? b/tag?)))
+  (expect false (s/valid? ::f/not-sexp '(not (and a/tag? b/tag?)
+                                             (or foo/tag?)))))
+
+
+(deftest not-sexp-conform-test
+  (expect {:op/not 'not
+           :single/sexp [:sexp/field 'a/tag?]}
+          (s/conform ::f/not-sexp '(not a/tag?)))
+
+  (expect {:op/not 'not
+           :single/sexp [:sexp/op [:sexp/op-field-val {:filter/field 'foo/bar
+                                                       :filter/op [:op/comparison '=]
+                                                       :filter/value [:type/number 5]}]]}
+          (s/conform ::f/not-sexp '(not (= foo/bar 5))))
+
+  (expect {:op/not 'not
+           :single/sexp [:sexp/op [:sexp/op-val {:filter/op [:op/custom 'search]
+                                                 :filter/value [:type/string "meow"]}]]}
+          (s/conform ::f/not-sexp '(not (search "meow")))))
+
+
 (deftest logical-sexp-test
   (expect true (s/valid? ::f/logical-sexp '(and a/tag?)))
   (expect true (s/valid? ::f/logical-sexp '(and a/tag? b/tag?)))
   (expect true (s/valid? ::f/logical-sexp '(and a/tag? foo/bar)))
-  (expect true (s/valid? ::f/logical-sexp '(and a/tag? foo/bar (exists? hello/bye)))))
+  (expect true (s/valid? ::f/logical-sexp '(and a/tag? foo/bar (exists? hello/bye))))
+  (expect true (s/valid? ::f/logical-sexp '(or b/tag? (not a/tag?))))
+  (expect true (s/valid? ::f/logical-sexp '(or b/tag? (not a/tag?))))
+  (expect false (s/valid? ::f/logical-sexp '(meow))))
 
 
 (deftest logical-sexp-conform-test
@@ -65,11 +99,11 @@
                                                   :filter/field 'hello/bye}]]]}
           (s/conform ::f/logical-sexp '(and a/tag? b/tag? (exists? hello/bye)))))
 
-
 (deftest normalize-test
   (expect '(and (= foo/bar 23)) (f/normalize '(= foo/bar 23)))
   (expect '(and (= foo/bar 23)) (f/normalize '(and (= foo/bar 23))))
   (expect '(or (= foo/bar 23)) (f/normalize '(or (= foo/bar 23))))
+  (expect '(not (= foo/bar 23)) (f/normalize '(not (= foo/bar 23))))
   (expect '(and foo/bar) (f/normalize 'foo/bar))
   ;; not semantically correct but the output is acceptable
   (expect '(and ((= foo/bar 23))) (f/normalize '((= foo/bar 23)))))
@@ -250,7 +284,6 @@
       (expect-error ::f/scalar-value-required
               (eval-sexp '(contains? test/int [3456]))))))
 
-
 (deftest contains?-sym-is-coll-test
   (binding [f/*enable-index-scan* true]
     (expect #{:hello/dude}
@@ -258,46 +291,12 @@
 
     (testing "val should be a scalar"
       (expect-error ::f/scalar-value-required
-              (eval-sexp '(contains? test/collection [300]))))
+                    (eval-sexp '(contains? test/collection [300]))))
 
     (testing "collection required as first arg to contains?"
       (expect-error ::f/collection-required
-              (eval-sexp '(contains? 300 test/collection))))))
+                    (eval-sexp '(contains? 300 test/collection))))))
 
-(deftest not-contains?-test
-  (binding [f/*enable-index-scan* true]
-    (testing "not-contains? 1 int"
-      (expect #{:hello/there :hello/world}
-              (eval-sexp '(not-contains? [3456] test/int))))
-
-    (testing "not-contains? multiple ints"
-      (expect #{:hello/there}
-              (eval-sexp '(not-contains? [3456 1234] test/int))))
-
-    (testing "not-contains? 1 string"
-      (expect #{:hello/friend :hello/there :hello/dude}
-              (eval-sexp '(not-contains? ["World"] test/string))))
-
-    (testing "not-contains? multiple strings"
-      (expect #{:hello/friend :hello/there}
-              (eval-sexp '(not-contains? ["World" "Dude"] test/string))))
-
-    (testing "scalar required for 2nd arg to not-contains?"
-      (expect-error ::f/scalar-value-required
-              (eval-sexp '(not-contains? test/int [3456]))))))
-
-(deftest not-contains?-sym-is-coll-test
-  (binding [f/*enable-index-scan* true]
-    (expect #{:hello/there :hello/world :hello/friend}
-            (eval-sexp '(not-contains? test/collection 300)))
-
-    (testing "val should be a scalar"
-      (expect-error ::f/scalar-value-required
-              (eval-sexp '(not-contains? test/collection [300]))))
-
-    (testing "wrong order"
-      (expect-error ::f/collection-required
-              (eval-sexp '(not-contains? 300 test/collection))))))
 
 (deftest intersects?-test
   (binding [f/*enable-index-scan* true]
@@ -649,3 +648,22 @@
   (expect #{"uss-e" "uss-d"} (eval-sf-sexp 'sf/team-ids))
   (expect #{"uss-e" "uss-d" "bev-crusher" "yar"} (eval-sf-sexp '(or sf/position sf/team-ids)))
   (expect #{} (eval-sf-sexp '(and sf/position sf/team-ids))))
+
+
+(deftest not-test
+  (let [non-android-ids (->> (c/ids :sf/android?)
+                             (i/difference (c/ids :sf/id))
+                             (c/mapv :sf/id)
+                             set)]
+
+    (expect false (contains? non-android-ids "data"))
+
+    (testing "not with a field/tag"
+      (expect non-android-ids (eval-sf-sexp '(not sf/android?))))
+
+    (testing "not not is unsupported syntax"
+      (expect-error ::f/invalid-syntax (eval-sf-sexp '(not (not sf/android?)))))
+
+    (binding [f/*enable-index-scan* true]
+      (expect non-android-ids (eval-sf-sexp '(not (contains? ["data"] sf/id))))
+      (expect non-android-ids (eval-sf-sexp '(not (= "data" sf/id)))))))
