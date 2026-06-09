@@ -335,7 +335,8 @@
 (defn- lookup-reducer
   [ctx {[op-type op] :filter/op field :filter/field :as filter-expr}]
   (let [ctx (assoc ctx ::sexp filter-expr)
-        registry (::registry ctx)]
+        registry (or (::registry ctx)
+                     (get-registry))]
     (or (get-in registry [:conceptual.filter/reducers [op field]])
         (get-in registry [:conceptual.filter/reducers field])
         (when (= :op/custom op-type) (get-in registry [:conceptual.filter/ops op]))
@@ -396,7 +397,7 @@
   ([conformed-sexp init-ids]
    (evaluate-sexp {} conformed-sexp init-ids))
   ([ctx conformed-sexp init-ids]
-   (evaluate-conformed ctx (get-registry) conformed-sexp init-ids))
+   (evaluate-conformed ctx (or (::registry ctx) (get-registry)) conformed-sexp init-ids))
   ([ctx registry conformed-sexp init-ids]
    (evaluate-sexp (assoc ctx ::registry registry) conformed-sexp init-ids)))
 

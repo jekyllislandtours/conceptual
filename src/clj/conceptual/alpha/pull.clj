@@ -371,7 +371,7 @@
          f-sexp :filter} key-opts
         many? (a/int-array? id+)
         v (if (and many? f-sexp)
-            (c.filter/evaluate-conformed f-sexp id+)
+            (c.filter/evaluate-conformed (:pull/filter-ctx rel-opts) f-sexp id+)
             id+)
         ;; must sort before paginate and only valid for to-many relations
         v (if (and many? -sort-by)
@@ -385,7 +385,7 @@
 
 
 (defn reify-relations*
-  [{:keys [pull/relation-value pull/relation-finalizer]
+  [{:keys [pull/relation-value pull/relation-finalizer pull/filter-ctx]
     :or {relation-value default-value
          relation-finalizer :pull/concept} :as ctx}
    {:keys [pull/key pull/key-id pull/key-opts pull/pattern pull.virtual-attribute/resolver-fn] :as relation} c]
@@ -398,6 +398,7 @@
                   :pull/concept c
                   :pull/depth depth
                   :pull/reified-relation? (some? pattern)
+                  :pull/filter-ctx filter-ctx
                   :db/id (:db/id c)}
         id+ (if resolver-fn
               (resolver-fn rel-opts)
@@ -460,7 +461,8 @@
   `opts`
      - optional map of keys `sort`, `sort-by`, `page` and `max-page-size`"
   [{:keys [pull/concept-finalizer
-           pull/paginator]
+           pull/paginator
+           pull/filter-ctx]
     :or {concept-finalizer default-finalizer} :as ctx} parsed-pattern id+ &
    {:keys [sort sort-by page] :as opts}]
   (validate-sort-params nil sort sort-by)
@@ -468,8 +470,9 @@
         {:keys [pull/key-infos pull/relations]} parsed-pattern
         ks (set (map :pull/key key-infos))
         rm-db-id? (not (contains? ks :db/id))
-        cb-opts {:pull/ctx ctx
-                 :pull/parsed-pattern parsed-pattern}
+        cb-opts (cond-> {:pull/ctx ctx
+                         :pull/parsed-pattern parsed-pattern}
+                  filter-ctx (assoc :pull/filter-ctx filter-ctx))
         xform (comp (map (fn [id] {:db/id id}))
                     (map (partial assoc-all-kvs ctx key-infos))
                     (map (partial reify-relations ctx relations))
