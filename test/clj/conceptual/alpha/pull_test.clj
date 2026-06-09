@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest use-fixtures testing]]
    [conceptual.test.core :as test.core]
    [conceptual.core :as c]
+   [conceptual.alpha.filter :as c.filter]
    [conceptual.int-sets :as i]
    [conceptual.alpha.pull :as pull]
    [expectations.clojure.test :refer [expect]]))
@@ -809,6 +810,53 @@
                                        :filter '$x}]
                                      [:sf/id :sf/name]}]}])
                      (->db-id "uss-e"))))
+
+
+;; tests that the filter ctx is passed along
+(deftest relation-filter-registry-test
+  (let [search-counter (volatile! 0)
+        search-op-fn (fn [_ctx _filter-info _ids]
+                       (vswap! search-counter inc)
+                       (i/set [(->db-id "picard")]))
+        registry (-> (c.filter/new-registry)
+                     (c.filter/register-op! 'search search-op-fn))
+        f (fn [filter-registry]
+            (pull/pull (cond-> {:pull/relation-value id-resolver}
+                         filter-registry (assoc :pull/filter-ctx {::c.filter/registry filter-registry}))
+                       (pull/parse {:pull/relation? sf-relation?}
+                                   [:sf/id
+                                    :sf/name
+                                    {[:sf/captain-id {:as :sf/captain}] [:sf/id :sf/name]}
+                                    {[:sf/team-ids {:as :sf/teams :limit 3}]
+                                     [:sf/id
+                                      :sf/name
+                                      {[:sf/member-ids
+                                        {:as :sf/members
+                                         :filter '(search "jean")}]
+                                       [:sf/id :sf/name]}]}])
+                       (->db-id "uss-e")))]
+    ;; since no registry
+    (expect Exception (f nil))
+
+    ;; counter is zero initially
+    (expect zero? @search-counter)
+
+    (expect {:sf/id "uss-e"
+             :sf/name "USS Enterprise"
+             :sf/captain {:sf/id "picard"
+                          :sf/name "Jean-Luc Picard"}
+             :sf/teams [{:sf/id "uss-e-bridge-team"
+                         :sf/name "Bridge Team"
+                         :sf/members [{:sf/id "picard" :sf/name "Jean-Luc Picard"}]}
+                        {:sf/id "uss-e-security-team"
+                         :sf/name "Security Team"
+                         :sf/members []}
+                        {:sf/id "uss-e-eng-team"
+                         :sf/name "Engineering Team"
+                         :sf/members []}]}
+            (f registry))
+    ;; counter has been updated so our registry was passed along
+    (expect pos? @search-counter)))
 
 
 (defn metadata-finalizer
